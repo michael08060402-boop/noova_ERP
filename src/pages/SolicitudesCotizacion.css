@@ -1,0 +1,218 @@
+/* ====================================================
+   SOLICITUDES DE COTIZACIÓN A PROVEEDORES
+   ==================================================== */
+
+.mensaje-flash {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid;
+}
+.mensaje-flash.mensaje-success {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #6ee7b7;
+}
+.mensaje-flash.mensaje-error {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+
+/* ── Tabs ── */
+.sc-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--gris-borde);
+}
+
+.sc-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1rem;
+  border: none;
+  background: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--texto-suave);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.sc-tab:hover {
+  color: var(--texto-oscuro);
+}
+
+.sc-tab-activa {
+  color: var(--azul-primario);
+  border-bottom-color: var(--azul-primario);
+}
+
+/* ── Botón enviar en tabla ── */
+.btn-enviar {
+  color: var(--azul-primario);
+}
+
+.btn-enviar:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Ítems de la solicitud (form) ── */
+.campo-ancho {
+  width: 100%;
+}
+
+.sc-items-tabla {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border: 1px solid var(--gris-borde);
+  border-radius: 8px;
+  padding: 0.75rem;
+  background: var(--gris-fondo);
+}
+
+.sc-items-header,
+.sc-items-fila {
+  display: grid;
+  grid-template-columns: 2.2fr 0.6fr 0.8fr 2fr 2rem;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.sc-items-header span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--texto-medio);
+  text-transform: uppercase;
+}
+
+.sc-items-fila input {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--gris-borde);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  background: #fff;
+}
+
+.sc-items-fila .btn-accion {
+  justify-self: center;
+}
+
+.sc-btn-agregar-item {
+  align-self: flex-start;
+  margin-top: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+@media (max-width: 768px) {
+  .sc-items-header {
+    display: none;
+  }
+  .sc-items-fila {
+    grid-template-columns: 1fr;
+    border-bottom: 1px dashed var(--gris-borde);
+    padding-bottom: 0.5rem;
+  }
+}
+
+/* ── Detalle de solicitud ── */
+.sc-detalle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.sc-detalle-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.sc-detalle-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--texto-medio);
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.sc-detalle-obs {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--texto-oscuro);
+}
+
+.sc-historial {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--gris-borde);
+}
+
+.sc-historial ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.82rem;
+  color: var(--texto-medio);
+}
+
+/* ── Vista previa del correo ── */
+.sc-preview-correo {
+  border: 1px solid var(--gris-borde);
+  border-radius: 8px;
+  padding: 1rem;
+  background: #fff;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* ── Plantilla de mensaje ── */
+.sc-detalle-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sc-link-plantilla {
+  background: none;
+  border: none;
+  color: var(--azul-primario);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.sc-link-plantilla:hover {
+  text-decoration: underline;
+}
+
+.campo-ancho textarea {
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--gris-borde);
+  border-radius: 8px;
+  resize: vertical;
+}
+
+.sc-spin {
+  animation: sc-girar 1s linear infinite;
+}
+@keyframes sc-girar {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

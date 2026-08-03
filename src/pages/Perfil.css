@@ -1,0 +1,116 @@
+/* ====================================================
+   PERFIL - Tarjeta de perfil de usuario
+   ==================================================== */
+
+.perfil-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1.5rem;
+  max-width: 700px;
+}
+
+/* ── LOGO NOOVA ── */
+.perfil-avatar-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-bottom: 1.25rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.perfil-logo {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.perfil-avatar-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.perfil-name {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.perfil-email {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+/* ── MENSAJES ── */
+.mensaje-flash {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid;
+}
+
+.mensaje-flash.mensaje-success {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #6ee7b7;
+}
+
+.mensaje-flash.mensaje-error {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+
+@media (max-width: 768px) {
+  .perfil-avatar-section {
+    flex-direction: column;
+    text-align: center;
+    align-items: center;
+  }
+}
+
+.email-solo-lectura-wrap {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.email-solo-lectura-wrap input {
+  flex: 1;
+}
+.email-edicion {
+  display: flex;
+  flex-direction: column;
+}
+.email-edicion input {
+  width: 100%;
+}
+
+.perfil-card + .perfil-card {
+  margin-top: 1.5rem;
+}
+
+/* ── SEGURIDAD / CONTRASEÑA ── */
+.perfil-seccion-titulo {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 1rem;
+}
+.password-solo-lectura-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.password-edicion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}

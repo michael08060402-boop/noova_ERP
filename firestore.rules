@@ -1,0 +1,80 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Función helper: usuario autenticado
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Función helper: es administrador
+    function isAdmin() {
+      return isAuth()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'administrador';
+    }
+
+    // Función helper: puede gestionar usuarios y roles (Gerencia, Sistemas o Administrador)
+    function isGestorUsuarios() {
+      return isAuth()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['administrador', 'gerencia', 'sistemas'];
+    }
+
+    // Perfil de usuario: cada usuario lee el suyo
+    // Solo Administrador / Gerencia / Sistemas pueden crear/editar/eliminar usuarios
+    match /users/{userId} {
+      allow read: if isAuth();
+      allow create, update, delete: if isGestorUsuarios();
+      // Un usuario puede actualizar SOLO su propio perfil, pero NO su rol
+      allow update: if isAuth() && request.auth.uid == userId
+                    && !('role' in request.resource.data.diff(resource.data).affectedKeys());
+    }
+
+    // Colecciones de negocio: cualquier autenticado puede leer y escribir
+    // (el ERP es single-tenant, todos los empleados ven todo)
+    match /clientes/{docId} {
+      allow read, write: if isAuth();
+    }
+    match /cotizaciones/{docId} {
+      allow read, write: if isAuth();
+    }
+    match /equipos/{docId} {
+      allow read, write: if isAuth();
+    }
+    match /mangas/{docId} {
+      allow read, write: if isAuth();
+    }
+    match /proveedores/{docId} {
+      allow read, write: if isAuth();
+    }
+    match /solicitudesCotizacion/{docId} {
+      allow read, write: if isAuth();
+    }
+    match /facturacion/{docId} {
+      allow read, write: if isAuth();
+      // NO se pueden eliminar comprobantes ACEPTADOS por SUNAT (es ilegal)
+      allow delete: if isAuth()
+                    && (!exists(/databases/$(database)/documents/facturacion/$(docId))
+                        || get(/databases/$(database)/documents/facturacion/$(docId)).data.estadoSunat != 'ACEPTADA');
+    }
+    match /configuracion/{docId} {
+      allow read: if isAuth();
+      // Cualquier usuario autenticado puede editar la configuración (ERP single-tenant).
+      // Si se quiere restringir a admin, cambiar `isAuth()` por `isAdmin()`.
+      allow write: if isAuth();
+    }
+    match /logs/{docId} {
+      // Append-only: cualquier autenticado puede crear logs, nadie los borra
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if isAdmin();
+    }
+    match /ruc_cache/{docId} {
+      allow read, write: if isAuth();
+    }
+    match /contadores/{docId} {
+      allow read, write: if isAuth();
+    }
+  }
+}

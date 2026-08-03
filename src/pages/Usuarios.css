@@ -1,0 +1,55 @@
+/* ====================================================
+   USUARIOS Y ROLES
+   ==================================================== */
+
+.mensaje-flash {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid;
+}
+.mensaje-flash.mensaje-success {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #6ee7b7;
+}
+.mensaje-flash.mensaje-error {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+
+.usuarios-select-rol {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--gris-borde);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  background: #fff;
+}
+
+.usuarios-select-rol:disabled {
+  background: var(--gris-fondo);
+  color: var(--texto-suave);
+  cursor: not-allowed;
+}
+
+.usuarios-tag-nube {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.usuarios-tag-nube-completo {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.fila-inactiva {
+  opacity: 0.55;
+}

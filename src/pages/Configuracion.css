@@ -1,0 +1,205 @@
+/* ====================================================
+   CONFIGURACIÓN - Pestañas y secciones
+   ==================================================== */
+
+/* ── LAYOUT DE CONFIGURACIÓN ── */
+.config-layout {
+  display: flex;
+  gap: 1.25rem;
+  align-items: flex-start;
+}
+
+/* ── PESTAÑAS LATERALES ── */
+.config-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 200px;
+  flex-shrink: 0;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.5rem;
+}
+
+.config-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.625rem 0.75rem;
+  border: none;
+  background: none;
+  color: #6b7280;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-align: left;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.config-tab:hover {
+  background: #f9fafb;
+  color: #1f2937;
+}
+
+.config-tab-activa {
+  background: #eff6ff;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.config-tab-activa:hover {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.tab-icon {
+  font-size: 1rem;
+  display: inline-flex;
+}
+
+/* ── CONTENIDO ── */
+.config-contenido {
+  flex: 1;
+  min-width: 0;
+}
+
+.config-seccion {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.seccion-titulo {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 0.5rem 0;
+}
+
+.seccion-pista {
+  font-size: 0.82rem;
+  color: #6b7280;
+  margin: 0 0 1rem 0;
+  line-height: 1.5;
+}
+
+.seccion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.separador-seccion {
+  margin: 1.5rem 0;
+  border: none;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* ── CONDICIONES DE PAGO ── */
+.condiciones-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.condicion-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.condicion-texto {
+  font-size: 0.875rem;
+  color: #1f2937;
+  font-weight: 500;
+}
+
+.btn-quitar-condicion {
+  background: none;
+  border: none;
+  color: #dc2626;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  transition: background 0.15s;
+}
+
+.btn-quitar-condicion:hover {
+  background: #fef2f2;
+}
+
+/* ── CORRELATIVO ── */
+.correlativo-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.75rem 1rem;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  border-radius: 6px;
+  margin-top: 0.5rem;
+}
+
+.preview-label {
+  font-size: 0.82rem;
+  color: #1e40af;
+  font-weight: 500;
+}
+
+.preview-value {
+  font-family: 'Courier New', monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.config-guardar {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ── BADGE DE ACCIÓN EN LOGS ── */
+.badge-accion {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  background: #f3f4f6;
+  color: #374151;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+}
+
+.texto-cargando {
+  padding: 1rem;
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+  .config-layout {
+    flex-direction: column;
+  }
+
+  .config-tabs {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .config-tab {
+    white-space: nowrap;
+  }
+}

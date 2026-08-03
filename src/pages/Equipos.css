@@ -1,0 +1,47 @@
+/* ====================================================
+   EQUIPOS - Estilos específicos
+   Lo general está en styles/shared.css
+   ==================================================== */
+
+/* ── BADGE DE CATEGORÍA ── */
+.badge-categoria {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  background: #eff6ff;
+  color: #2563eb;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1px solid #dbeafe;
+  white-space: nowrap;
+}
+
+/* ── INPUT CATEGORÍA PERSONALIZADA ── */
+/* Aparece debajo del select cuando el usuario elige "Otro (escribir...)" */
+.input-categoria-custom {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #2563eb;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  background: #eff6ff;
+  color: #1e40af;
+  box-sizing: border-box;
+  height: 40px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.input-categoria-custom:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+/* Asegura que los encabezados y celdas de la columna Precio estén alineados a la derecha */
+.tabla-datos th.texto-derecha,
+.tabla-datos td.texto-derecha {
+  text-align: right !important;
+}
