@@ -1,5 +1,7 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
-const admin = require('firebase-admin');
+const { initializeApp, getApps } = require('firebase-admin/app');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getAuth } = require('firebase-admin/auth');
 const { generarXmlUBL, SIG_ID } = require('./src/generarXml');
 const { firmarXml } = require('./src/firmarXml');
 const { enviarASunat } = require('./src/sunatClient');
@@ -14,9 +16,11 @@ const AdmZip = require('adm-zip');
 
 const TIPO_DOC_COD = { 'Factura': '01', 'Boleta': '03', 'Nota de Crédito': '07' };
 
-if (!admin.apps.length) {
-  admin.initializeApp();
+if (getApps().length === 0) {
+  initializeApp();
 }
+
+const db = getFirestore();
 
 const PERMISOS_POR_ROL = {
   administrador: ['dashboard', 'clientes', 'equipos', 'mangas', 'cotizaciones', 'mensajeria', 'proveedores', 'compras', 'facturacion', 'nube', 'usuarios', 'configuracion'],
@@ -30,7 +34,7 @@ const PERMISOS_POR_ROL = {
 };
 
 async function obtenerPerfilActivo(uid) {
-  const snapshot = await admin.firestore().collection('users').doc(uid).get();
+  const snapshot = await db.collection('users').doc(uid).get();
   if (!snapshot.exists || snapshot.data().activo === false) {
     throw new HttpsError('permission-denied', 'El usuario no tiene un perfil activo');
   }
@@ -116,7 +120,6 @@ function construirCodigo(prefijo, numero, longitud) {
 async function crearDocumentoCorrelativo({ request, coleccion, campoConfig, permiso, defaults, prepararDatos }) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
   const perfil = await exigirPermiso(request.auth.uid, permiso);
-  const db = admin.firestore();
   const configRef = db.collection('configuracion').doc('general');
 
   return db.runTransaction(async (transaction) => {
@@ -307,7 +310,7 @@ exports.ordenesCompraListar = onCall(
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
     await exigirPermiso(request.auth.uid, 'compras');
-    const snap = await admin.firestore().collection('ordenesCompra').orderBy('createdAt', 'desc').get();
+    const snap = await db.collection('ordenesCompra').orderBy('createdAt', 'desc').get();
     return { ordenes: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) };
   }
 );
@@ -319,12 +322,12 @@ exports.ordenCompraActualizar = onCall(
     await exigirPermiso(request.auth.uid, 'compras');
     const { id, orden } = request.data || {};
     if (!id || !orden) throw new HttpsError('invalid-argument', 'id y orden son requeridos');
-    const ref = admin.firestore().collection('ordenesCompra').doc(String(id));
+    const ref = db.collection('ordenesCompra').doc(String(id));
     const actual = await ref.get();
     if (!actual.exists) throw new HttpsError('not-found', 'La orden de compra no existe');
     const proveedorId = textoSeguro(orden.proveedorId, 150);
     if (!proveedorId) throw new HttpsError('invalid-argument', 'Selecciona un proveedor registrado');
-    const proveedorSnapshot = await admin.firestore().collection('proveedores').doc(proveedorId).get();
+    const proveedorSnapshot = await db.collection('proveedores').doc(proveedorId).get();
     if (!proveedorSnapshot.exists) throw new HttpsError('not-found', 'El proveedor seleccionado ya no existe');
     const proveedor = proveedorSnapshot.data();
     if (proveedor.activo === false && actual.data().proveedorId !== proveedorId) {
@@ -343,7 +346,7 @@ exports.ordenCompraEliminar = onCall(
     await exigirPermiso(request.auth.uid, 'compras');
     const { id } = request.data || {};
     if (!id) throw new HttpsError('invalid-argument', 'id es requerido');
-    const ref = admin.firestore().collection('ordenesCompra').doc(String(id));
+    const ref = db.collection('ordenesCompra').doc(String(id));
     const actual = await ref.get();
     if (!actual.exists) throw new HttpsError('not-found', 'La orden de compra no existe');
     if (actual.data().estado !== 'Borrador') {
@@ -390,8 +393,7 @@ exports.proveedoresListar = onCall(
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
     await exigirAlgunoPermisos(request.auth.uid, ['proveedores', 'compras']);
-    const db = admin.firestore();
-    await asegurarProveedorDemo(db);
+      await asegurarProveedorDemo(db);
     const snap = await db.collection('proveedores').orderBy('razonSocial', 'asc').get();
     return { proveedores: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) };
   }
@@ -404,7 +406,7 @@ exports.proveedorCrear = onCall(
     await exigirPermiso(request.auth.uid, 'proveedores');
     const proveedor = normalizarProveedorMaestro(request.data?.proveedor || {});
     const ahora = new Date().toISOString();
-    const ref = await admin.firestore().collection('proveedores').add({ ...proveedor, esDemo: false, createdAt: ahora, updatedAt: ahora });
+    const ref = await db.collection('proveedores').add({ ...proveedor, esDemo: false, createdAt: ahora, updatedAt: ahora });
     return { id: ref.id };
   }
 );
@@ -417,7 +419,7 @@ exports.proveedorActualizar = onCall(
     const { id, proveedor: proveedorEntrada } = request.data || {};
     if (!id) throw new HttpsError('invalid-argument', 'id es requerido');
     const proveedor = normalizarProveedorMaestro(proveedorEntrada || {});
-    const ref = admin.firestore().collection('proveedores').doc(String(id));
+    const ref = db.collection('proveedores').doc(String(id));
     const snap = await ref.get();
     if (!snap.exists) throw new HttpsError('not-found', 'El proveedor no existe');
     await ref.update({ ...proveedor, esDemo: false, updatedAt: new Date().toISOString() });
@@ -432,8 +434,7 @@ exports.proveedorEliminar = onCall(
     await exigirPermiso(request.auth.uid, 'proveedores');
     const { id } = request.data || {};
     if (!id) throw new HttpsError('invalid-argument', 'id es requerido');
-    const db = admin.firestore();
-    const usado = await db.collection('ordenesCompra').where('proveedorId', '==', String(id)).limit(1).get();
+      const usado = await db.collection('ordenesCompra').where('proveedorId', '==', String(id)).limit(1).get();
     if (!usado.empty) throw new HttpsError('failed-precondition', 'No se puede eliminar un proveedor que ya está asociado a una orden de compra');
     await db.collection('proveedores').doc(String(id)).delete();
     return { eliminado: true };
@@ -482,8 +483,7 @@ exports.emitirComprobante = onCall(
       rucEmpresa: empresaData.ruc,
     });
 
-    const db = admin.firestore();
-    try {
+      try {
       // 1. Generar XML UBL 2.1
       console.log('Generando XML...');
       const facturaConOperacion = {
@@ -716,7 +716,6 @@ const NUBE_CARPETA_POR_ROL = {
 };
 
 async function obtenerCarpetaAreaDeUsuario(uid) {
-  const db = admin.firestore();
   const snap = await db.collection('users').doc(uid).get();
   if (!snap.exists || snap.data().activo === false) {
     throw new HttpsError('permission-denied', 'El usuario no tiene un perfil activo');
@@ -906,7 +905,7 @@ exports.solicitudesCotizacionListar = onCall(
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
     await exigirPermiso(request.auth.uid, 'compras');
-    const snap = await admin.firestore().collection('solicitudesCotizacion').orderBy('createdAt', 'desc').get();
+    const snap = await db.collection('solicitudesCotizacion').orderBy('createdAt', 'desc').get();
     return { solicitudes: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) };
   }
 );
@@ -917,8 +916,7 @@ exports.solicitudCotizacionCrear = onCall(
     if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
     const perfil = await exigirPermiso(request.auth.uid, 'compras');
     const solicitud = normalizarSolicitudProveedor(request.data?.solicitud || {});
-    const db = admin.firestore();
-    const contadorRef = db.collection('contadores').doc('solicitudesCotizacion');
+      const contadorRef = db.collection('contadores').doc('solicitudesCotizacion');
     const ref = db.collection('solicitudesCotizacion').doc();
     const anio = new Date().getFullYear();
     return db.runTransaction(async (tx) => {
@@ -952,7 +950,7 @@ exports.solicitudCotizacionActualizar = onCall(
     const { id, solicitud: entrada } = request.data || {};
     if (!id) throw new HttpsError('invalid-argument', 'id es requerido');
     const solicitud = normalizarSolicitudProveedor(entrada || {});
-    const ref = admin.firestore().collection('solicitudesCotizacion').doc(String(id));
+    const ref = db.collection('solicitudesCotizacion').doc(String(id));
     const snap = await ref.get();
     if (!snap.exists) throw new HttpsError('not-found', 'La solicitud no existe');
     await ref.update({ ...solicitud, updatedAt: new Date().toISOString() });
@@ -967,7 +965,7 @@ exports.solicitudCotizacionEliminar = onCall(
     await exigirPermiso(request.auth.uid, 'compras');
     const { id } = request.data || {};
     if (!id) throw new HttpsError('invalid-argument', 'id es requerido');
-    const ref = admin.firestore().collection('solicitudesCotizacion').doc(String(id));
+    const ref = db.collection('solicitudesCotizacion').doc(String(id));
     const snap = await ref.get();
     if (!snap.exists) return { eliminado: true };
     await ref.delete();
@@ -1005,8 +1003,7 @@ exports.solicitudCotizacionEnviarCorreo = onCall(
       throw new HttpsError('invalid-argument', 'asunto y cuerpoHtml son requeridos');
     }
 
-    const db = admin.firestore();
-    const docRef = db.collection('solicitudesCotizacion').doc(solicitudId);
+      const docRef = db.collection('solicitudesCotizacion').doc(solicitudId);
 
     try {
       const resultado = await enviarCorreo({ destinatarios, cc, asunto, cuerpoHtml });
@@ -1015,7 +1012,7 @@ exports.solicitudCotizacionEnviarCorreo = onCall(
       await docRef.update({
         estado: 'Enviada',
         updatedAt: ahora,
-        historialEnvios: admin.firestore.FieldValue.arrayUnion({
+        historialEnvios: FieldValue.arrayUnion({
           fecha: ahora,
           destinatarios: Array.isArray(destinatarios) ? destinatarios : [destinatarios],
           cc: cc || [],
@@ -1061,7 +1058,7 @@ exports.usuariosCrear = onCall(
     }
 
     try {
-      const userRecord = await admin.auth().createUser({
+      const userRecord = await getAuth().createUser({
         email: email.trim(),
         password,
         displayName: nombre.trim()
@@ -1080,7 +1077,7 @@ exports.usuariosCrear = onCall(
         createdAt: ahora,
         updatedAt: ahora
       };
-      await admin.firestore().collection('users').doc(userRecord.uid).set(perfil);
+      await db.collection('users').doc(userRecord.uid).set(perfil);
 
       return { uid: userRecord.uid, ...perfil };
     } catch (err) {
@@ -1108,7 +1105,7 @@ exports.usuariosResetearPassword = onCall(
       throw new HttpsError('invalid-argument', 'uid y una nuevaPassword de al menos 6 caracteres son requeridos');
     }
     try {
-      await admin.auth().updateUser(uid, { password: nuevaPassword });
+      await getAuth().updateUser(uid, { password: nuevaPassword });
       return { actualizado: true };
     } catch (err) {
       console.error('Error en usuariosResetearPassword:', err.message);
@@ -1132,8 +1129,8 @@ exports.usuariosCambiarEstado = onCall(
       throw new HttpsError('invalid-argument', 'uid y activo (boolean) son requeridos');
     }
     try {
-      await admin.auth().updateUser(uid, { disabled: !activo });
-      await admin.firestore().collection('users').doc(uid).update({ activo, updatedAt: new Date().toISOString() });
+      await getAuth().updateUser(uid, { disabled: !activo });
+      await db.collection('users').doc(uid).update({ activo, updatedAt: new Date().toISOString() });
       return { actualizado: true };
     } catch (err) {
       console.error('Error en usuariosCambiarEstado:', err.message);

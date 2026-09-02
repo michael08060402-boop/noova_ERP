@@ -7,12 +7,14 @@ const CACHE_TTL_MS = 0;
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
                    '(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
+const { initializeApp, getApps } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
+
 let _db = null;
 function getDb() {
   if (!_db) {
-    const admin = require('firebase-admin');
-    if (!admin.apps.length) admin.initializeApp();
-    _db = admin.firestore();
+    if (getApps().length === 0) initializeApp();
+    _db = getFirestore();
   }
   return _db;
 }
