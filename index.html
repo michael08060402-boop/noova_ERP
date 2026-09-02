@@ -5,15 +5,8 @@
     <link rel="icon" type="image/svg+xml" href="/noova-logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- ── SEGURIDAD: cabeceras defensivas vía meta tag ── -->
-    <!-- Evita clickjacking: la app no puede ser embebida en iframes -->
-    <meta http-equiv="X-Frame-Options" content="DENY" />
-    <!-- Evita MIME sniffing -->
-    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-    <!-- Referrer policy: sólo envía el origin a terceros -->
+    <!-- Referrer policy sí está soportada como meta; el resto se sirve como cabeceras HTTP en firebase.json. -->
     <meta name="referrer" content="strict-origin-when-cross-origin" />
-    <!-- Permissions policy: bloquea cámaras, micrófono, geolocalización -->
-    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=()" />
     <!-- Content Security Policy: restringe orígenes permitidos para scripts, estilos, conexiones, imágenes e iframes -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
@@ -26,13 +19,7 @@
       object-src 'none';
       base-uri 'self';
       form-action 'self';
-      frame-ancestors 'none';
     " />
-
-    <!-- Fuente Inter desde Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
     <title>Noova - ERP</title>
   </head>

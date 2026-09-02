@@ -1,6 +1,5 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { formatDate } from './formatDate';
 import { calcularSubtotal, calcularIGV, calcularTotal } from './formatCurrency';
 import logoNoova from '../assets/noova-logo.png';
 import imagenManga from '../assets/manga-ventilacion.png';
@@ -178,7 +177,6 @@ export async function generateMangaPDF(cotizacion, config = {}) {
 
   const empresa = config?.empresa || {};
   const ruc = empresa.ruc || '';
-  const direccion = empresa.direccion || '';
 
   const cliente = cotizacion.cliente || {};
   const contactoSeleccionado =
@@ -760,7 +758,6 @@ export async function generateMangaPDF(cotizacion, config = {}) {
       // separador "|" en color claro sobre el fondo navy, antes de cada grupo
       doc.setDrawColor(255, 255, 255);
       doc.setLineWidth(0.3);
-      const dividerX2 = groupX - (groupGap - (iconR * 2 + 2 + doc.getTextWidth(socialItems[i - 1].label))) / 2;
       doc.line(groupX - 4, socialY - 4, groupX - 4, socialY + 4);
     }
 

@@ -7,6 +7,7 @@ import {
   cambiarEstadoUsuario,
   resetearPasswordUsuario
 } from '../services/usuarioService';
+import { ROLES } from '../services/userService';
 
 export function useUsuarios() {
   const [usuarios, setUsuarios] = useState([]);
@@ -41,7 +42,13 @@ export function useUsuarios() {
   const editRol = useCallback(async (uid, role) => {
     setError(null);
     await cambiarRolUsuario(uid, role);
-    setUsuarios((prev) => prev.map((u) => (u.uid === uid ? { ...u, role } : u)));
+    const definicion = ROLES[role] || ROLES.sin_acceso;
+    setUsuarios((prev) => prev.map((u) => (u.uid === uid ? {
+      ...u,
+      role,
+      sector: definicion.sector,
+      permissions: definicion.navItems
+    } : u)));
   }, []);
 
   const editDatos = useCallback(async (uid, datos) => {

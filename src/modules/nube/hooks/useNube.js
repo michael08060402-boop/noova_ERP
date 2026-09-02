@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import {
-  listarCarpeta, buscarDocumentos, codificarRuta,
+  listarCarpeta, buscarDocumentos,
   obtenerContexto, crearCarpeta as crearCarpetaServicio,
   subirArchivo as subirArchivoServicio,
   renombrarItem as renombrarItemServicio,
@@ -45,8 +45,7 @@ export default function useNube() {
   }, []);
 
   // Cargar contenido de una carpeta
-  // rutaCompleta: si se proporciona, reconstruye el breadcrumb completo (desde busqueda)
-  const cargarCarpeta = useCallback(async (carpetaId = null, nombreCarpeta = null, rutaCompleta = null) => {
+  const cargarCarpeta = useCallback(async (carpetaId = null, nombreCarpeta = null) => {
     setCargando(true);
     setError(null);
     setResultadosBusqueda(null);
@@ -58,15 +57,7 @@ export default function useNube() {
       setItems(resultado);
 
       // Actualizar breadcrumb
-      if (rutaCompleta) {
-        // Navegacion desde busqueda: reconstruir breadcrumb completo
-        const segmentos = rutaCompleta.split('/');
-        const nuevaRuta = segmentos.map((nombre, idx) => {
-          const rutaParcial = segmentos.slice(0, idx + 1).join('/');
-          return { id: codificarRuta(rutaParcial), nombre };
-        });
-        setRuta(nuevaRuta);
-      } else if (carpetaId && nombreCarpeta) {
+      if (carpetaId && nombreCarpeta) {
         setRuta(prev => [...prev, { id: carpetaId, nombre: nombreCarpeta }]);
       } else if (!carpetaId) {
         setRuta([]);
@@ -110,7 +101,7 @@ export default function useNube() {
   // El usuario vera el documento en el navegador con sus permisos de Microsoft 365
   const abrirArchivo = useCallback((urlWeb) => {
     if (!urlWeb) {
-      setError('No se pudo obtener el enlace del documento. Configura ONEDRIVE_WEB_BASE_URL en el servidor local-api para habilitar los enlaces a SharePoint.');
+      setError('OneDrive no devolvió un enlace web para este documento. Revisa la configuración de Microsoft Graph y los permisos del sitio.');
       return;
     }
     window.open(urlWeb, '_blank', 'noopener');

@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { FiPlus, FiSearch, FiKey, FiUserX, FiUserCheck, FiEdit2 } from 'react-icons/fi';
 import { useUsuarios } from '../hooks/useUsuarios';
 import { useAuth } from '../context/AuthContext';
-import { ROLES } from '../services/userService';
+import { MODULOS, ROLES, normalizarRol } from '../services/userService';
 import { addLog } from '../services/logService';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -14,7 +14,7 @@ import './Usuarios.css';
 const USUARIO_VACIO = { email: '', password: '', nombre: '', cargo: '', telefono: '', role: 'comercial' };
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export default function Usuarios() {
+export default function Usuarios({ embebido = false }) {
   const { userProfile } = useAuth();
   const { usuarios, loading, addUsuario, editRol, editDatos, editEstado, resetPassword } = useUsuarios();
 
@@ -50,17 +50,30 @@ export default function Usuarios() {
   const [guardandoDatos, setGuardandoDatos] = useState(false);
   const {
     register: registerEdit, handleSubmit: handleSubmitEdit, reset: resetEdit
-  } = useForm({ defaultValues: { nombre: '', cargo: '', telefono: '' } });
+  } = useForm({ defaultValues: { nombre: '', cargo: '', telefono: '', sector: '', permissions: [] } });
 
   function abrirEditar(u) {
+    const rolNormalizado = normalizarRol(u.role);
+    const permisosRol = ROLES[rolNormalizado]?.navItems || [];
     setUsuarioEditar(u);
-    resetEdit({ nombre: u.nombre || '', cargo: u.cargo || '', telefono: u.telefono || '' });
+    resetEdit({
+      nombre: u.nombre || '',
+      cargo: u.cargo || '',
+      telefono: u.telefono || '',
+      sector: u.sector || ROLES[rolNormalizado]?.sector || '',
+      permissions: rolNormalizado === 'administrador'
+        ? permisosRol
+        : (Array.isArray(u.permissions) ? u.permissions : permisosRol)
+    });
   }
 
   async function alGuardarDatos(data) {
     setGuardandoDatos(true);
     try {
-      await editDatos(usuarioEditar.uid, data);
+      await editDatos(usuarioEditar.uid, {
+        ...data,
+        permissions: [...new Set(['dashboard', ...(data.permissions || [])])]
+      });
       mostrarMensaje('success', 'Datos actualizados correctamente');
       setUsuarioEditar(null);
     } catch (err) {
@@ -132,18 +145,19 @@ export default function Usuarios() {
     return usuarios.filter((u) =>
       (u.nombre || '').toLowerCase().includes(term) ||
       (u.email || '').toLowerCase().includes(term) ||
-      (ROLES[u.role]?.label || u.role || '').toLowerCase().includes(term)
+      (u.sector || '').toLowerCase().includes(term) ||
+      (ROLES[normalizarRol(u.role)]?.label || u.role || '').toLowerCase().includes(term)
     );
   }, [usuarios, terminoBusqueda]);
 
   if (loading) return <Loading message="Cargando usuarios..." />;
 
   return (
-    <div className="pagina">
-      <div className="pagina-header">
+    <div className={embebido ? 'usuarios-embebido' : 'pagina'}>
+      <div className={embebido ? 'seccion-header' : 'pagina-header'}>
         <div>
-          <h1 className="pagina-titulo">Usuarios y Roles</h1>
-          <p className="pagina-subtitle">Gestiona quién entra al ERP y qué puede ver o hacer cada colaborador</p>
+          <h1 className={embebido ? 'seccion-titulo' : 'pagina-titulo'}>Usuarios y Roles</h1>
+          <p className={embebido ? 'seccion-pista' : 'pagina-subtitle'}>Gestiona quién entra al ERP y qué módulos puede ver o utilizar cada colaborador</p>
         </div>
         <button className="btn-principal" onClick={() => { reset(USUARIO_VACIO); setMostrarModalNuevo(true); }}>
           <FiPlus size={16} /> Nuevo Usuario
@@ -177,6 +191,7 @@ export default function Usuarios() {
                   <th>Nombre</th>
                   <th>Correo</th>
                   <th>Cargo</th>
+                  <th>Sector</th>
                   <th>Rol</th>
                   <th className="texto-centro">Nube</th>
                   <th className="texto-centro">Estado</th>
@@ -189,10 +204,11 @@ export default function Usuarios() {
                     <td className="texto-negrita">{u.nombre || '—'}</td>
                     <td>{u.email}</td>
                     <td>{u.cargo || '—'}</td>
+                    <td>{u.sector || ROLES[normalizarRol(u.role)]?.sector || '—'}</td>
                     <td>
                       <select
                         className="usuarios-select-rol"
-                        value={u.role}
+                        value={normalizarRol(u.role)}
                         onChange={(e) => alCambiarRol(u, e.target.value)}
                         disabled={u.uid === userProfile?.uid}
                         title={u.uid === userProfile?.uid ? 'No puedes cambiar tu propio rol' : 'Cambiar rol'}
@@ -203,8 +219,8 @@ export default function Usuarios() {
                       </select>
                     </td>
                     <td className="texto-centro">
-                      {ROLES[u.role]?.nubeCarpeta ? (
-                        <span className="usuarios-tag-nube">{ROLES[u.role].nubeCarpeta}</span>
+                      {ROLES[normalizarRol(u.role)]?.nubeCarpeta ? (
+                        <span className="usuarios-tag-nube">{ROLES[normalizarRol(u.role)].nubeCarpeta}</span>
                       ) : (
                         <span className="usuarios-tag-nube usuarios-tag-nube-completo">Todo</span>
                       )}
@@ -308,6 +324,31 @@ export default function Usuarios() {
             <label>Teléfono</label>
             <input {...registerEdit('telefono')} />
           </div>
+          <div className="campo">
+            <label>Sector</label>
+            <input {...registerEdit('sector')} placeholder="Ej: Compras, Operaciones, Ingeniería" />
+          </div>
+          <fieldset className="usuarios-permisos">
+            <legend>Acceso a módulos</legend>
+            {normalizarRol(usuarioEditar?.role) === 'administrador' ? (
+              <p>El Administrador tiene acceso total al ERP. Para los colaboradores puedes habilitar o quitar módulos individualmente.</p>
+            ) : (
+              <p>Selecciona exactamente qué módulos puede ver y utilizar este colaborador.</p>
+            )}
+            <div className="usuarios-permisos-grid">
+              {MODULOS.map((modulo) => (
+                <label key={modulo.key}>
+                  <input
+                    type="checkbox"
+                    value={modulo.key}
+                    {...registerEdit('permissions')}
+                    disabled={normalizarRol(usuarioEditar?.role) === 'administrador'}
+                  />
+                  <span>{modulo.label}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <div className="acciones-form">
             <button type="button" className="btn-secundario" onClick={() => setUsuarioEditar(null)}>Cancelar</button>
             <button type="submit" className="btn-principal" disabled={guardandoDatos}>

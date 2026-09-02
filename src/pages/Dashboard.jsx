@@ -6,7 +6,9 @@ import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { useClientes } from '../hooks/useClientes';
 import { useCotizaciones } from '../hooks/useCotizaciones';
 import { useEquipos } from '../hooks/useEquipos';
+import { useOrdenesCompra } from '../hooks/useOrdenesCompra';
 import { useAuth } from '../context/AuthContext';
+import { tienePermiso } from '../services/userService';
 import { formatDate, parseFechaLocal } from '../utils/formatDate';
 import { formatCurrency } from '../utils/formatCurrency';
 import Loading from '../components/Loading';
@@ -33,6 +35,7 @@ const COLORES_ESTADO = {
 };
 
 const NOMBRES_MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const COLORES_CATEGORIAS = [COLORES.azulPrimario, COLORES.azulOscuro, COLORES.amarillo, COLORES.verde, COLORES.rojo, COLORES.gris];
 
 const opcionesGrafico = {
   responsive: true,
@@ -67,10 +70,15 @@ const opcionesLine = {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { clientes, loading: cargandoClientes } = useClientes();
-  const { cotizaciones, loading: cargandoCotizaciones } = useCotizaciones();
-  const { equipos, loading: cargandoEquipos } = useEquipos();
   const { userProfile } = useAuth();
+  const puedeVerClientes = tienePermiso(userProfile, 'clientes');
+  const puedeVerCotizaciones = tienePermiso(userProfile, 'cotizaciones');
+  const puedeVerEquipos = tienePermiso(userProfile, 'equipos');
+  const puedeVerCompras = tienePermiso(userProfile, 'compras');
+  const { clientes, loading: cargandoClientes } = useClientes(puedeVerClientes);
+  const { cotizaciones, loading: cargandoCotizaciones } = useCotizaciones(puedeVerCotizaciones);
+  const { equipos, loading: cargandoEquipos } = useEquipos(puedeVerEquipos);
+  const { ordenes, loading: cargandoOrdenes } = useOrdenesCompra(puedeVerCompras);
 
   const [anioTendencia, setAnioTendencia] = useState(new Date().getFullYear());
   const [actualizarTendencia, setActualizarTendencia] = useState(0);
@@ -99,6 +107,12 @@ export default function Dashboard() {
   const totalMesSoles = useMemo(() => {
     return cotizacionesMes.reduce((sum, c) => sum + (c.total || 0), 0);
   }, [cotizacionesMes]);
+
+  const tasaAceptacion = useMemo(() => {
+    if (!cotizaciones.length) return 0;
+    const aceptadas = cotizaciones.filter((item) => ['Aceptada', 'Aprobada'].includes(item.estado)).length;
+    return Math.round((aceptadas / cotizaciones.length) * 100);
+  }, [cotizaciones]);
 
   const cotizacionesRecientes = useMemo(() => {
     return [...cotizaciones]
@@ -198,19 +212,17 @@ export default function Dashboard() {
     }, {});
   }, [equipos]);
 
-  const coloresCategorias = [COLORES.azulPrimario, COLORES.azulOscuro, COLORES.amarillo, COLORES.verde, COLORES.rojo, COLORES.gris];
-
   const datosCategorias = useMemo(() => ({
     labels: Object.keys(conteoCategorias),
     datasets: [{
       data: Object.values(conteoCategorias),
-      backgroundColor: Object.keys(conteoCategorias).map((_, i) => coloresCategorias[i % coloresCategorias.length]),
+      backgroundColor: Object.keys(conteoCategorias).map((_, i) => COLORES_CATEGORIAS[i % COLORES_CATEGORIAS.length]),
       borderWidth: 0
     }]
   }), [conteoCategorias]);
 
   // --- Render ---
-  if (cargandoClientes || cargandoCotizaciones || cargandoEquipos) {
+  if (cargandoClientes || cargandoCotizaciones || cargandoEquipos || cargandoOrdenes) {
     return <Loading message="Cargando dashboard..." />;
   }
 
@@ -229,6 +241,13 @@ export default function Dashboard() {
             Bienvenido, {userProfile?.nombre || userProfile?.email || 'Usuario'}
           </p>
         </div>
+      </div>
+
+      <div className="dashboard-kpis" aria-label="Indicadores principales">
+        {puedeVerCotizaciones && <div className="dashboard-kpi"><span>Cotizaciones del mes</span><strong>{cotizacionesMes.length}</strong><small>{formatCurrency(totalMesSoles)}</small></div>}
+        {puedeVerCotizaciones && <div className="dashboard-kpi"><span>Tasa de aceptación</span><strong>{tasaAceptacion}%</strong><small>{cotizaciones.length} cotizaciones acumuladas</small></div>}
+        {puedeVerCompras && <div className="dashboard-kpi"><span>Órdenes pendientes</span><strong>{ordenes.filter((orden) => orden.estado === 'Borrador').length}</strong><small>{ordenes.length} órdenes registradas</small></div>}
+        {puedeVerClientes && <div className="dashboard-kpi"><span>Clientes</span><strong>{clientes.length}</strong><small>registros disponibles</small></div>}
       </div>
 
       <div className="dashboard-chart-grid">

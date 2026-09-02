@@ -3,7 +3,6 @@ import { useAuth } from '../context/AuthContext';
 import { updateUserProfile } from '../services/userService';
 import { addLog } from '../services/logService';
 import { sanitizarTexto, esCelularValido, contienePatronPeligroso } from '../utils/validation';
-import { auth } from '../firebase/config';
 import { EmailAuthProvider, reauthenticateWithCredential, updateEmail, updatePassword } from 'firebase/auth';
 import logo from '../assets/noova-logo.png';
 import '../styles/shared.css';

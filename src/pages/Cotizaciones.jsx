@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
 import { createPortal } from 'react-dom';
-import { FiDownload, FiEdit2, FiTrash2, FiPlus, FiSearch, FiUserPlus, FiLoader, FiX, FiCheck } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
+import { FiDownload, FiEdit2, FiTrash2, FiPlus, FiSearch, FiUserPlus, FiLoader, FiX, FiShoppingCart } from 'react-icons/fi';
 import { useCotizaciones } from '../hooks/useCotizaciones';
 import { useClientes } from '../hooks/useClientes';
 import { useEquipos } from '../hooks/useEquipos';
@@ -227,6 +228,7 @@ function EquipoCombobox({ equipos, value, onSelect }) {
 }
 
 export default function Cotizaciones() {
+  const navigate = useNavigate();
   const { cotizaciones, loading, addCotizacion, editCotizacion, removeCotizacion } = useCotizaciones();
   const { clientes, addCliente, editCliente } = useClientes();
   const { equipos } = useEquipos();
@@ -931,6 +933,15 @@ export default function Cotizaciones() {
                       </td>
                       <td className="texto-centro">
                         <div className="acciones-tabla">
+                          {!cot.ordenCompraId && (
+                            <button
+                              className="btn-accion"
+                              onClick={() => navigate('/compras', { state: { cotizacionOrigen: cot } })}
+                              title="Generar orden de compra y marcar cotización como aceptada"
+                            >
+                              <FiShoppingCart size={18} />
+                            </button>
+                          )}
                           <button className="btn-accion" onClick={() => exportarPDF(cot)} title={`Exportar PDF (${tipoCot === 'manga' ? 'Manga' : 'Equipo'})`}>
                             <FiDownload size={18} />
                           </button>
@@ -1179,7 +1190,7 @@ export default function Cotizaciones() {
                   />
                   {contactoDropdownAbierto && contactosFiltrados.length > 0 && (
                     <div className="lista-resultados-clientes">
-                      {contactosFiltrados.map((ct, idx) => {
+                      {contactosFiltrados.map((ct) => {
                         const realIdx = contactosCliente.indexOf(ct);
                         return (
                           <button key={realIdx} type="button" className="resultado-cliente"
@@ -1249,6 +1260,20 @@ export default function Cotizaciones() {
               </select>
             </div>
           </div>
+
+          {import.meta.env.DEV && editandoId && (
+            <div className="fila-form fila-form-1">
+              <div className="campo">
+                <label>Estado de cotización · pruebas</label>
+                <select value={form.estado} onChange={(e) => handleChange('estado', e.target.value)}>
+                  {ESTADOS.map((estado) => <option key={estado} value={estado}>{estado}</option>)}
+                </select>
+                <span className="pista-form">
+                  Solo aparece con <code>npm run dev</code>. Permite volver de Aceptada a Generada para pruebas sin modificar la relación histórica con una OC existente.
+                </span>
+              </div>
+            </div>
+          )}
 
           <div className="fila-form fila-form-1">
             <label className="checkbox-sin-igv">

@@ -1,125 +1,61 @@
-// Capa de comunicacion del modulo Nube.
-// La UI nunca sabe de donde vienen los datos — solo llama a estas funciones.
-//
-// Proveedor activo: se controla con VITE_NUBE_PROVIDER
-//   "local" → API local que lee la carpeta OneDrive sincronizada
-//   "graph" → Cloud Functions que llaman Microsoft Graph API
-//
-// Para cambiar de proveedor solo se modifica la variable de entorno,
-// sin tocar la UI, el hook ni los componentes.
-
-const PROVEEDOR = import.meta.env.VITE_NUBE_PROVIDER || 'local';
-
-// ── UTILIDADES ──
-
-// Codificar ruta relativa como ID (base64url) — coincide con el servidor
-// Usado para reconstruir breadcrumbs al navegar desde busqueda
-function codificarRuta(rutaRelativa) {
-  if (!rutaRelativa) return 'root';
-  const bytes = new TextEncoder().encode(rutaRelativa);
-  let binary = '';
-  bytes.forEach(b => binary += String.fromCharCode(b));
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-// ── PROVEEDOR LOCAL ──
-// Llama al servidor Express que lee el filesystem
-
-const API_BASE = '/api/nube';
-
-// Mensaje de ayuda cuando la API local no esta conectada
-const MSG_API_DESCONECTADA = 'No se pudo conectar con el servidor de documentos. Verifica que local-api este iniciado con: cd local-api && set "ONEDRIVE_LOCAL_PATH=RUTA_ONEDRIVE" && set "ONEDRIVE_WEB_BASE_URL=URL_SHAREPOINT" && npm start';
-
-async function fetchLocal(url) {
-  try {
-    const respuesta = await fetch(url);
-    if (!respuesta.ok) {
-      const error = await respuesta.json().catch(() => ({ error: 'Error de conexion' }));
-      throw new Error(error.error || 'Error de conexion');
-    }
-    return respuesta;
-  } catch (err) {
-    // fetch lanza TypeError cuando el servidor no esta corriendo
-    if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
-      throw new Error(MSG_API_DESCONECTADA);
-    }
-    throw err;
-  }
-}
-
-async function listarCarpetaLocal(carpetaId = null) {
-  const params = new URLSearchParams();
-  if (carpetaId && carpetaId !== 'root') {
-    params.set('id', carpetaId);
-  }
-  const url = `${API_BASE}/carpeta${params.toString() ? '?' + params.toString() : ''}`;
-  const respuesta = await fetchLocal(url);
-  const data = await respuesta.json();
-  return data.items;
-}
-
-async function buscarDocumentosLocal(termino) {
-  const params = new URLSearchParams({ q: termino });
-  const url = `${API_BASE}/buscar?${params.toString()}`;
-  const respuesta = await fetchLocal(url);
-  const data = await respuesta.json();
-  return data.items;
-}
-
-// ── PROVEEDOR GRAPH (Cloud Functions) ──
-// Llama a Firebase Cloud Functions que usan Microsoft Graph API
-
-import { functions } from '../../../firebase/config';
 import { httpsCallable } from 'firebase/functions';
+import { functions } from '../../../firebase/config';
 
-async function listarCarpetaGraph(carpetaId = null) {
-  const fn = httpsCallable(functions, 'nubeListarCarpeta');
-  const resultado = await fn({ carpetaId });
-  return resultado.data.items;
+// Arquitectura única de producción:
+// navegador -> Firebase callable -> Microsoft Graph -> OneDrive/SharePoint.
+// No hay fallback al disco local ni a un servidor Express del equipo.
+const PROVEEDOR = 'graph';
+const LIMITE_SUBIDA_BYTES = 4 * 1024 * 1024;
+
+async function llamar(nombre, datos = {}) {
+  try {
+    const funcion = httpsCallable(functions, nombre);
+    const resultado = await funcion(datos);
+    return resultado.data;
+  } catch (error) {
+    const code = String(error?.code || '');
+    const mensaje = String(error?.message || '');
+    if (code.includes('not-found') && /function|not found|NOT_FOUND/i.test(mensaje)) {
+      throw new Error('Las Cloud Functions de Nube no están desplegadas o están desactualizadas. Ejecuta firebase deploy --only functions.');
+    }
+    if (code.includes('failed-precondition')) {
+      throw new Error(mensaje || 'Microsoft Graph no está configurado. Revisa los secretos de Firebase Functions.');
+    }
+    if (code.includes('permission-denied')) {
+      throw new Error(mensaje || 'Microsoft Graph o tu perfil no tienen permisos suficientes para acceder a Nube.');
+    }
+    if (code.includes('not-found')) {
+      throw new Error(mensaje || 'No se encontró el OneDrive/SharePoint configurado. Revisa el tipo e identificador del drive.');
+    }
+    if (code.includes('unavailable')) {
+      throw new Error(mensaje || 'Microsoft Graph no está disponible en este momento.');
+    }
+    if (code.includes('internal')) {
+      throw new Error(mensaje && !/internal/i.test(mensaje)
+        ? mensaje
+        : 'OneDrive respondió con un error interno. Revisa los logs de Firebase Functions y la configuración de Microsoft Graph.');
+    }
+    throw new Error(mensaje || 'No se pudo comunicar con OneDrive.');
+  }
 }
 
-async function buscarDocumentosGraph(termino) {
-  const fn = httpsCallable(functions, 'nubeBuscarDocumentos');
-  const resultado = await fn({ termino });
-  return resultado.data.items;
+async function listarCarpeta(carpetaId = null) {
+  const data = await llamar('nubeListarCarpeta', { carpetaId });
+  return data.items;
 }
 
-// Contexto de rol: si el usuario está restringido a una carpeta de área
-async function obtenerContextoGraph() {
-  const fn = httpsCallable(functions, 'nubeObtenerContexto');
-  const resultado = await fn();
-  return resultado.data; // { carpetaArea, carpetaId }
+async function buscarDocumentos(termino) {
+  const data = await llamar('nubeBuscarDocumentos', { termino });
+  return data.items;
 }
 
-async function crearCarpetaGraph(carpetaPadreId, nombre) {
-  const fn = httpsCallable(functions, 'nubeCrearCarpeta');
-  const resultado = await fn({ carpetaPadreId, nombre });
-  return resultado.data.item;
+async function obtenerContexto() {
+  return llamar('nubeObtenerContexto');
 }
 
-// archivo: objeto File del navegador
-async function subirArchivoGraph(carpetaPadreId, archivo) {
-  const contenidoBase64 = await archivoABase64(archivo);
-  const fn = httpsCallable(functions, 'nubeSubirArchivo');
-  const resultado = await fn({
-    carpetaPadreId,
-    nombre: archivo.name,
-    contenidoBase64,
-    mimeType: archivo.type || 'application/octet-stream'
-  });
-  return resultado.data.item;
-}
-
-async function renombrarItemGraph(itemId, nuevoNombre) {
-  const fn = httpsCallable(functions, 'nubeRenombrarItem');
-  const resultado = await fn({ itemId, nuevoNombre });
-  return resultado.data.item;
-}
-
-async function eliminarItemGraph(itemId) {
-  const fn = httpsCallable(functions, 'nubeEliminarItem');
-  await fn({ itemId });
-  return true;
+async function crearCarpeta(carpetaPadreId, nombre) {
+  const data = await llamar('nubeCrearCarpeta', { carpetaPadreId, nombre });
+  return data.item;
 }
 
 function archivoABase64(archivo) {
@@ -131,54 +67,39 @@ function archivoABase64(archivo) {
   });
 }
 
-const LIMITE_SUBIDA_BYTES = 4 * 1024 * 1024;
-
-// ── INTERFAZ PUBLICA ──
-// El hook y los componentes solo usan estas funciones,
-// nunca saben que proveedor hay detras.
-
-async function listarCarpeta(carpetaId = null) {
-  if (PROVEEDOR === 'graph') return listarCarpetaGraph(carpetaId);
-  return listarCarpetaLocal(carpetaId);
-}
-
-async function buscarDocumentos(termino) {
-  if (PROVEEDOR === 'graph') return buscarDocumentosGraph(termino);
-  return buscarDocumentosLocal(termino);
-}
-
-// Devuelve { carpetaArea: null|string, carpetaId: null|string }.
-// En modo "local" nunca hay restricción por rol (no aplica CRUD todavía).
-async function obtenerContexto() {
-  if (PROVEEDOR === 'graph') return obtenerContextoGraph();
-  return { carpetaArea: null, carpetaId: null };
-}
-
-async function crearCarpeta(carpetaPadreId, nombre) {
-  if (PROVEEDOR !== 'graph') throw new Error('Crear carpetas solo está disponible en el modo Graph (nube en línea).');
-  return crearCarpetaGraph(carpetaPadreId, nombre);
-}
-
 async function subirArchivo(carpetaPadreId, archivo) {
-  if (PROVEEDOR !== 'graph') throw new Error('Subir archivos solo está disponible en el modo Graph (nube en línea).');
   if (archivo.size > LIMITE_SUBIDA_BYTES) {
-    throw new Error('El archivo supera los 4MB permitidos para subida directa.');
+    throw new Error('El archivo supera los 4 MB permitidos para subida directa.');
   }
-  return subirArchivoGraph(carpetaPadreId, archivo);
+
+  const contenidoBase64 = await archivoABase64(archivo);
+  const data = await llamar('nubeSubirArchivo', {
+    carpetaPadreId,
+    nombre: archivo.name,
+    contenidoBase64,
+    mimeType: archivo.type || 'application/octet-stream'
+  });
+  return data.item;
 }
 
 async function renombrarItem(itemId, nuevoNombre) {
-  if (PROVEEDOR !== 'graph') throw new Error('Renombrar solo está disponible en el modo Graph (nube en línea).');
-  return renombrarItemGraph(itemId, nuevoNombre);
+  const data = await llamar('nubeRenombrarItem', { itemId, nuevoNombre });
+  return data.item;
 }
 
 async function eliminarItem(itemId) {
-  if (PROVEEDOR !== 'graph') throw new Error('Eliminar solo está disponible en el modo Graph (nube en línea).');
-  return eliminarItemGraph(itemId);
+  await llamar('nubeEliminarItem', { itemId });
+  return true;
 }
 
 export {
-  listarCarpeta, buscarDocumentos, PROVEEDOR, codificarRuta,
-  obtenerContexto, crearCarpeta, subirArchivo, renombrarItem, eliminarItem,
+  listarCarpeta,
+  buscarDocumentos,
+  PROVEEDOR,
+  obtenerContexto,
+  crearCarpeta,
+  subirArchivo,
+  renombrarItem,
+  eliminarItem,
   LIMITE_SUBIDA_BYTES
 };

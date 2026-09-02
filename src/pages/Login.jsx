@@ -16,23 +16,12 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [intentosRestantes, setIntentosRestantes] = useState(null);
-  const [avisoInactividad, setAvisoInactividad] = useState(false);
 
   useEffect(() => {
     const savedEmail = localStorage.getItem('rememberedEmail');
     if (savedEmail) {
       setEmail(savedEmail);
       setRememberMe(true);
-    }
-    // Si la sesión anterior se cerró por inactividad, se lo indicamos al
-    // usuario claramente para que no parezca un error del sistema.
-    try {
-      if (sessionStorage.getItem('noova_logout_motivo') === 'inactividad') {
-        setAvisoInactividad(true);
-        sessionStorage.removeItem('noova_logout_motivo');
-      }
-    } catch {
-      // sessionStorage no disponible; se ignora silenciosamente
     }
   }, []);
 
@@ -104,11 +93,6 @@ export default function Login() {
           <p>Ingresa tus credenciales para continuar</p>
         </div>
 
-        {avisoInactividad && !error && (
-          <div className="login-aviso-inactividad">
-            Tu sesión se cerró automáticamente por inactividad (30 minutos sin uso). Vuelve a iniciar sesión para continuar.
-          </div>
-        )}
         {error && <div className="login-error">{error}</div>}
 
         {intentosRestantes !== null && intentosRestantes > 0 && intentosRestantes < 4 && !error && (

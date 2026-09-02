@@ -21,38 +21,6 @@
   border-color: #fca5a5;
 }
 
-/* ── Tabs ── */
-.sc-tabs {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-  border-bottom: 1px solid var(--gris-borde);
-}
-
-.sc-tab {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.6rem 1rem;
-  border: none;
-  background: none;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--texto-suave);
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.sc-tab:hover {
-  color: var(--texto-oscuro);
-}
-
-.sc-tab-activa {
-  color: var(--azul-primario);
-  border-bottom-color: var(--azul-primario);
-}
-
 /* ── Botón enviar en tabla ── */
 .btn-enviar {
   color: var(--azul-primario);

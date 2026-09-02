@@ -14,18 +14,11 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'administrador';
     }
 
-    // Función helper: puede gestionar usuarios y roles (Gerencia, Sistemas o Administrador)
-    function isGestorUsuarios() {
-      return isAuth()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['administrador', 'gerencia', 'sistemas'];
-    }
-
     // Perfil de usuario: cada usuario lee el suyo
-    // Solo Administrador / Gerencia / Sistemas pueden crear/editar/eliminar usuarios
+    // Solo admin puede crear/editar/eliminar usuarios
     match /users/{userId} {
       allow read: if isAuth();
-      allow create, update, delete: if isGestorUsuarios();
+      allow create, update, delete: if isAdmin();
       // Un usuario puede actualizar SOLO su propio perfil, pero NO su rol
       allow update: if isAuth() && request.auth.uid == userId
                     && !('role' in request.resource.data.diff(resource.data).affectedKeys());
@@ -45,12 +38,20 @@ service cloud.firestore {
     match /mangas/{docId} {
       allow read, write: if isAuth();
     }
+
+    // Módulos nuevos de Compras: mismo modelo single-tenant que el ERP actual.
+    // Se añaden sin cambiar las reglas que ya funcionan para las colecciones existentes.
     match /proveedores/{docId} {
       allow read, write: if isAuth();
     }
     match /solicitudesCotizacion/{docId} {
       allow read, write: if isAuth();
     }
+    match /ordenesCompra/{docId} {
+      allow read, create, update: if isAuth();
+      allow delete: if isAuth() && resource.data.estado == 'Borrador';
+    }
+
     match /facturacion/{docId} {
       allow read, write: if isAuth();
       // NO se pueden eliminar comprobantes ACEPTADOS por SUNAT (es ilegal)

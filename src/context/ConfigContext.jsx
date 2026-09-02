@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { getConfig as fetchConfig, updateConfig as saveConfig } from '../services/configService';
+import { useAuth } from './AuthContext';
 
 const ConfigContext = createContext();
 
@@ -8,18 +9,27 @@ export function useConfig() {
 }
 
 export function ConfigProvider({ children }) {
+  const { currentUser, userProfile } = useAuth();
   const [config, setConfig] = useState(null);
-  const [loadingConfig, setLoadingConfig] = useState(true);
+  const [loadingConfig, setLoadingConfig] = useState(false);
   const [configError, setConfigError] = useState(null);
 
   useEffect(() => {
+    if (!currentUser || !userProfile) {
+      setConfig(null);
+      setConfigError(null);
+      setLoadingConfig(false);
+      return;
+    }
     let mounted = true;
 
     async function loadConfig() {
+      setLoadingConfig(true);
       try {
         const data = await fetchConfig();
         if (mounted) {
           setConfig(data);
+          setConfigError(null);
         }
       } catch (err) {
         console.error('Error cargando configuración:', err);
@@ -37,14 +47,18 @@ export function ConfigProvider({ children }) {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [currentUser, userProfile]);
 
   async function refreshConfig() {
     setLoadingConfig(true);
     try {
       const latest = await fetchConfig(true);
       setConfig(latest);
+      setConfigError(null);
       return latest;
+    } catch (err) {
+      setConfigError(err);
+      return null;
     } finally {
       setLoadingConfig(false);
     }
@@ -56,7 +70,8 @@ export function ConfigProvider({ children }) {
       ...prevConfig,
       ...data,
       empresa: { ...prevConfig?.empresa, ...data.empresa },
-      cotizacion: { ...prevConfig?.cotizacion, ...data.cotizacion }
+      cotizacion: { ...prevConfig?.cotizacion, ...data.cotizacion },
+      ordenCompra: { ...prevConfig?.ordenCompra, ...data.ordenCompra }
     }));
   }
 

@@ -1,9 +1,26 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import './Modal.css';
 
 export default function Modal({ isOpen, onClose, title, children, size = 'medium' }) {
   const containerRef = useRef(null);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+
+  const hasUnsavedInput = useCallback(() => {
+    if (!containerRef.current) return false;
+    const inputs = containerRef.current.querySelectorAll('input, textarea');
+    for (const el of inputs) {
+      if (el.value && el.value.trim() !== '' && el.type !== 'hidden') return true;
+    }
+    return false;
+  }, []);
+
+  const tryClose = useCallback(() => {
+    if (hasUnsavedInput()) {
+      setShowExitConfirm(true);
+    } else {
+      onClose();
+    }
+  }, [hasUnsavedInput, onClose]);
 
   useEffect(() => {
     if (isOpen) {
@@ -27,26 +44,9 @@ export default function Modal({ isOpen, onClose, title, children, size = 'medium
       window.addEventListener('keydown', handleEsc);
     }
     return () => window.removeEventListener('keydown', handleEsc);
-  }, [isOpen]);
+  }, [isOpen, tryClose]);
 
   if (!isOpen) return null;
-
-  function hasUnsavedInput() {
-    if (!containerRef.current) return false;
-    const inputs = containerRef.current.querySelectorAll('input, textarea');
-    for (const el of inputs) {
-      if (el.value && el.value.trim() !== '' && el.type !== 'hidden') return true;
-    }
-    return false;
-  }
-
-  function tryClose() {
-    if (hasUnsavedInput()) {
-      setShowExitConfirm(true);
-    } else {
-      onClose();
-    }
-  }
 
   function handleOverlayClick(e) {
     if (e.target === e.currentTarget) {

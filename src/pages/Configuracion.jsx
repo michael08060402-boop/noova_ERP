@@ -1,8 +1,11 @@
 import { useEffect, useState, useMemo } from 'react';
-import { FiHome, FiCreditCard, FiHash, FiShield, FiX, FiPlus, FiCheck, FiCheckCircle, FiAlertCircle } from 'react-icons/fi';
+import { useSearchParams } from 'react-router-dom';
+import { FiHome, FiCreditCard, FiHash, FiShield, FiUsers, FiX, FiPlus, FiCheck, FiCheckCircle, FiAlertCircle } from 'react-icons/fi';
 import { useConfig } from '../context/ConfigContext';
 import { useAuth } from '../context/AuthContext';
 import { getLogs } from '../services/logService';
+import { normalizarRol, tienePermiso } from '../services/userService';
+import Usuarios from './Usuarios';
 import Modal from '../components/Modal';
 import Loading from '../components/Loading';
 import Paginacion from '../components/Paginacion';
@@ -11,11 +14,12 @@ import './Configuracion.css';
 
 export default function Configuracion() {
   const { config, loadingConfig, updateConfig } = useConfig();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { userProfile } = useAuth();
   const [configLocal, setConfigLocal] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState(null);
-  const [pestanaActiva, setPestanaActiva] = useState('empresa');
+  const [pestanaActiva, setPestanaActiva] = useState(() => searchParams.get('tab') || 'empresa');
   const [logs, setLogs] = useState([]);
   const [cargandoLogs, setCargandoLogs] = useState(false);
 
@@ -27,11 +31,21 @@ export default function Configuracion() {
   const [paginaLogs, setPaginaLogs] = useState(1);
   const [porPaginaLogs, setPorPaginaLogs] = useState(10);
 
-  const esAdmin = userProfile?.role === 'administrador' || userProfile?.role === 'gerencia';
+  const rolActual = normalizarRol(userProfile?.role);
+  const esAdmin = rolActual === 'administrador' || rolActual === 'gerencia';
+  const puedeConfigurarSistema = esAdmin || tienePermiso(userProfile, 'configuracion');
+  const puedeGestionarUsuarios = esAdmin || tienePermiso(userProfile, 'usuarios');
 
   useEffect(() => {
     if (config) setConfigLocal(config);
   }, [config]);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && ['empresa', 'pagos', 'correlativo', 'usuarios', 'logs'].includes(tab)) {
+      setPestanaActiva(tab);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (pestanaActiva === 'logs') cargarLogs();
@@ -88,6 +102,13 @@ export default function Configuracion() {
     }));
   }
 
+  function actualizarOrdenCompra(campo, valor) {
+    setConfigLocal((prev) => ({
+      ...prev,
+      ordenCompra: { ...prev.ordenCompra, [campo]: valor }
+    }));
+  }
+
   // Los datos de la empresa son fijos y de solo lectura; solo el lema anual
   // es editable. El contacto del PDF se toma del perfil del usuario.
   function actualizarEmpresa(campo, valor) {
@@ -134,15 +155,31 @@ export default function Configuracion() {
     }));
   }
 
-  const pestanas = [
-    { id: 'empresa', label: 'Empresa', icon: <FiHome /> },
-    { id: 'pagos', label: 'Condiciones', icon: <FiCreditCard /> },
-    { id: 'correlativo', label: 'Correlativos', icon: <FiHash /> }
-  ];
+  const pestanas = [];
+
+  if (puedeConfigurarSistema) {
+    pestanas.push(
+      { id: 'empresa', label: 'Empresa', icon: <FiHome /> },
+      { id: 'pagos', label: 'Condiciones', icon: <FiCreditCard /> },
+      { id: 'correlativo', label: 'Correlativos', icon: <FiHash /> }
+    );
+  }
+
+  if (puedeGestionarUsuarios) {
+    pestanas.push({ id: 'usuarios', label: 'Usuarios y Roles', icon: <FiUsers /> });
+  }
 
   if (esAdmin) {
     pestanas.push({ id: 'logs', label: 'Auditoría', icon: <FiShield /> });
   }
+
+  useEffect(() => {
+    if (pestanas.length > 0 && !pestanas.some((tab) => tab.id === pestanaActiva)) {
+      const primera = pestanas[0].id;
+      setPestanaActiva(primera);
+      setSearchParams(primera === 'empresa' ? {} : { tab: primera }, { replace: true });
+    }
+  }, [pestanaActiva, puedeConfigurarSistema, puedeGestionarUsuarios, esAdmin]);
 
   if (loadingConfig) return <Loading message="Cargando configuración..." />;
   if (!configLocal) return <div className="estado-vacio"><p>Error al cargar la configuración</p></div>;
@@ -174,7 +211,10 @@ export default function Configuracion() {
             <button
               key={tab.id}
               className={`config-tab ${pestanaActiva === tab.id ? 'config-tab-activa' : ''}`}
-              onClick={() => setPestanaActiva(tab.id)}
+              onClick={() => {
+                setPestanaActiva(tab.id);
+                setSearchParams(tab.id === 'empresa' ? {} : { tab: tab.id }, { replace: true });
+              }}
             >
               <span className="tab-icon">{tab.icon}</span>
               <span className="tab-label">{tab.label}</span>
@@ -285,7 +325,7 @@ export default function Configuracion() {
 
           {pestanaActiva === 'correlativo' && (
             <div className="config-seccion">
-              <h2 className="seccion-titulo">Códigos Correlativos de Cotización</h2>
+              <h2 className="seccion-titulo">Correlativos de documentos</h2>
               <p className="seccion-pista">
                 Configure el <strong>prefijo</strong> y el <strong>próximo número</strong> que se
                 usará al crear la siguiente cotización. El sistema <strong>auto-incrementa</strong>
@@ -293,6 +333,7 @@ export default function Configuracion() {
                 cuando quieras saltar a un número específico (ej: 1004321) o reiniciar el correlativo.
               </p>
               <div className="formulario">
+                <h3 className="config-subtitulo">Cotizaciones</h3>
                 <div className="fila-form">
                   <div className="campo">
                     <label>Prefijo</label>
@@ -334,12 +375,61 @@ export default function Configuracion() {
                     {(configLocal.cotizacion?.proximoNumero || 1000001).toString().padStart(7, '0')}
                   </span>
                 </div>
+                <div className="config-separador" />
+                <h3 className="config-subtitulo">Órdenes de compra</h3>
+                <p className="seccion-pista">
+                  El formato oficial usa el patrón <strong>OC100110</strong>: prefijo OC y seis dígitos.
+                  El número se reserva únicamente al guardar la orden y la Cloud Function lo incrementa
+                  dentro de una transacción para evitar duplicados entre usuarios.
+                </p>
+                <div className="fila-form">
+                  <div className="campo">
+                    <label>Prefijo OC</label>
+                    <input
+                      type="text"
+                      value={configLocal.ordenCompra?.prefijo || 'OC'}
+                      onChange={(e) => actualizarOrdenCompra('prefijo', e.target.value.toUpperCase())}
+                      maxLength="8"
+                    />
+                  </div>
+                  <div className="campo">
+                    <label>Próximo número OC *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={configLocal.ordenCompra?.proximoNumero || 100111}
+                      onChange={(e) => actualizarOrdenCompra('proximoNumero', Math.max(1, Number(e.target.value)))}
+                    />
+                    <span className="pista-form">Se asigna al guardar, nunca al abrir el formulario.</span>
+                  </div>
+                </div>
+                <div className="campo">
+                  <label>Última OC generada</label>
+                  <input value={configLocal.ordenCompra?.ultimoCorrelativo || 'OC100110'} readOnly className="input-solo-lectura" />
+                </div>
+                <div className="correlativo-preview">
+                  <span className="preview-label">Próxima OC:</span>
+                  <span className="preview-value">
+                    {configLocal.ordenCompra?.prefijo || 'OC'}
+                    {String(configLocal.ordenCompra?.proximoNumero || 100111).padStart(configLocal.ordenCompra?.longitud || 6, '0')}
+                  </span>
+                </div>
+                <div className="fila-form">
+                  <div className="campo"><label>Autorizado por</label><input value={configLocal.ordenCompra?.autorizadoPor || ''} onChange={(e) => actualizarOrdenCompra('autorizadoPor', e.target.value)} placeholder="Nombre que figura en la firma" /></div>
+                  <div className="campo"><label>Cargo del autorizador</label><input value={configLocal.ordenCompra?.cargoAutorizador || ''} onChange={(e) => actualizarOrdenCompra('cargoAutorizador', e.target.value)} /></div>
+                </div>
               </div>
               <div className="config-guardar">
                 <button className="btn-principal" onClick={guardarConfig} disabled={guardando}>
                   {guardando ? 'Guardando...' : 'Guardar Configuración'}
                 </button>
               </div>
+            </div>
+          )}
+
+          {pestanaActiva === 'usuarios' && puedeGestionarUsuarios && (
+            <div className="config-seccion config-seccion-usuarios">
+              <Usuarios embebido />
             </div>
           )}
 

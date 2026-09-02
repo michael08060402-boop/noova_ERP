@@ -7,12 +7,13 @@ import {
   deleteCliente
 } from '../services/clienteService';
 
-export function useClientes() {
+export function useClientes(enabled = true) {
   const [clientes, setClientes] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState(null);
 
   const fetchClientes = useCallback(async () => {
+    if (!enabled) return [];
     try {
       setLoading(true);
       setError(null);
@@ -24,11 +25,11 @@ export function useClientes() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
-    fetchClientes();
-  }, [fetchClientes]);
+    if (enabled) fetchClientes();
+  }, [enabled, fetchClientes]);
 
   const addCliente = useCallback(async (data) => {
     try {

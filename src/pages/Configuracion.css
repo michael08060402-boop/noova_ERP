@@ -150,6 +150,18 @@
   margin-top: 0.5rem;
 }
 
+.config-subtitulo {
+  margin: .15rem 0;
+  font-size: 1rem;
+  color: var(--texto-oscuro);
+}
+
+.config-separador {
+  height: 1px;
+  background: var(--gris-borde);
+  margin: .5rem 0;
+}
+
 .preview-label {
   font-size: 0.82rem;
   color: #1e40af;

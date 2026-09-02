@@ -1,7 +1,7 @@
 import { db, functions } from '../firebase/config';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { updateUserProfile } from './userService';
+import { ROLES, updateUserProfile } from './userService';
 
 const COLECCION = 'users';
 
@@ -18,11 +18,12 @@ export async function crearUsuario({ email, password, nombre, cargo, telefono, r
 }
 
 export async function cambiarRolUsuario(uid, role) {
-  await updateUserProfile(uid, { role });
+  const definicion = ROLES[role] || ROLES.sin_acceso;
+  await updateUserProfile(uid, { role, sector: definicion.sector, permissions: definicion.navItems });
 }
 
-export async function cambiarDatosUsuario(uid, { nombre, cargo, telefono }) {
-  await updateUserProfile(uid, { nombre, cargo, telefono });
+export async function cambiarDatosUsuario(uid, { nombre, cargo, telefono, sector, permissions }) {
+  await updateUserProfile(uid, { nombre, cargo, telefono, sector, permissions });
 }
 
 export async function cambiarEstadoUsuario(uid, activo) {

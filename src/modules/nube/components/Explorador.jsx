@@ -50,7 +50,7 @@ export default function Explorador({
     if (enBusqueda) {
       limpiarBusqueda();
     }
-    cargarCarpeta(item.id, item.nombre, item.ruta || null);
+    cargarCarpeta(item.id, item.nombre);
   }
 
   async function confirmarCrearCarpeta(e) {

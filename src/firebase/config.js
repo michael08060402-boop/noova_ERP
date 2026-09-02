@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 
@@ -15,6 +15,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.error('No se pudo habilitar la persistencia local de Firebase Auth:', error);
+});
 const db = getFirestore(app);
 const functions = getFunctions(app);
 
@@ -31,4 +34,4 @@ if (USE_EMULATORS) {
   console.info('Modo producción: conectado a Firebase real');
 }
 
-export { auth, db, functions };
+export { auth, authPersistenceReady, db, functions };

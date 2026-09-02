@@ -7,12 +7,13 @@ import {
   deleteCotizacion
 } from '../services/cotizacionService';
 
-export function useCotizaciones() {
+export function useCotizaciones(enabled = true) {
   const [cotizaciones, setCotizaciones] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState(null);
 
   const fetchCotizaciones = useCallback(async () => {
+    if (!enabled) return [];
     try {
       setLoading(true);
       setError(null);
@@ -24,11 +25,11 @@ export function useCotizaciones() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
-    fetchCotizaciones();
-  }, [fetchCotizaciones]);
+    if (enabled) fetchCotizaciones();
+  }, [enabled, fetchCotizaciones]);
 
   const addCotizacion = useCallback(async (data) => {
     try {

@@ -3,16 +3,6 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  server: {
-    // Proxy para la API local del módulo Nube en desarrollo
-    proxy: {
-      '/api/nube': {
-        target: 'http://localhost:3100',
-        changeOrigin: true,
-        secure: false
-      }
-    }
-  },
   build: {
     rollupOptions: {
       output: {
@@ -24,7 +14,9 @@ export default defineConfig({
         }
       }
     },
-    chunkSizeWarningLimit: 600,
+    // jsPDF se entrega en un chunk lazy separado; 700 kB evita alertas sobre
+    // ese proveedor sin inflar el bundle inicial del ERP.
+    chunkSizeWarningLimit: 700,
     sourcemap: false
   }
 })

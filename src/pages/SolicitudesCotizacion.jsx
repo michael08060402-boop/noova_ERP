@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import {
   FiPlus, FiSearch, FiTrash2, FiEdit2, FiSend, FiEye, FiClock,
-  FiFileText, FiTruck, FiRefreshCw
+  FiFileText, FiRefreshCw
 } from 'react-icons/fi';
 import { useSolicitudesCotizacion } from '../hooks/useSolicitudesCotizacion';
 import { useProveedores } from '../hooks/useProveedores';
@@ -41,7 +41,6 @@ const SOLICITUD_VACIA = {
   detalle: PLANTILLAS_POR_TIPO[TIPOS_SOLICITUD[0]]
 };
 
-const PROVEEDOR_VACIO = { razonSocial: '', ruc: '', contacto: '', email: '', telefono: '', rubro: '' };
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -74,11 +73,8 @@ export default function SolicitudesCotizacion() {
   const {
     solicitudes, loading, addSolicitud, editSolicitud, removeSolicitud, enviarSolicitud
   } = useSolicitudesCotizacion();
-  const {
-    proveedores, loading: loadingProveedores, addProveedor, editProveedor, removeProveedor
-  } = useProveedores();
+  const { proveedores, loading: loadingProveedores } = useProveedores();
 
-  const [tabActiva, setTabActiva] = useState('solicitudes'); // 'solicitudes' | 'proveedores'
   const [terminoBusqueda, setTerminoBusqueda] = useState('');
   const [mensaje, setMensaje] = useState(null);
 
@@ -293,67 +289,6 @@ export default function SolicitudesCotizacion() {
     }
   }
 
-  // ── Proveedores: modal crear/editar (opcional, solo para agilizar envíos repetidos) ──
-  const [mostrarModalProveedor, setMostrarModalProveedor] = useState(false);
-  const [editandoProveedorId, setEditandoProveedorId] = useState(null);
-  const [guardandoProveedor, setGuardandoProveedor] = useState(false);
-  const {
-    register: registerProv, handleSubmit: handleSubmitProv, reset: resetProv,
-    formState: { errors: errorsProv }
-  } = useForm({ defaultValues: PROVEEDOR_VACIO });
-
-  function nuevoProveedor() {
-    setEditandoProveedorId(null);
-    resetProv(PROVEEDOR_VACIO);
-    setMostrarModalProveedor(true);
-  }
-
-  function editarProveedor(prov) {
-    setEditandoProveedorId(prov.id);
-    resetProv({
-      razonSocial: prov.razonSocial || '',
-      ruc: prov.ruc || '',
-      contacto: prov.contacto || '',
-      email: prov.email || '',
-      telefono: prov.telefono || '',
-      rubro: prov.rubro || ''
-    });
-    setMostrarModalProveedor(true);
-  }
-
-  async function alGuardarProveedor(data) {
-    if (data.email && !EMAIL_REGEX.test(data.email)) {
-      mostrarMensaje('error', 'El correo del proveedor no es válido');
-      return;
-    }
-    setGuardandoProveedor(true);
-    try {
-      if (editandoProveedorId) {
-        await editProveedor(editandoProveedorId, data);
-      } else {
-        await addProveedor(data);
-      }
-      setMostrarModalProveedor(false);
-    } catch (err) {
-      mostrarMensaje('error', 'Error al guardar proveedor: ' + err.message);
-    } finally {
-      setGuardandoProveedor(false);
-    }
-  }
-
-  const [mostrarConfirmProveedor, setMostrarConfirmProveedor] = useState(false);
-  const [eliminarProveedorId, setEliminarProveedorId] = useState(null);
-
-  async function confirmarEliminarProveedor() {
-    try {
-      await removeProveedor(eliminarProveedorId);
-      setMostrarConfirmProveedor(false);
-      setEliminarProveedorId(null);
-    } catch (err) {
-      mostrarMensaje('error', 'Error al eliminar proveedor: ' + err.message);
-    }
-  }
-
   const solicitudesFiltradas = useMemo(() => {
     const term = terminoBusqueda.toLowerCase();
     return solicitudes.filter((s) =>
@@ -362,15 +297,6 @@ export default function SolicitudesCotizacion() {
       (s.tipo || '').toLowerCase().includes(term)
     );
   }, [solicitudes, terminoBusqueda]);
-
-  const proveedoresFiltrados = useMemo(() => {
-    const term = terminoBusqueda.toLowerCase();
-    return proveedores.filter((p) =>
-      (p.razonSocial || '').toLowerCase().includes(term) ||
-      (p.ruc || '').toLowerCase().includes(term) ||
-      (p.rubro || '').toLowerCase().includes(term)
-    );
-  }, [proveedores, terminoBusqueda]);
 
   if (loading || loadingProveedores) return <Loading message="Cargando solicitudes de cotización..." />;
 
@@ -381,49 +307,27 @@ export default function SolicitudesCotizacion() {
           <h1 className="pagina-titulo">Solicitudes de Cotización a Proveedores</h1>
           <p className="pagina-subtitle">Pide cotizaciones a otras empresas: escribe el correo, el detalle y envía.</p>
         </div>
-        {tabActiva === 'solicitudes' ? (
-          <button className="btn-principal" onClick={nuevaSolicitud}>
-            <FiPlus size={16} /> Nueva Solicitud
-          </button>
-        ) : (
-          <button className="btn-principal" onClick={nuevoProveedor}>
-            <FiPlus size={16} /> Nuevo Proveedor
-          </button>
-        )}
+        <button className="btn-principal" onClick={nuevaSolicitud}>
+          <FiPlus size={16} /> Nueva Solicitud
+        </button>
       </div>
 
       {mensaje && (
         <div className={`mensaje-flash mensaje-${mensaje.tipo}`}>{mensaje.texto}</div>
       )}
 
-      <div className="sc-tabs">
-        <button
-          className={`sc-tab ${tabActiva === 'solicitudes' ? 'sc-tab-activa' : ''}`}
-          onClick={() => { setTabActiva('solicitudes'); setTerminoBusqueda(''); }}
-        >
-          <FiFileText size={15} /> Solicitudes ({solicitudes.length})
-        </button>
-        <button
-          className={`sc-tab ${tabActiva === 'proveedores' ? 'sc-tab-activa' : ''}`}
-          onClick={() => { setTabActiva('proveedores'); setTerminoBusqueda(''); }}
-        >
-          <FiTruck size={15} /> Proveedores guardados ({proveedores.length})
-        </button>
-      </div>
-
       <div className="filtros-barra">
         <div className="barra-busqueda">
           <FiSearch className="icono-busqueda" size={18} />
           <input
             type="text"
-            placeholder={tabActiva === 'solicitudes' ? 'Buscar por código, proveedor o tipo...' : 'Buscar por razón social, RUC o rubro...'}
+            placeholder="Buscar por código, proveedor o tipo..."
             value={terminoBusqueda}
             onChange={(e) => setTerminoBusqueda(e.target.value)}
           />
         </div>
       </div>
 
-      {tabActiva === 'solicitudes' ? (
         <div className="tarjeta-tabla">
           {solicitudesFiltradas.length === 0 ? (
             <div className="estado-vacio">
@@ -488,59 +392,6 @@ export default function SolicitudesCotizacion() {
             </div>
           )}
         </div>
-      ) : (
-        <div className="tarjeta-tabla">
-          {proveedoresFiltrados.length === 0 ? (
-            <div className="estado-vacio">
-              <p>No hay proveedores guardados</p>
-              <p className="pista">Guardar un proveedor es opcional: solo agiliza envíos repetidos, no es obligatorio para enviar una solicitud</p>
-            </div>
-          ) : (
-            <div className="tabla-contenedor">
-              <table className="tabla-datos">
-                <thead>
-                  <tr>
-                    <th>Razón social</th>
-                    <th>RUC</th>
-                    <th>Rubro</th>
-                    <th>Contacto</th>
-                    <th>Correo</th>
-                    <th>Teléfono</th>
-                    <th className="texto-centro">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {proveedoresFiltrados.map((p) => (
-                    <tr key={p.id}>
-                      <td className="texto-negrita">{p.razonSocial}</td>
-                      <td>{p.ruc || '—'}</td>
-                      <td>{p.rubro || '—'}</td>
-                      <td>{p.contacto || '—'}</td>
-                      <td>{p.email || '—'}</td>
-                      <td>{p.telefono || '—'}</td>
-                      <td className="texto-centro">
-                        <div className="acciones-tabla">
-                          <button className="btn-accion" onClick={() => editarProveedor(p)} title="Editar">
-                            <FiEdit2 size={16} />
-                          </button>
-                          <button
-                            className="btn-accion btn-eliminar"
-                            onClick={() => { setEliminarProveedorId(p.id); setMostrarConfirmProveedor(true); }}
-                            title="Eliminar"
-                          >
-                            <FiTrash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Modal: nueva/editar solicitud — escribir y enviar en un solo paso */}
       <Modal
         isOpen={mostrarModalSolicitud}
@@ -674,67 +525,6 @@ export default function SolicitudesCotizacion() {
         message="Esta acción eliminará la solicitud de cotización permanentemente. ¿Está seguro?"
       />
 
-      {/* Modal: nuevo/editar proveedor */}
-      <Modal
-        isOpen={mostrarModalProveedor}
-        onClose={() => setMostrarModalProveedor(false)}
-        title={editandoProveedorId ? 'Editar Proveedor' : 'Nuevo Proveedor'}
-      >
-        <form onSubmit={handleSubmitProv(alGuardarProveedor)} className="formulario">
-          <div className="campo">
-            <label>Razón social *</label>
-            <input
-              {...registerProv('razonSocial', { required: 'La razón social es requerida' })}
-              className={errorsProv.razonSocial ? 'input-error' : ''}
-            />
-            {errorsProv.razonSocial && <span className="mensaje-error">{errorsProv.razonSocial.message}</span>}
-          </div>
-          <div className="campo">
-            <label>RUC</label>
-            <input {...registerProv('ruc')} placeholder="20XXXXXXXXX" />
-          </div>
-          <div className="campo">
-            <label>Rubro</label>
-            <input {...registerProv('rubro')} placeholder="Ej: Calibraciones, equipos, insumos..." />
-          </div>
-          <div className="campo">
-            <label>Persona de contacto</label>
-            <input {...registerProv('contacto')} />
-          </div>
-          <div className="campo">
-            <label>Correo *</label>
-            <input
-              type="email"
-              {...registerProv('email', {
-                required: 'El correo es requerido',
-                pattern: { value: EMAIL_REGEX, message: 'Correo inválido' }
-              })}
-              className={errorsProv.email ? 'input-error' : ''}
-            />
-            {errorsProv.email && <span className="mensaje-error">{errorsProv.email.message}</span>}
-          </div>
-          <div className="campo">
-            <label>Teléfono</label>
-            <input {...registerProv('telefono')} />
-          </div>
-          <div className="acciones-form">
-            <button type="button" className="btn-secundario" onClick={() => setMostrarModalProveedor(false)}>
-              Cancelar
-            </button>
-            <button type="submit" className="btn-principal" disabled={guardandoProveedor}>
-              {guardandoProveedor ? 'Guardando...' : editandoProveedorId ? 'Actualizar' : 'Guardar'}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      <ConfirmDialog
-        isOpen={mostrarConfirmProveedor}
-        onClose={() => setMostrarConfirmProveedor(false)}
-        onConfirm={confirmarEliminarProveedor}
-        title="¿Eliminar proveedor?"
-        message="Esta acción eliminará el proveedor permanentemente. ¿Está seguro?"
-      />
     </div>
   );
 }

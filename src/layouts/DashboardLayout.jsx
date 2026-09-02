@@ -2,11 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   FiBarChart2, FiUsers, FiFileText, FiSettings,
-  FiMenu, FiLogOut, FiUser, FiX, FiDollarSign, FiBell, FiTool, FiWind, FiMessageCircle, FiCloud, FiShoppingCart, FiShield
+  FiMenu, FiLogOut, FiUser, FiX, FiDollarSign, FiBell, FiTool, FiWind, FiMessageCircle, FiCloud, FiShoppingCart, FiTruck
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useCotizaciones } from '../hooks/useCotizaciones';
-import { ROLES } from '../services/userService';
+import { tienePermiso } from '../services/userService';
 import logo from '../assets/logo-blanco.png';
 import '../styles/shared.css';
 import './DashboardLayout.css';
@@ -18,10 +18,10 @@ const ITEMS_MENU = [
   { path: '/mangas', label: 'Mangas', icon: <FiWind />, key: 'mangas' },
   { path: '/cotizaciones', label: 'Cotizaciones', icon: <FiFileText />, key: 'cotizaciones' },
   { path: '/mensajeria', label: 'Mensajería', icon: <FiMessageCircle />, key: 'mensajeria' },
-  { path: '/compras', label: 'Compras', icon: <FiShoppingCart />, key: 'compras' },
+  { path: '/proveedores', label: 'Proveedores', icon: <FiTruck />, key: 'proveedores' },
+  { path: '/compras', label: 'Órdenes de compra', icon: <FiShoppingCart />, key: 'compras' },
   { path: '/facturacion', label: 'Boletas / Facturas', icon: <FiDollarSign />, key: 'facturacion' },
   { path: '/nube', label: 'Nube', icon: <FiCloud />, key: 'nube' },
-  { path: '/usuarios', label: 'Usuarios y Roles', icon: <FiShield />, key: 'usuarios' },
   { path: '/configuracion', label: 'Configuración', icon: <FiSettings />, key: 'configuracion' }
 ];
 
@@ -36,8 +36,8 @@ function useEsMobile() {
 }
 
 export default function DashboardLayout() {
-  const { currentUser, userProfile, logout, avisoTimeout, setAvisoTimeout } = useAuth();
-  const { cotizaciones } = useCotizaciones();
+  const { currentUser, userProfile, logout } = useAuth();
+  const { cotizaciones } = useCotizaciones(tienePermiso(userProfile, 'cotizaciones'));
   const navigate = useNavigate();
   const esMobile = useEsMobile();
 
@@ -49,9 +49,12 @@ export default function DashboardLayout() {
   const menuUsuarioRef = useRef(null);
   const notificacionesRef = useRef(null);
 
-  const rolUsuario = userProfile?.role || 'comercial';
-  const configRol = ROLES[rolUsuario] || ROLES.comercial;
-  const itemsMenu = ITEMS_MENU.filter(item => configRol.navItems.includes(item.key));
+  const itemsMenu = ITEMS_MENU.filter((item) => {
+    if (item.path === '/configuracion') {
+      return tienePermiso(userProfile, 'configuracion') || tienePermiso(userProfile, 'usuarios');
+    }
+    return tienePermiso(userProfile, item.key);
+  });
 
   useEffect(() => {
     function manejarClickFuera(e) {
@@ -199,13 +202,6 @@ export default function DashboardLayout() {
               </button>
             )}
             <span className="topbar-title">ERP NOOVA S.A.C.</span>
-            <button
-              className="btn-editar-empresa"
-              onClick={() => navigate('/configuracion')}
-              title="Editar datos de la empresa"
-            >
-              <FiSettings size={14} /> Editar Empresa
-            </button>
           </div>
 
           <div className="topbar-actions">
@@ -249,22 +245,6 @@ export default function DashboardLayout() {
         </main>
       </div>
 
-      {/* Aviso de cierre de sesión por inactividad */}
-      {avisoTimeout && (
-        <div className="timeout-aviso-overlay">
-          <div className="timeout-aviso-caja">
-            <h3>Su sesión expirará pronto</h3>
-            <p>Por inactividad, su sesión se cerrará automáticamente en 2 minutos.</p>
-            <p className="timeout-aviso-pista">Haga clic en cualquier parte para seguir trabajando.</p>
-            <button
-              className="btn-principal"
-              onClick={() => setAvisoTimeout(false)}
-            >
-              Continuar trabajando
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

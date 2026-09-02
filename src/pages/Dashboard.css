@@ -10,6 +10,35 @@
   margin-bottom: 1.25rem;
 }
 
+.dashboard-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: .75rem;
+  margin-bottom: .875rem;
+}
+
+.dashboard-kpi {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+  min-width: 0;
+}
+
+.dashboard-kpi span, .dashboard-kpi small {
+  display: block;
+  color: #6b7280;
+  font-size: .76rem;
+}
+
+.dashboard-kpi strong {
+  display: block;
+  margin: .25rem 0 .1rem;
+  color: #111827;
+  font-size: 1.45rem;
+  line-height: 1.2;
+}
+
 .dashboard-chart-grid {
   display: grid;
   grid-template-columns: 1.4fr 0.6fr;

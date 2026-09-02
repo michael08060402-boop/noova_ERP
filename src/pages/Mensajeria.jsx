@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   FiMessageCircle, FiSearch, FiSend, FiUser, FiClock,
   FiAlertCircle, FiCheckCircle, FiX, FiChevronDown, FiUsers,
-  FiCalendar, FiTrash2, FiBell
+  FiCalendar, FiTrash2
 } from 'react-icons/fi';
 import { useClientes } from '../hooks/useClientes';
 import { useAuth } from '../context/AuthContext';

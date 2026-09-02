@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase/config';
 
@@ -14,16 +14,14 @@ export function useRucLookup() {
   const [error, setError] = useState(null);
   const debounceRef = useRef(null);
   const rucEnProcesoRef = useRef(null);
-  const consultarRucFn = useRef(null);
-
-  // Inicializa la Cloud Function perezosamente
-  if (!consultarRucFn.current) {
+  const consultarRucFn = useMemo(() => {
     try {
-      consultarRucFn.current = httpsCallable(functions, 'consultarRuc', { timeout: 30000 });
+      return httpsCallable(functions, 'consultarRuc', { timeout: 30000 });
     } catch (err) {
       console.error('useRucLookup: no se pudo inicializar httpsCallable:', err);
+      return null;
     }
-  }
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -56,10 +54,10 @@ export function useRucLookup() {
       rucEnProcesoRef.current = rucLimpio;
       setCargando(true);
       try {
-        if (!consultarRucFn.current) {
+        if (!consultarRucFn) {
           throw new Error('Cloud Function no inicializada');
         }
-        const result = await consultarRucFn.current({ ruc: rucLimpio });
+        const result = await consultarRucFn({ ruc: rucLimpio });
         const data = result.data;
         if (!data || !data.razonSocial) {
           throw new Error('Respuesta vacía del servidor');
@@ -74,7 +72,7 @@ export function useRucLookup() {
         rucEnProcesoRef.current = null;
       }
     }, DEBOUNCE_MS);
-  }, []);
+  }, [consultarRucFn]);
 
   const limpiar = useCallback(() => {
     setDatosRuc(null);

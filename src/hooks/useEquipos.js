@@ -8,12 +8,13 @@ import {
   deleteEquipo
 } from '../services/equipoService';
 
-export function useEquipos() {
+export function useEquipos(enabled = true) {
   const [equipos, setEquipos] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState(null);
 
   const fetchEquipos = useCallback(async () => {
+    if (!enabled) return [];
     try {
       setLoading(true);
       setError(null);
@@ -25,11 +26,11 @@ export function useEquipos() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
-    fetchEquipos();
-  }, [fetchEquipos]);
+    if (enabled) fetchEquipos();
+  }, [enabled, fetchEquipos]);
 
   const addEquipo = useCallback(async (data) => {
     try {

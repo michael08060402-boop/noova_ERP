@@ -5,8 +5,6 @@ import { calcularSubtotal, calcularIGV, calcularTotal } from './formatCurrency';
 
 import headerImg from '../assets/header.png';
 import footerImg from '../assets/footer.png';
-import noovaLogoImg from '../assets/noova-logo.png';
-import banconacionImg from '../assets/banconacion.png';
 import interbankImg from '../assets/interbank.png';
 
 const IMG_FULL_HEADER = headerImg;
@@ -512,15 +510,6 @@ function numeroALetras(num) {
   return (resultado + ' Y ' + decStr + '/100').toUpperCase();
 }
 
-// Formatea la dirección: mayúsculas, "OFICINA" → "OF.", sin tildes.
-function formatearDireccionEmpresa(direccion) {
-  if (!direccion) return '';
-  return direccion
-    .toUpperCase()
-    .replace(/OFICINA/g, 'OF.')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-}
-
 // Generación de PDF para facturas y boletas electrónicas.
 // Réplica exacta del formato oficial SUNAT enviado como referencia:
 //   - Página US Letter (612x792 pts)
@@ -536,7 +525,6 @@ function formatearDireccionEmpresa(direccion) {
 export function generateFacturaPDF(factura, config = {}) {
   const doc = new jsPDF({ format: 'letter', unit: 'pt' });
   const pageWidth = doc.internal.pageSize.getWidth();   // 612
-  const pageHeight = doc.internal.pageSize.getHeight(); // 792
   const margin = 11.5;
   const contentW = pageWidth - 2 * margin;
   const topMargin = 26.5; // Margen superior del original
@@ -905,7 +893,6 @@ export function generateFacturaPDF(factura, config = {}) {
   //   - Valores centrados VERTICALMENTE dentro de las cajas
   //   - Importe Total SIN negrita
   const totTop = y;
-  const mitadW = contentW / 2;
 
   // 11 filas de totales; la venta gratuita va solo en el lado izquierdo.
   const filasTotales = 11;
@@ -1088,7 +1075,6 @@ export function generateFacturaPDF(factura, config = {}) {
   // El marco cierra con DOBLE línea en el borde inferior
   const marcoTop = topMargin;
   const marcoBottom = yLey;
-  const marcoH = marcoBottom - marcoTop;
 
   // Dibujar los 3 lados del marco (superior, izquierdo, derecho) con línea simple
   doc.setDrawColor(0, 0, 0);
@@ -1102,8 +1088,6 @@ export function generateFacturaPDF(factura, config = {}) {
   // Borde inferior DOBLE (dos rayas paralelas separadas por ~3pt)
   doc.line(margin, marcoBottom, margin + contentW, marcoBottom);
   doc.line(margin, marcoBottom + 3, margin + contentW, marcoBottom + 3);
-
-  y = marcoBottom + 7;
 
   return doc;
 }

@@ -28,6 +28,16 @@ const CONFIG_BASE = {
     prefijo: 'NV',
     secuenciaInicio: 1000001,
     proximoNumero: 1000001
+  },
+  ordenCompra: {
+    prefijo: 'OC',
+    longitud: 6,
+    ultimoCorrelativo: 'OC100110',
+    proximoNumero: 100111,
+    elaboradoPor: '',
+    cargoElaborador: '',
+    autorizadoPor: '',
+    cargoAutorizador: 'GERENTE GENERAL NOOVA S.A.C.'
   }
 };
 
@@ -37,7 +47,8 @@ function mergeConfig(data = {}) {
     condicionesPago: Array.isArray(data.condicionesPago) ? data.condicionesPago : CONFIG_BASE.condicionesPago,
     condicionesVenta: Array.isArray(data.condicionesVenta) ? data.condicionesVenta : CONFIG_BASE.condicionesVenta,
     cuentasBancarias: data.cuentasBancarias || CONFIG_BASE.cuentasBancarias,
-    cotizacion: { ...CONFIG_BASE.cotizacion, ...(data.cotizacion || {}) }
+    cotizacion: { ...CONFIG_BASE.cotizacion, ...(data.cotizacion || {}) },
+    ordenCompra: { ...CONFIG_BASE.ordenCompra, ...(data.ordenCompra || {}) }
   };
 }
 

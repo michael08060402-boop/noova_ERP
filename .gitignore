@@ -33,6 +33,7 @@ dist-ssr
 # Skills (herramienta de desarrollo)
 skills-lock.json
 .agents/
+.impeccable/
 
 # Certificados
 certificado.p12
