@@ -4,13 +4,12 @@ const { post } = require('./graphClient');
 // Usa la misma app-only auth (client credentials) que ya usa el módulo Nube,
 // por lo tanto no requiere ningún servicio de terceros ni costo adicional:
 // se envía desde el buzón de Microsoft 365 configurado en GRAPH_MAIL_SENDER
-// (o GRAPH_DRIVE_ID como respaldo), sin límites propios más allá de los
-// que ya tenga la cuenta de correo de la empresa.
+// sin límites propios más allá de los que ya tenga la cuenta de correo de la empresa.
 
 function buzonRemitente() {
-  const remitente = process.env.GRAPH_MAIL_SENDER || process.env.GRAPH_DRIVE_ID;
+  const remitente = process.env.GRAPH_MAIL_SENDER;
   if (!remitente) {
-    throw new Error('Falta variable GRAPH_MAIL_SENDER (o GRAPH_DRIVE_ID) con el correo remitente.');
+    throw new Error('Falta variable GRAPH_MAIL_SENDER con el correo remitente.');
   }
   return remitente;
 }

@@ -52,7 +52,7 @@ async function listarCarpeta(carpetaId) {
     tamaño: item.size || 0,
     fechaModificacion: item.lastModifiedDateTime,
     urlWeb: item.webUrl || null,
-    extension: item.file?.name ? item.name.split('.').pop().toLowerCase() : null,
+    extension: item.file ? item.name.split('.').pop().toLowerCase() : null,
     mimeType: item.file?.mimeType || null
   }));
 }
@@ -97,7 +97,7 @@ async function buscarDocumentos(termino) {
       tamaño: item.size || 0,
       fechaModificacion: item.lastModifiedDateTime,
       urlWeb: item.webUrl || null,
-      extension: item.file?.name ? item.name.split('.').pop().toLowerCase() : null,
+      extension: item.file ? item.name.split('.').pop().toLowerCase() : null,
       mimeType: item.file?.mimeType || null,
       ruta: rutaPadre ? `${rutaPadre}/${item.name}` : item.name,
       _rutaPadreCompleta: rutaPadre
@@ -130,7 +130,7 @@ async function listarCarpetaPorRuta(rutaCarpeta) {
       tamaño: item.size || 0,
       fechaModificacion: item.lastModifiedDateTime,
       urlWeb: item.webUrl || null,
-      extension: item.file?.name ? item.name.split('.').pop().toLowerCase() : null,
+      extension: item.file ? item.name.split('.').pop().toLowerCase() : null,
       mimeType: item.file?.mimeType || null
     }));
   } catch (err) {

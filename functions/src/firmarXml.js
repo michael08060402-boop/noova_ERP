@@ -9,8 +9,6 @@ async function firmarXml(xmlString, certBase64, certPass, sigId = 'IDSignNOOVA')
   const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, certPass);
 
   let privateKey = null;
-  let cert = null;
-
   let primerCertificado = null;
 
   for (const safeContent of p12.safeContents) {
@@ -26,7 +24,7 @@ async function firmarXml(xmlString, certBase64, certPass, sigId = 'IDSignNOOVA')
     }
   }
 
-  cert = primerCertificado;
+  const cert = primerCertificado;
 
   if (!privateKey || !cert) {
     throw new Error('No se pudo extraer clave privada o certificado del P12');
