@@ -11,6 +11,7 @@ import { downloadOrdenCompraPDF } from '../utils/generateOrdenCompraPDF';
 import { formatDate, formatDateISO } from '../utils/formatDate';
 import { addLog } from '../services/logService';
 import { LISTA_PRECIOS_PARTNER_2026, buscarProductoPartner } from '../data/preciosPartner2026';
+import { FIRMANTES } from '../data/firmantes';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Loading from '../components/Loading';
@@ -50,8 +51,9 @@ function formularioVacio(config, userProfile, cotizacion = null) {
       : [{ ...ITEM_VACIO }],
     origenCotizacionId: cotizacion?.id || null,
     origenCotizacionCodigo: cotizacion?.codigo || null,
-    elaboradoPor: userProfile?.nombre || ocConfig.elaboradoPor || '',
-    cargoElaborador: userProfile?.cargo || ocConfig.cargoElaborador || '',
+    firmadoPorId: '',
+    elaboradoPor: ocConfig.elaboradoPor || '',
+    cargoElaborador: ocConfig.cargoElaborador || '',
     autorizadoPor: ocConfig.autorizadoPor || '',
     cargoAutorizador: ocConfig.cargoAutorizador || ''
   };
@@ -168,6 +170,16 @@ export default function Compras() {
         telefono: proveedor.telefono || proveedor.celular || '',
         email: proveedor.email || ''
       } : { razonSocial: '', ruc: '', contacto: '', direccion: '', telefono: '', email: '' }
+    }));
+  }
+
+  function seleccionarFirmante(id) {
+    const firmante = FIRMANTES.find((f) => f.id === id);
+    setForm((prev) => ({
+      ...prev,
+      firmadoPorId: id,
+      elaboradoPor: firmante?.nombre || '',
+      cargoElaborador: firmante?.cargo || ''
     }));
   }
 
@@ -364,6 +376,26 @@ export default function Compras() {
             <div className="campo"><label>Forma de pago *</label><input value={form.formaPago} onChange={(event) => setForm((prev) => ({ ...prev, formaPago: event.target.value }))} /></div>
             <div className="campo campo-doble"><label>Lugar de entrega *</label><input value={form.lugarEntrega} onChange={(event) => setForm((prev) => ({ ...prev, lugarEntrega: event.target.value }))} /></div>
             <div className="campo"><label>Referencia</label><input value={form.referencia} onChange={(event) => setForm((prev) => ({ ...prev, referencia: event.target.value }))} /></div>
+          </div>
+          <div className="fila-form fila-form-1">
+            <div className="campo">
+              <label>Firmado por *</label>
+              <select
+                value={form.firmadoPorId}
+                onChange={(event) => seleccionarFirmante(event.target.value)}
+                className={errores.firmadoPorId ? 'input-error' : ''}
+              >
+                <option value="">Seleccionar...</option>
+                {FIRMANTES.map((f) => (
+                  <option key={f.id} value={f.id}>{f.nombre} — {f.cargo}</option>
+                ))}
+              </select>
+              {errores.firmadoPorId ? (
+                <span className="mensaje-error">{errores.firmadoPorId}</span>
+              ) : (
+                <span className="pista-form">Se usa como "Elaborado por" y su firma en el PDF de la orden de compra.</span>
+              )}
+            </div>
           </div>
 
           <div className="compras-items-header"><h3>Ítems de compra</h3><button type="button" className="btn-secundario btn-pequeno" onClick={agregarItem}><FiPlus size={14} /> Agregar ítem</button></div>

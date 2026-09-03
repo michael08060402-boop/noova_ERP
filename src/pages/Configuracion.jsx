@@ -415,8 +415,14 @@ export default function Configuracion() {
                   </span>
                 </div>
                 <div className="fila-form">
-                  <div className="campo"><label>Autorizado por</label><input value={configLocal.ordenCompra?.autorizadoPor || ''} onChange={(e) => actualizarOrdenCompra('autorizadoPor', e.target.value)} placeholder="Nombre que figura en la firma" /></div>
-                  <div className="campo"><label>Cargo del autorizador</label><input value={configLocal.ordenCompra?.cargoAutorizador || ''} onChange={(e) => actualizarOrdenCompra('cargoAutorizador', e.target.value)} /></div>
+                  <div className="campo">
+                    <label>Autorizado por</label>
+                    <input value="Alfredo Landeo León Landeo" readOnly className="input-solo-lectura" />
+                  </div>
+                  <div className="campo">
+                    <label>Cargo del autorizador</label>
+                    <input value="GERENTE GENERAL NOOVA S.A.C." readOnly className="input-solo-lectura" />
+                  </div>
                 </div>
               </div>
               <div className="config-guardar">

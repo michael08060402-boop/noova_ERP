@@ -68,6 +68,7 @@ function normalizarOrden(data, proveedor) {
     ...totales,
     origenCotizacionId: data.origenCotizacionId || null,
     origenCotizacionCodigo: limpiar(data.origenCotizacionCodigo, 40) || null,
+    firmadoPorId: limpiar(data.firmadoPorId, 40),
     elaboradoPor: limpiar(data.elaboradoPor, 140),
     cargoElaborador: limpiar(data.cargoElaborador, 100),
     autorizadoPor: limpiar(data.autorizadoPor, 140),

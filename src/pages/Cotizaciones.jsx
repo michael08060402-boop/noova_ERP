@@ -1271,7 +1271,7 @@ export default function Cotizaciones() {
             </div>
           </div>
 
-          {/* Tipo de item — fila propia */}
+          {/* Tipo de item y Firmado por */}
           <div className="fila-form fila-form-1">
             <div className="campo">
               <label>Tipo de item</label>

@@ -33,6 +33,7 @@ export function validarOrdenCompra(orden) {
   if (!orden?.fecha) errores.fecha = 'La fecha es requerida';
   if (!orden?.formaPago?.trim()) errores.formaPago = 'La forma de pago es requerida';
   if (!orden?.lugarEntrega?.trim()) errores.lugarEntrega = 'El lugar de entrega es requerido';
+  if (!orden?.firmadoPorId?.trim()) errores.firmadoPorId = 'Seleccione quién firma la orden';
   if (!Array.isArray(orden?.items) || orden.items.length === 0) {
     errores.items = 'Agregue al menos un ítem';
   } else {

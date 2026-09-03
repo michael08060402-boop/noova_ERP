@@ -1,6 +1,9 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import noovaLogoUrl from '../assets/noova-logo.png';
+import firmaAlfredoUrl from '../assets/firmas/ing.alfredoleon.jpeg';
+import firmaElenaUrl from '../assets/firmas/ingelena.jpeg';
+import firmaGianfrancoUrl from '../assets/firmas/gianfranco.jpeg';
 import { formatDate } from './formatDate';
 import { numeroALetrasOrden } from './ordenCompra';
 
@@ -15,6 +18,20 @@ function cargarImagen(url) {
     image.onerror = reject;
     image.src = url;
   });
+}
+
+function dibujarFirmaAjustada(doc, imagen, boxX, boxY, boxW, boxH) {
+  if (!imagen) return;
+  const ratio = imagen.naturalWidth / imagen.naturalHeight;
+  let w = boxW;
+  let h = w / ratio;
+  if (h > boxH) {
+    h = boxH;
+    w = h * ratio;
+  }
+  const x = boxX + (boxW - w) / 2;
+  const y = boxY + (boxH - h) / 2;
+  doc.addImage(imagen, 'JPEG', x, y, w, h, undefined, 'FAST');
 }
 
 function poligono(doc, puntos, color) {
@@ -123,6 +140,11 @@ export async function generateOrdenCompraPDF(orden, config = {}) {
   const empresa = config.empresa || {};
   const proveedor = orden.proveedor || {};
   const logo = await cargarImagen(noovaLogoUrl);
+  const firmaAlfredo = await cargarImagen(firmaAlfredoUrl);
+  const firmaElena = await cargarImagen(firmaElenaUrl);
+  const firmaGianfranco = await cargarImagen(firmaGianfrancoUrl);
+  const FIRMAS_ELABORADOR = { elena: firmaElena, gianfranco: firmaGianfranco };
+  const firmaElaborador = FIRMAS_ELABORADOR[orden.firmadoPorId] || null;
 
   dibujarMarca(doc, empresa, logo);
   texto(doc, `ORDEN DE COMPRA N°: ${orden.codigo || 'PENDIENTE'}`, 105, 54, {
@@ -220,20 +242,22 @@ export async function generateOrdenCompraPDF(orden, config = {}) {
     texto(doc, `Origen interno: ${orden.origenCotizacionCodigo}`, 9, y + 33, { size: 6.3, color: [90, 90, 90] });
   }
 
-  const firmasY = Math.min(258, Math.max(y + 48, 235));
+  const firmasY = Math.min(216, Math.max(y + 48, 190));
   doc.setFillColor(...CELESTE);
   doc.rect(8, firmasY, 98, 5, 'F');
   doc.rect(110, firmasY, 92, 5, 'F');
   texto(doc, 'ELABORADO POR:', 57, firmasY + 3.5, { bold: true, size: 7.6, color: [255, 255, 255], align: 'center' });
   texto(doc, 'AUTORIZADO POR:', 156, firmasY + 3.5, { bold: true, size: 7.6, color: [255, 255, 255], align: 'center' });
+  dibujarFirmaAjustada(doc, firmaElaborador, 19, firmasY + 6, 76, 36);
+  dibujarFirmaAjustada(doc, firmaAlfredo, 118, firmasY + 6, 76, 36);
   doc.setDrawColor(...AZUL);
-  doc.line(25, firmasY + 18, 89, firmasY + 18);
-  doc.line(126, firmasY + 18, 190, firmasY + 18);
+  doc.line(25, firmasY + 44, 89, firmasY + 44);
+  doc.line(126, firmasY + 44, 190, firmasY + 44);
   const ocConfig = config.ordenCompra || {};
-  texto(doc, (orden.elaboradoPor || ocConfig.elaboradoPor || '-').toUpperCase(), 57, firmasY + 23, { bold: true, size: 7.6, align: 'center' });
-  texto(doc, orden.cargoElaborador || ocConfig.cargoElaborador || '', 57, firmasY + 27.5, { size: 7.2, align: 'center' });
-  texto(doc, (orden.autorizadoPor || ocConfig.autorizadoPor || '-').toUpperCase(), 156, firmasY + 23, { bold: true, size: 7.6, align: 'center' });
-  texto(doc, orden.cargoAutorizador || ocConfig.cargoAutorizador || '', 156, firmasY + 27.5, { size: 7.2, align: 'center' });
+  texto(doc, (orden.elaboradoPor || ocConfig.elaboradoPor || '-').toUpperCase(), 57, firmasY + 50, { bold: true, size: 7.6, align: 'center' });
+  texto(doc, orden.cargoElaborador || ocConfig.cargoElaborador || '', 57, firmasY + 54.5, { size: 7.2, align: 'center' });
+  texto(doc, 'ALFREDO LANDEO LEÓN LANDEO', 156, firmasY + 50, { bold: true, size: 7.6, align: 'center' });
+  texto(doc, 'GERENTE GENERAL NOOVA S.A.C.', 156, firmasY + 54.5, { size: 7.2, align: 'center' });
   dibujarFooter(doc);
   return doc;
 }
