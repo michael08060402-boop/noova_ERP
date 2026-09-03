@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { FiDownload, FiEdit2, FiTrash2, FiPlus, FiSearch, FiUserPlus, FiLoader, FiX, FiShoppingCart } from 'react-icons/fi';
+import { FiDownload, FiEdit2, FiTrash2, FiPlus, FiSearch, FiUserPlus, FiLoader, FiX, FiShoppingCart, FiBriefcase, FiList, FiFileText, FiArrowLeft } from 'react-icons/fi';
 import { useCotizaciones } from '../hooks/useCotizaciones';
 import { useClientes } from '../hooks/useClientes';
 import { useEquipos } from '../hooks/useEquipos';
@@ -14,7 +14,6 @@ import { addLog } from '../services/logService';
 import { useRucLookup } from '../hooks/useRucLookup';
 import { formatDate, formatDateISO } from '../utils/formatDate';
 import { formatUSD, formatCurrency, calcularSubtotal, calcularIGV, calcularTotal } from '../utils/formatCurrency';
-import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Paginacion from '../components/Paginacion';
 import Loading from '../components/Loading';
@@ -236,7 +235,7 @@ export default function Cotizaciones() {
   const { currentUser, userProfile } = useAuth();
   const { config, refreshConfig } = useConfig();
 
-  const [mostrarModal, setMostrarModal] = useState(false);
+  const [vista, setVista] = useState('lista'); // 'lista' | 'form'
   const [mostrarConfirm, setMostrarConfirm] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [eliminarId, setEliminarId] = useState(null);
@@ -341,7 +340,7 @@ export default function Cotizaciones() {
     setClienteDropdownAbierto(false);
     setBusquedaContacto('');
     setContactoDropdownAbierto(false);
-    setMostrarModal(true);
+    setVista('form');
   }
 
   function editarCotizacion(cot) {
@@ -375,7 +374,7 @@ export default function Cotizaciones() {
     setErroresForm({});
     setBusquedaCliente(cot.cliente?.razonSocial || '');
     setClienteSeleccionado(cot.cliente || null);
-    setMostrarModal(true);
+    setVista('form');
   }
 
   function solicitarEliminar(id) {
@@ -741,7 +740,7 @@ export default function Cotizaciones() {
         const result = await addCotizacion(data);
         await addLog({ usuario: responsable, accion: 'crear_cotizacion', detalle: result.codigo || '' });
       }
-      setMostrarModal(false);
+      setVista('lista');
     } catch (err) {
       console.error('Error guardando cotización:', err);
       mostrarMensaje('error', 'Error al guardar cotización: ' + err.message);
@@ -817,13 +816,34 @@ export default function Cotizaciones() {
       <div className="pagina-header">
         <div>
           <h1 className="pagina-titulo">Cotizaciones</h1>
-          <p className="pagina-subtitle">
-            {cotizaciones.length} cotizaciones registradas • {pendientesCount} pendientes
-          </p>
+          {vista === 'lista' && (
+            <p className="pagina-subtitle">
+              {cotizaciones.length} cotizaciones registradas • {pendientesCount} pendientes
+            </p>
+          )}
         </div>
-        <button className="btn-principal" onClick={nuevaCotizacion}>
-          <FiPlus size={16} /> Nueva Cotización
-        </button>
+        {vista === 'lista' && (
+          <button className="btn-principal" onClick={nuevaCotizacion}>
+            <FiPlus size={16} /> Nueva Cotización
+          </button>
+        )}
+      </div>
+
+      <div className="tabs-cotizaciones">
+        {vista === 'form' ? (
+          <button type="button" className="tab-cotizacion tab-volver" onClick={() => setVista('lista')}>
+            <FiArrowLeft size={14} /> Volver a la lista de cotizaciones
+          </button>
+        ) : (
+          <button type="button" className="tab-cotizacion activa" onClick={() => setVista('lista')}>
+            Lista de cotizaciones
+          </button>
+        )}
+        {vista === 'form' && (
+          <button type="button" className="tab-cotizacion activa" disabled>
+            {editandoId ? 'Editar Cotización' : 'Nueva Cotización'}
+          </button>
+        )}
       </div>
 
       {mensaje && (
@@ -832,6 +852,8 @@ export default function Cotizaciones() {
         </div>
       )}
 
+      {vista === 'lista' && (
+      <>
       <div className="filtros-barra">
         <div className="barra-busqueda">
           <FiSearch className="icono-busqueda" size={18} />
@@ -962,14 +984,17 @@ export default function Cotizaciones() {
           </>
         )}
       </div>
+      </>
+      )}
 
-      <Modal
-        isOpen={mostrarModal}
-        onClose={() => setMostrarModal(false)}
-        title={editandoId ? 'Editar Cotización' : 'Nueva Cotización'}
-        size="large"
-      >
+      {vista === 'form' && (
+      <div className="cotizacion-form-vista">
         <form onSubmit={handleSubmit} className="formulario formulario-compacto">
+        <div className="cotizacion-form-grid">
+        <div className="cotizacion-form-principal">
+        <div className="form-card">
+          <div className="form-card-header"><FiBriefcase size={16} /><h3>Datos comerciales</h3></div>
+          <div className="form-card-body">
           {/* Cliente */}
           <div className="fila-form">
             <div className="campo campo-cliente-busqueda">
@@ -1285,8 +1310,12 @@ export default function Cotizaciones() {
               Calcular sin IGV (algunas empresas no lo aplican)
             </label>
           </div>
+          </div>
+        </div>
 
-          {/* Items */}
+        <div className="form-card">
+          <div className="form-card-header"><FiList size={16} /><h3>Items de la cotización</h3></div>
+          <div className="form-card-body">
           <div className="items-seccion">
             <div className="items-header">
               <h3 className="items-titulo">{form.tipoItem === 'manga' ? 'Mangas / Accesorios' : 'Equipos / Items'}</h3>
@@ -1547,46 +1576,60 @@ export default function Cotizaciones() {
               </table>
             </div>
 
-            <div className="totales-seccion">
-              <div className="totales-grid">
+          </div>
+          </div>
+        </div>
+
+        </div>
+
+        <div className="cotizacion-form-sidebar">
+          <div className="form-card resumen-card">
+            <div className="form-card-header"><FiFileText size={16} /><h3>Resumen de cotización</h3></div>
+            <div className="form-card-body">
+              <div className="total-fila">
+                <span>Subtotal:</span>
+                <span className="total-valor">{formatMoneda(subtotal, form.moneda)}</span>
+              </div>
+              {!form.sinIGV && (
                 <div className="total-fila">
-                  <span>Subtotal:</span>
-                  <span className="total-valor">{formatMoneda(subtotal, form.moneda)}</span>
+                  <span>IGV (18%):</span>
+                  <span className="total-valor">{formatMoneda(igv, form.moneda)}</span>
                 </div>
-                {!form.sinIGV && (
-                  <div className="total-fila">
-                    <span>IGV (18%):</span>
-                    <span className="total-valor">{formatMoneda(igv, form.moneda)}</span>
-                  </div>
-                )}
-                <div className="total-fila total-final">
-                  <span>Total:</span>
-                  <span className="total-valor total-monto">{formatMoneda(total, form.moneda)}</span>
-                </div>
+              )}
+              <div className="total-fila total-final">
+                <span>Total:</span>
+                <span className="total-valor total-monto">{formatMoneda(total, form.moneda)}</span>
               </div>
             </div>
           </div>
 
           {/* Sección INCLUYE (fija, se muestra en el PDF de la cotización) */}
-          <div className="campo">
-            <label>Incluye</label>
-            <ul className="incluye-lista">
-              <li>Protocolo de calibración de fábrica</li>
-              <li>Garantía oficial Testo</li>
-              <li>Soporte técnico postventa</li>
-            </ul>
+          <div className="form-card">
+            <div className="form-card-body">
+            <div className="campo">
+              <label>Incluye</label>
+              <ul className="incluye-lista">
+                <li>Protocolo de calibración de fábrica</li>
+                <li>Garantía oficial Testo</li>
+                <li>Soporte técnico postventa</li>
+              </ul>
+            </div>
+            </div>
           </div>
 
-          <div className="acciones-form">
-            <button type="button" className="btn-secundario" onClick={() => setMostrarModal(false)}>
+          <div className="acciones-form acciones-form-sidebar">
+            <button type="button" className="btn-secundario" onClick={() => setVista('lista')}>
               Cancelar
             </button>
             <button type="submit" className="btn-principal" disabled={guardando}>
               {guardando ? 'Guardando...' : editandoId ? 'Actualizar Cotización' : 'Crear Cotización'}
             </button>
           </div>
+        </div>
+        </div>
         </form>
-      </Modal>
+      </div>
+      )}
 
       <ConfirmDialog
         isOpen={mostrarConfirm}
