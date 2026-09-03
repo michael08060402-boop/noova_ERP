@@ -17,7 +17,9 @@ export default function Paginacion({
   paginaActual = 1,
   porPagina = 10,
   onCambiarPagina,
-  onCambiarPorPagina
+  onCambiarPorPagina,
+  mostrarInfo = true,
+  compacta = false
 }) {
   // Calcula total de páginas y rango visible
   const totalPaginas = Math.max(1, Math.ceil(total / porPagina));
@@ -40,10 +42,12 @@ export default function Paginacion({
   if (total === 0) return null;
 
   return (
-    <div className="paginacion">
-      <div className="paginacion-info">
-        Mostrando {paginaInicio} a {paginaFin} de {total} registros
-      </div>
+    <div className={`paginacion${compacta ? ' paginacion-compacta' : ''}`}>
+      {mostrarInfo && (
+        <div className="paginacion-info">
+          Mostrando {paginaInicio} a {paginaFin} de {total} registros
+        </div>
+      )}
 
       <div className="paginacion-controles">
         {onCambiarPorPagina && (

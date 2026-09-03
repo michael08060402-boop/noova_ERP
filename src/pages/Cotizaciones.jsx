@@ -90,7 +90,7 @@ function EquipoCombobox({ equipos, value, onSelect }) {
     [equipos, value]
   );
 
-  const textoMostrado = abierto ? busqueda : (equipoSeleccionado ? `${equipoSeleccionado.codigo} - ${equipoSeleccionado.nombre}` : '');
+  const textoMostrado = abierto ? busqueda : (equipoSeleccionado ? equipoSeleccionado.nombre : '');
 
   const resultados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -854,7 +854,26 @@ export default function Cotizaciones() {
 
       {vista === 'lista' && (
       <>
-      <div className="filtros-barra">
+      <div className="filtros-barra filtros-barra-cotizaciones">
+        <div className="pestanas-estado">
+          <button
+            type="button"
+            className={`pestana-estado${filtroEstado === '' ? ' activa' : ''}`}
+            onClick={() => alCambiarEstado('')}
+          >
+            Todos <span className="pestana-estado-contador">{cotizaciones.length}</span>
+          </button>
+          {ESTADOS.filter((e) => e !== 'Error').map((e) => (
+            <button
+              type="button"
+              key={e}
+              className={`pestana-estado${filtroEstado === e ? ' activa' : ''}`}
+              onClick={() => alCambiarEstado(e)}
+            >
+              {e} <span className="pestana-estado-contador">{cotizaciones.filter((c) => c.estado === e).length}</span>
+            </button>
+          ))}
+        </div>
         <div className="barra-busqueda">
           <FiSearch className="icono-busqueda" size={18} />
           <input
@@ -864,17 +883,16 @@ export default function Cotizaciones() {
             onChange={(e) => alCambiarBusqueda(e.target.value)}
           />
         </div>
-        <select
-          className="selector-filtro"
-          value={filtroEstado}
-          onChange={(e) => alCambiarEstado(e.target.value)}
-        >
-          <option value="">Todos los estados</option>
-          {ESTADOS.map((e) => (
-            <option key={e} value={e}>{e}</option>
-          ))}
-        </select>
       </div>
+
+      <Paginacion
+        total={cotizacionesFiltradas.length}
+        paginaActual={paginaActual}
+        porPagina={porPagina}
+        onCambiarPagina={setPaginaActual}
+        onCambiarPorPagina={setPorPagina}
+        compacta
+      />
 
       <div className="tarjeta-tabla">
         {cotizacionesFiltradas.length === 0 ? (
@@ -884,13 +902,6 @@ export default function Cotizaciones() {
           </div>
         ) : (
           <>
-            <Paginacion
-              total={cotizacionesFiltradas.length}
-              paginaActual={paginaActual}
-              porPagina={porPagina}
-              onCambiarPagina={setPaginaActual}
-              onCambiarPorPagina={setPorPagina}
-            />
             <div className="tabla-contenedor">
               <table className="tabla-datos">
                 <thead>
@@ -898,7 +909,6 @@ export default function Cotizaciones() {
                     <th>Código</th>
                     <th>Fecha</th>
                     <th>Cliente</th>
-                    <th className="texto-centro">Tipo</th>
                     <th>Responsable</th>
                     <th>Cond. Pago</th>
                     <th className="texto-derecha">Total</th>
@@ -916,14 +926,18 @@ export default function Cotizaciones() {
                     <tr key={cot.id} className={COLOR_FILA_ESTADO[cot.estado] || ''}>
                       <td className="texto-codigo">{cot.codigo}</td>
                       <td>{formatDate(cot.fecha || cot.fechaEmision || cot.createdAt)}</td>
-                      <td>{cot.cliente?.razonSocial || '-'}</td>
-                      <td className="texto-centro">
-                        <span
-                          className={`badge-tipo-cotizacion badge-tipo-${tipoCot}`}
-                          title={cot.tipoItem ? 'Tipo guardado al crear' : 'Tipo detectado automáticamente'}
-                        >
-                          {tipoCot === 'manga' ? 'Manga' : 'Equipo'}
-                        </span>
+                      <td>
+                        <div className="cliente-con-avatar">
+                          <div className="cliente-con-avatar-info">
+                            <span className="cliente-con-avatar-nombre">{cot.cliente?.razonSocial || '-'}</span>
+                            <span
+                              className={`badge-tipo-cotizacion badge-tipo-${tipoCot}`}
+                              title={cot.tipoItem ? 'Tipo guardado al crear' : 'Tipo detectado automáticamente'}
+                            >
+                              {tipoCot === 'manga' ? 'Manga' : 'Equipo'}
+                            </span>
+                          </div>
+                        </div>
                       </td>
                       <td>{cot.responsable || '-'}</td>
                       <td>{cot.condicionPago || '-'}</td>
@@ -993,7 +1007,7 @@ export default function Cotizaciones() {
         <div className="cotizacion-form-grid">
         <div className="cotizacion-form-principal">
         <div className="form-card">
-          <div className="form-card-header"><FiBriefcase size={16} /><h3>Datos comerciales</h3></div>
+          <div className="form-card-header"><span className="form-card-icon"><FiBriefcase size={16} /></span><h3>Datos comerciales</h3></div>
           <div className="form-card-body">
           {/* Cliente */}
           <div className="fila-form">
@@ -1237,8 +1251,8 @@ export default function Cotizaciones() {
             </div>
           )}
 
-          {/* Condición, Validez, Moneda */}
-          <div className="fila-form fila-form-3">
+          {/* Condición, Validez, Moneda, Tipo de item */}
+          <div className="fila-form fila-form-4">
             <div className="campo">
               <label>Condición de Pago</label>
               <select value={form.condicionPago} onChange={(e) => handleChange('condicionPago', e.target.value)}>
@@ -1269,10 +1283,6 @@ export default function Cotizaciones() {
                 ))}
               </select>
             </div>
-          </div>
-
-          {/* Tipo de item y Firmado por */}
-          <div className="fila-form fila-form-1">
             <div className="campo">
               <label>Tipo de item</label>
               <select
@@ -1284,6 +1294,18 @@ export default function Cotizaciones() {
                 <option value="manga">Mangas de ventilación</option>
               </select>
             </div>
+          </div>
+
+          {/* Calcular sin IGV */}
+          <div className="fila-form fila-form-1">
+            <label className="checkbox-sin-igv">
+              <input
+                type="checkbox"
+                checked={!!form.sinIGV}
+                onChange={(e) => handleChange('sinIGV', e.target.checked)}
+              />
+              Calcular sin IGV (algunas empresas no lo aplican)
+            </label>
           </div>
 
           {import.meta.env.DEV && editandoId && (
@@ -1300,21 +1322,11 @@ export default function Cotizaciones() {
             </div>
           )}
 
-          <div className="fila-form fila-form-1">
-            <label className="checkbox-sin-igv">
-              <input
-                type="checkbox"
-                checked={!!form.sinIGV}
-                onChange={(e) => handleChange('sinIGV', e.target.checked)}
-              />
-              Calcular sin IGV (algunas empresas no lo aplican)
-            </label>
-          </div>
           </div>
         </div>
 
         <div className="form-card">
-          <div className="form-card-header"><FiList size={16} /><h3>Items de la cotización</h3></div>
+          <div className="form-card-header"><span className="form-card-icon"><FiList size={16} /></span><h3>Items de la cotización</h3></div>
           <div className="form-card-body">
           <div className="items-seccion">
             <div className="items-header">
@@ -1359,25 +1371,17 @@ export default function Cotizaciones() {
                       : item.tipo === 'transporte'
                         ? `Transporte #${numeroEnGrupo}`
                         : (form.tipoItem === 'manga' ? `Manga #${numeroEnGrupo}` : `Equipo #${numeroEnGrupo}`);
+                    const finGrupoEnMain = item.tipo === 'transporte';
                     return (
                     <Fragment key={index}>
                     <tr className={`fila-badge-tipo ${item.tipo === 'accesorio' ? 'badge-accesorio' : item.tipo === 'transporte' ? 'badge-transporte' : 'badge-producto'}`}>
                       <td colSpan={colSpanFila}>
                         <div className="fila-badge-contenido">
                           <span className="badge-tipo-item">{etiquetaTipo}</span>
-                          <button
-                            type="button"
-                            className="btn-quitar-item-general"
-                            onClick={() => quitarItem(index)}
-                            disabled={form.items.length <= 1}
-                            title="Eliminar este item completo"
-                          >
-                            <FiX size={14} />
-                          </button>
                         </div>
                       </td>
                     </tr>
-                    <tr>
+                    <tr className={finGrupoEnMain ? 'fila-item-divisor' : ''}>
                       <td>
                         <div className="input-con-cargando">
                           <input
@@ -1386,7 +1390,9 @@ export default function Cotizaciones() {
                             onChange={(e) => cambiarItem(index, 'codigo', e.target.value)}
                             onBlur={(e) => e.target.value && buscarEquipoPorCodigo(index, e.target.value)}
                             placeholder={item.tipo === 'transporte' ? 'Ej: 6000 0001' : 'Código'}
-                            className={buscandoCodigo[index] ? 'input-cargando' : ''}
+                            readOnly={item.tipo !== 'transporte'}
+                            title={item.codigo}
+                            className={`${item.tipo !== 'transporte' ? 'input-solo-lectura' : ''} ${buscandoCodigo[index] ? 'input-cargando' : ''}`}
                           />
                           {buscandoCodigo[index] && <span className="spinner-inline"></span>}
                         </div>
@@ -1427,7 +1433,7 @@ export default function Cotizaciones() {
                             value={item.cantidad}
                             onChange={(e) => cambiarItem(index, 'cantidad', e.target.value)}
                             min="1"
-                            className={`input-centro input-sin-flechas ${erroresForm[`item_${index}_cantidad`] ? 'input-error' : ''}`}
+                            className={`input-centro ${erroresForm[`item_${index}_cantidad`] ? 'input-error' : ''}`}
                           />
                           {form.tipoItem === 'manga' && item.tipo === 'producto' && <span className="cantidad-sufijo">m</span>}
                           {item.tipo === 'accesorio' && <span className="cantidad-sufijo">pza</span>}
@@ -1457,7 +1463,17 @@ export default function Cotizaciones() {
                       <td className="texto-derecha texto-negrita">
                         {formatMoneda((Number(item.cantidad) || 0) * (Number(item.precioUnitario) || 0), form.moneda)}
                       </td>
-                      <td></td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-quitar-item-general"
+                          onClick={() => quitarItem(index)}
+                          disabled={form.items.length <= 1}
+                          title="Eliminar este item completo"
+                        >
+                          <FiTrash2 size={14} />
+                        </button>
+                      </td>
                     </tr>
                     {form.tipoItem === 'manga' && (item.tipo === 'producto' || item.tipo === 'accesorio') && (
                       <tr className="fila-specs-manga">
@@ -1524,7 +1540,7 @@ export default function Cotizaciones() {
                       </tr>
                     )}
                     {item.tipo !== 'transporte' && (
-                      <tr className="fila-entrega-oc">
+                      <tr className="fila-entrega-oc fila-item-divisor">
                         <td colSpan={colSpanFila}>
                           <div className="entrega-oc-label">
                             Tiempo de entrega (OC) de este ítem:
@@ -1584,7 +1600,7 @@ export default function Cotizaciones() {
 
         <div className="cotizacion-form-sidebar">
           <div className="form-card resumen-card">
-            <div className="form-card-header"><FiFileText size={16} /><h3>Resumen de cotización</h3></div>
+            <div className="form-card-header"><span className="form-card-icon"><FiFileText size={16} /></span><h3>Resumen de cotización</h3></div>
             <div className="form-card-body">
               <div className="total-fila">
                 <span>Subtotal:</span>

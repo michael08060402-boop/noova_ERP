@@ -390,11 +390,7 @@ export default function Compras() {
                   <option key={f.id} value={f.id}>{f.nombre} — {f.cargo}</option>
                 ))}
               </select>
-              {errores.firmadoPorId ? (
-                <span className="mensaje-error">{errores.firmadoPorId}</span>
-              ) : (
-                <span className="pista-form">Se usa como "Elaborado por" y su firma en el PDF de la orden de compra.</span>
-              )}
+              {errores.firmadoPorId && <span className="mensaje-error">{errores.firmadoPorId}</span>}
             </div>
           </div>
 
