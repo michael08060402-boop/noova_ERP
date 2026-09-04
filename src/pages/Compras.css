@@ -72,7 +72,6 @@
   background: #fff;
   border: 1.5px solid #d5dae2;
   border-radius: 10px;
-  overflow: hidden;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 16px rgba(15, 23, 42, 0.06);
 }
 .form-card-header {
@@ -82,6 +81,7 @@
   padding: 0.75rem 1rem;
   background: var(--gris-fondo);
   border-bottom: 1px solid var(--gris-borde);
+  border-radius: 10px 10px 0 0;
 }
 .form-card-icon {
   display: inline-flex;
@@ -159,6 +159,77 @@
 .compras-items input, .compras-items textarea { width: 100%; padding: .45rem .5rem; border: 1px solid var(--gris-borde); border-radius: 6px; font-size: .82rem; resize: vertical; }
 .compras-check { display: flex; align-items: center; gap: .5rem; font-size: .84rem; color: var(--texto-medio); margin: .65rem 0; }
 .compras-btn-observaciones { align-self: flex-start; }
+
+/* ── SELECTOR DE COTIZACIÓN DE ORIGEN (combobox propio) ── */
+.combo-selector { position: relative; }
+.combo-selector-trigger {
+  width: 100%;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--gris-borde);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: var(--texto-oscuro);
+  text-align: left;
+  cursor: pointer;
+}
+.combo-selector-trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.combo-selector-trigger svg { flex-shrink: 0; color: var(--texto-suave); }
+.combo-selector-trigger:disabled {
+  background: var(--gris-fondo);
+  color: var(--texto-suave);
+  cursor: not-allowed;
+}
+.combo-selector-trigger:focus {
+  outline: none;
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
+}
+.combo-selector-lista {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--gris-borde);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  max-height: 320px;
+  overflow-y: auto;
+  z-index: 50;
+}
+.combo-opcion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  background: none;
+  border: none;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--texto-oscuro);
+}
+.combo-opcion:last-child { border-bottom: none; }
+.combo-opcion:hover { background: var(--gris-fondo); }
+.combo-opcion-sub {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--texto-suave);
+}
 
 @media (max-width: 760px) {
   .compras-header-actions, .compras-header-actions button { width: 100%; }

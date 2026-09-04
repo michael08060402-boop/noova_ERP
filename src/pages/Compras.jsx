@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FiDownload, FiEdit2, FiPlus, FiSearch, FiTrash2, FiTruck, FiPackage, FiDollarSign, FiArrowLeft, FiCheckCircle } from 'react-icons/fi';
+import { FiDownload, FiEdit2, FiPlus, FiSearch, FiTrash2, FiTruck, FiPackage, FiDollarSign, FiArrowLeft, FiCheckCircle, FiChevronDown } from 'react-icons/fi';
 import { useOrdenesCompra } from '../hooks/useOrdenesCompra';
 import { useProveedores } from '../hooks/useProveedores';
 import { useCotizaciones } from '../hooks/useCotizaciones';
@@ -81,6 +81,7 @@ export default function Compras() {
   const [ordenEliminar, setOrdenEliminar] = useState(null);
   const [errores, setErrores] = useState({});
   const [mostrarObservaciones, setMostrarObservaciones] = useState(false);
+  const [origenDropdownAbierto, setOrigenDropdownAbierto] = useState(false);
   const [form, setForm] = useState(() => formularioVacio(config, userProfile, cotizacionInicial));
 
   const totales = useMemo(() => calcularTotalesOrden(form.items, form.aplicaIgv), [form.items, form.aplicaIgv]);
@@ -278,6 +279,13 @@ export default function Compras() {
 
   if (loading || cargandoProveedores || cargandoCotizaciones) return <Loading message="Cargando compras..." />;
 
+  const cotizacionOrigenSeleccionada = form.origenCotizacionId
+    ? cotizacionesDisponibles.find((cotizacion) => cotizacion.id === form.origenCotizacionId)
+    : null;
+  const origenSeleccionadaLabel = cotizacionOrigenSeleccionada
+    ? `${cotizacionOrigenSeleccionada.codigo || 'Sin código'} · ${cotizacionOrigenSeleccionada.cliente?.razonSocial || 'Cliente sin nombre'} · ${cotizacionOrigenSeleccionada.estado}`
+    : 'Sin cotización · compra manual';
+
   return (
     <div className="pagina compras-page">
       <div className="pagina-header">
@@ -372,18 +380,40 @@ export default function Compras() {
           <div className="form-card-body">
           <div className="campo">
             <label>Cotización de origen (opcional)</label>
-            <select
-              value={form.origenCotizacionId || ''}
-              onChange={(event) => seleccionarCotizacionOrigen(event.target.value)}
-              disabled={Boolean(editandoId)}
-            >
-              <option value="">Sin cotización · compra manual</option>
-              {cotizacionesDisponibles.map((cotizacion) => (
-                <option key={cotizacion.id} value={cotizacion.id}>
-                  {cotizacion.codigo || 'Sin código'} · {cotizacion.cliente?.razonSocial || 'Cliente sin nombre'} · {cotizacion.estado}
-                </option>
-              ))}
-            </select>
+            <div className="combo-selector">
+              <button
+                type="button"
+                className="combo-selector-trigger"
+                onClick={() => !editandoId && setOrigenDropdownAbierto((prev) => !prev)}
+                onBlur={() => setTimeout(() => setOrigenDropdownAbierto(false), 180)}
+                disabled={Boolean(editandoId)}
+              >
+                <span>{origenSeleccionadaLabel}</span>
+                <FiChevronDown size={16} />
+              </button>
+              {origenDropdownAbierto && (
+                <div className="combo-selector-lista">
+                  <button
+                    type="button"
+                    className="combo-opcion"
+                    onMouseDown={(event) => { event.preventDefault(); seleccionarCotizacionOrigen(''); setOrigenDropdownAbierto(false); }}
+                  >
+                    Sin cotización · compra manual
+                  </button>
+                  {cotizacionesDisponibles.map((cotizacion) => (
+                    <button
+                      key={cotizacion.id}
+                      type="button"
+                      className="combo-opcion"
+                      onMouseDown={(event) => { event.preventDefault(); seleccionarCotizacionOrigen(cotizacion.id); setOrigenDropdownAbierto(false); }}
+                    >
+                      <span>{cotizacion.codigo || 'Sin código'}</span>
+                      <span className="combo-opcion-sub">{cotizacion.cliente?.razonSocial || 'Cliente sin nombre'} · {cotizacion.estado}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             {!editandoId && cotizacionesDisponibles.length === 0 && (
               <span className="pista">No hay cotizaciones disponibles sin una OC vinculada.</span>
             )}
