@@ -51,7 +51,7 @@
 .stat-verde { color: #059669; }
 .stat-amarillo { color: #d97706; }
 .stat-rojo { color: #dc2626; }
-.stat-azul { color: #2563eb; }
+.stat-azul { color: #1d4ed8; }
 
 .badge-tipo {
   display: inline-block;
@@ -63,7 +63,7 @@
 }
 .badge-tipo.tipo-boleta {
   background: #eff6ff;
-  color: #1d4ed8;
+  color: #1e3a8a;
   border-color: #dbeafe;
 }
 .badge-tipo.tipo-factura {
@@ -132,10 +132,10 @@
   cursor: pointer;
 }
 .item-cotizacion-aprobada:hover {
-  border-color: #2563eb;
+  border-color: #1d4ed8;
 }
 .item-cotizacion-aprobada.seleccionada {
-  border-color: #2563eb;
+  border-color: #1d4ed8;
   background: #eff6ff;
 }
 .item-info {
@@ -147,7 +147,7 @@
   font-family: 'Courier New', monospace;
   font-size: 0.82rem;
   font-weight: 600;
-  color: #2563eb;
+  color: #1d4ed8;
 }
 .item-cliente {
   font-size: 0.875rem;
@@ -160,7 +160,7 @@
   font-weight: 700;
 }
 .item-seleccionado {
-  color: #2563eb;
+  color: #1d4ed8;
   font-weight: 700;
   font-size: 1.2rem;
 }
@@ -215,7 +215,7 @@
   gap: 1rem;
 }
 .detalle-header {
-  border-bottom: 2px solid #2563eb;
+  border-bottom: 2px solid #1d4ed8;
   padding-bottom: 0.5rem;
 }
 .detalle-header h3 {

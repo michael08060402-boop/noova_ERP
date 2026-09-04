@@ -139,7 +139,7 @@
 .programar-datetime:focus {
   outline: none;
   border-color: var(--azul-primario);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
 }
 
 /* ── TABLA DE PROGRAMADOS ── */
@@ -278,7 +278,7 @@
 .sidebar-busqueda input:focus {
   outline: none;
   border-color: var(--azul-primario);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
 }
 
 .lista-clientes-mensajeria {
@@ -476,7 +476,7 @@
 .contacto-chip.seleccionado {
   border-color: var(--azul-primario);
   background: var(--azul-claro);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.2);
 }
 
 .contacto-chip.invalido {
@@ -528,7 +528,7 @@
 .composer-textarea:focus {
   outline: none;
   border-color: var(--azul-primario);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
 }
 
 .composer-contador {

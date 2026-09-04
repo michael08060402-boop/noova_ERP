@@ -1,3 +1,10 @@
+/* Sombra en la tabla de la lista, consistente con las tarjetas del
+   formulario (solo en esta página, no toca el estilo compartido). */
+.tarjeta-tabla {
+  border-color: #d5dae2;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 16px rgba(15, 23, 42, 0.06);
+}
+
 /* Fila de paginación de Cotizaciones: propia línea, sin la franja gris
    pesada del componente compartido. */
 .paginacion-compacta {
@@ -157,7 +164,6 @@
   background: #fff;
   border: 1.5px solid #b9c2d0;
   border-radius: 10px;
-  overflow: hidden;
   box-shadow: 0 2px 4px rgba(15, 23, 42, 0.06), 0 10px 24px rgba(15, 23, 42, 0.1);
 }
 .form-card-header {
@@ -167,6 +173,7 @@
   padding: 0.75rem 1rem;
   background: var(--gris-fondo);
   border-bottom: 1px solid var(--gris-borde);
+  border-radius: 10px 10px 0 0;
   color: var(--azul-primario);
 }
 .form-card-icon {
@@ -251,8 +258,8 @@
 }
 .selector-estado:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.15);
 }
 .selector-estado.borrador {
   background: rgba(107, 114, 128, 0.15);
@@ -260,9 +267,9 @@
   color: #374151;
 }
 .selector-estado.enviada {
-  background: rgba(37, 99, 235, 0.15);
-  border-color: rgba(37, 99, 235, 0.4);
-  color: #1d4ed8;
+  background: rgba(29, 78, 216, 0.15);
+  border-color: rgba(29, 78, 216, 0.4);
+  color: #1e3a8a;
 }
 .selector-estado.aprobada {
   background: rgba(5, 150, 105, 0.15);
@@ -305,8 +312,8 @@
 }
 .buscador-cliente input:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
 }
 .lista-resultados-clientes {
   position: absolute;
@@ -317,8 +324,6 @@
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.12);
-  max-height: 250px;
-  overflow-y: auto;
   z-index: 50;
 }
 .resultado-cliente {
@@ -426,8 +431,8 @@
 }
 .input-con-sufijo .input-numero:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
 }
 .sufijo-input {
   position: absolute;
@@ -556,8 +561,8 @@
 .items-tabla input:focus,
 .items-tabla select:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.1);
 }
 .items-tabla .input-centro { text-align: center; }
 
@@ -749,8 +754,8 @@
 }
 .equipo-combobox-input:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.1);
 }
 .equipo-combobox-limpiar {
   position: absolute;
@@ -797,7 +802,7 @@
 }
 .equipo-combobox-codigo {
   font-weight: 600;
-  color: #2563eb;
+  color: #1d4ed8;
   white-space: nowrap;
   font-size: 0.72rem;
 }
@@ -842,15 +847,15 @@
   padding-right: 1.75rem;
 }
 .input-cargando {
-  border-color: #2563eb !important;
+  border-color: #1d4ed8 !important;
 }
 .spinner-inline {
   position: absolute;
   right: 0.375rem;
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(37, 99, 235, 0.3);
-  border-top-color: #2563eb;
+  border: 2px solid rgba(29, 78, 216, 0.3);
+  border-top-color: #1d4ed8;
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
 }
@@ -877,7 +882,7 @@
   color: #374151;
 }
 .total-final {
-  border-top: 2px solid #2563eb;
+  border-top: 2px solid #1d4ed8;
   margin-top: 0.4rem;
   padding-top: 0.4rem;
   font-weight: 700;
@@ -914,9 +919,9 @@
   border-color: rgba(107, 114, 128, 0.35);
 }
 .badge-estado-sunat.enviada {
-  background: rgba(37, 99, 235, 0.12);
-  color: #1d4ed8;
-  border-color: rgba(37, 99, 235, 0.3);
+  background: rgba(29, 78, 216, 0.12);
+  color: #1e3a8a;
+  border-color: rgba(29, 78, 216, 0.3);
 }
 .badge-estado-sunat.aprobada {
   background: rgba(5, 150, 105, 0.12);
@@ -930,18 +935,28 @@
 }
 
 .info-icon {
-  display: inline-block;
-  margin-left: 4px;
-  font-size: 0.7rem;
-  color: #6b7280;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 5px;
+  border-radius: 50%;
+  background: #d1d5db;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  font-style: normal;
+  text-transform: none;
+  letter-spacing: 0;
   cursor: help;
 }
 
 .btn-enviar-sunat {
-  color: #2563eb;
+  color: #1d4ed8;
 }
 .btn-enviar-sunat:hover {
-  color: #1d4ed8;
+  color: #1e3a8a;
   background: #dbeafe;
 }
 
@@ -1203,7 +1218,7 @@
 
 .selector-estado-form.estado-enviada {
   background-color: #dbeafe;
-  border-color: #2563eb;
+  border-color: #1d4ed8;
   color: #1e40af;
 }
 
@@ -1409,8 +1424,8 @@
 
 .tiempo-entrega-unidad:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
 }
 
 /* ─── BADGE DE TIPO DE COTIZACIÓN (EQUIPO / MANGA) ─── */
@@ -1429,7 +1444,7 @@
 /* Equipo: azul (coincide con el color primario del ERP) */
 .badge-tipo-cotizacion.badge-tipo-equipo {
   background: #eff6ff;
-  color: #1d4ed8;
+  color: #1e3a8a;
   border-color: #dbeafe;
 }
 

@@ -969,15 +969,15 @@ export default function Cotizaciones() {
                       </td>
                       <td className="texto-centro">
                         <div className="acciones-tabla">
-                          {!cot.ordenCompraId && (
-                            <button
-                              className="btn-accion"
-                              onClick={() => navigate('/compras', { state: { cotizacionOrigen: cot } })}
-                              title="Generar orden de compra y marcar cotización como aceptada"
-                            >
-                              <FiShoppingCart size={18} />
-                            </button>
-                          )}
+                          <button
+                            className="btn-accion"
+                            style={cot.ordenCompraId ? { visibility: 'hidden' } : undefined}
+                            disabled={Boolean(cot.ordenCompraId)}
+                            onClick={() => navigate('/compras', { state: { cotizacionOrigen: cot } })}
+                            title="Generar orden de compra y marcar cotización como aceptada"
+                          >
+                            <FiShoppingCart size={18} />
+                          </button>
                           <button className="btn-accion" onClick={() => exportarPDF(cot)} title={`Exportar PDF (${tipoCot === 'manga' ? 'Manga' : 'Equipo'})`}>
                             <FiDownload size={18} />
                           </button>

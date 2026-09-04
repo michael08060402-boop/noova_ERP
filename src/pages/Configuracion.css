@@ -45,13 +45,13 @@
 
 .config-tab-activa {
   background: #eff6ff;
-  color: #2563eb;
+  color: #1d4ed8;
   font-weight: 600;
 }
 
 .config-tab-activa:hover {
   background: #dbeafe;
-  color: #1d4ed8;
+  color: #1e3a8a;
 }
 
 .tab-icon {
@@ -172,7 +172,7 @@
   font-family: 'Courier New', monospace;
   font-size: 0.95rem;
   font-weight: 700;
-  color: #1d4ed8;
+  color: #1e3a8a;
 }
 
 .config-guardar {

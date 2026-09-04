@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FiDownload, FiEdit2, FiPlus, FiSearch, FiTrash2 } from 'react-icons/fi';
+import { FiDownload, FiEdit2, FiPlus, FiSearch, FiTrash2, FiTruck, FiPackage, FiDollarSign, FiArrowLeft, FiCheckCircle } from 'react-icons/fi';
 import { useOrdenesCompra } from '../hooks/useOrdenesCompra';
 import { useProveedores } from '../hooks/useProveedores';
 import { useCotizaciones } from '../hooks/useCotizaciones';
@@ -12,7 +12,6 @@ import { formatDate, formatDateISO } from '../utils/formatDate';
 import { addLog } from '../services/logService';
 import { LISTA_PRECIOS_PARTNER_2026, buscarProductoPartner } from '../data/preciosPartner2026';
 import { FIRMANTES } from '../data/firmantes';
-import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Loading from '../components/Loading';
 import '../styles/shared.css';
@@ -75,12 +74,13 @@ export default function Compras() {
 
   const [busqueda, setBusqueda] = useState('');
   const [mensaje, setMensaje] = useState(null);
-  const [mostrarModal, setMostrarModal] = useState(Boolean(cotizacionInicial));
+  const [vista, setVista] = useState(cotizacionInicial ? 'form' : 'lista'); // 'lista' | 'form'
   const [editandoId, setEditandoId] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [exportandoId, setExportandoId] = useState(null);
   const [ordenEliminar, setOrdenEliminar] = useState(null);
   const [errores, setErrores] = useState({});
+  const [mostrarObservaciones, setMostrarObservaciones] = useState(false);
   const [form, setForm] = useState(() => formularioVacio(config, userProfile, cotizacionInicial));
 
   const totales = useMemo(() => calcularTotalesOrden(form.items, form.aplicaIgv), [form.items, form.aplicaIgv]);
@@ -112,19 +112,21 @@ export default function Compras() {
     setEditandoId(null);
     setErrores({});
     setForm(formularioVacio(config, userProfile));
-    setMostrarModal(true);
+    setMostrarObservaciones(false);
+    setVista('form');
   }
 
   function abrirEditar(orden) {
     setEditandoId(orden.id);
     setErrores({});
     setForm({ ...formularioVacio(config, userProfile), ...orden, items: orden.items?.map((item) => ({ ...item })) || [{ ...ITEM_VACIO }] });
-    setMostrarModal(true);
+    setMostrarObservaciones(Boolean(orden.observaciones));
+    setVista('form');
   }
 
   function cerrarModal() {
     if (guardando) return;
-    setMostrarModal(false);
+    setVista('lista');
     if (location.state?.cotizacionOrigen) navigate('/compras', { replace: true });
   }
 
@@ -243,7 +245,7 @@ export default function Compras() {
         await addLog({ usuario: userProfile?.nombre, accion: 'crear_orden_compra', detalle: result.codigo });
         flash('success', `Orden ${result.codigo} creada con correlativo reservado de forma segura`);
       }
-      setMostrarModal(false);
+      setVista('lista');
       if (location.state?.cotizacionOrigen) navigate('/compras', { replace: true });
     } catch (err) {
       flash('error', err.message || 'No se pudo guardar la orden de compra');
@@ -281,13 +283,34 @@ export default function Compras() {
       <div className="pagina-header">
         <div>
           <h1 className="pagina-titulo">Órdenes de compra</h1>
-          <p className="pagina-subtitulo">Emite compras manuales o genera una orden desde cualquier cotización registrada.</p>
+          {vista === 'lista' && (
+            <p className="pagina-subtitulo">Emite compras manuales o genera una orden desde cualquier cotización registrada.</p>
+          )}
         </div>
-        <div className="compras-header-actions">
-          <button className="btn-principal" onClick={abrirNueva}>
-            <FiPlus size={16} /> Nueva orden
+        {vista === 'lista' && (
+          <div className="compras-header-actions">
+            <button className="btn-principal" onClick={abrirNueva}>
+              <FiPlus size={16} /> Nueva orden
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="tabs-compras">
+        {vista === 'form' ? (
+          <button type="button" className="tab-compra tab-volver" onClick={cerrarModal}>
+            <FiArrowLeft size={14} /> Volver a la lista de órdenes
           </button>
-        </div>
+        ) : (
+          <button type="button" className="tab-compra activa" onClick={() => setVista('lista')}>
+            Lista de órdenes
+          </button>
+        )}
+        {vista === 'form' && (
+          <button type="button" className="tab-compra activa" disabled>
+            {editandoId ? `Editar ${form.codigo || ''}` : (form.origenCotizacionCodigo ? `OC desde ${form.origenCotizacionCodigo}` : 'Nueva orden')}
+          </button>
+        )}
       </div>
 
       {(mensaje || error || errorProveedores || errorCotizaciones) && (
@@ -296,6 +319,8 @@ export default function Compras() {
         </div>
       )}
 
+      {vista === 'lista' && (
+      <>
       <div className="filtros-barra">
         <div className="barra-busqueda">
           <FiSearch className="icono-busqueda" size={18} />
@@ -334,9 +359,17 @@ export default function Compras() {
           </div>
         )}
       </div>
+      </>
+      )}
 
-      <Modal isOpen={mostrarModal} onClose={cerrarModal} title={editandoId ? `Editar ${form.codigo}` : (form.origenCotizacionCodigo ? `OC desde ${form.origenCotizacionCodigo}` : 'Nueva orden de compra')} size="large">
+      {vista === 'form' && (
+      <div className="compras-form-vista">
         <form className="formulario compras-form" onSubmit={guardarOrden}>
+        <div className="compras-form-grid">
+        <div className="compras-form-principal">
+        <div className="form-card">
+          <div className="form-card-header"><span className="form-card-icon"><FiTruck size={16} /></span><h3>Datos de la orden</h3></div>
+          <div className="form-card-body">
           <div className="campo">
             <label>Cotización de origen (opcional)</label>
             <select
@@ -360,7 +393,7 @@ export default function Compras() {
               Se copiaron productos y cantidades de {form.origenCotizacionCodigo}. Al crear la OC, esa cotización pasará automáticamente a Aceptada. Cuando el código existe en la lista LP26, el costo se carga desde <strong>Precio Partner</strong>; los precios actuales del ERP y los precios de venta de la cotización no se modifican.
             </div>
           )}
-          <div className="fila-form">
+          <div className="fila-form fila-form-3">
             <div className="campo campo-doble">
               <label>Proveedor *</label>
               <select value={form.proveedorId} onChange={(event) => seleccionarProveedor(event.target.value)} className={errores.proveedor ? 'input-error' : ''}>
@@ -372,29 +405,21 @@ export default function Compras() {
             <div className="campo"><label>Fecha *</label><input type="date" value={form.fecha} onChange={(event) => setForm((prev) => ({ ...prev, fecha: event.target.value }))} /></div>
             <div className="campo"><label>Moneda</label><select value={form.moneda} onChange={(event) => setForm((prev) => ({ ...prev, moneda: event.target.value }))}><option value="US$">Dólares (US$)</option><option value="S/">Soles (S/)</option></select></div>
           </div>
-          <div className="fila-form">
+          <div className="fila-form fila-form-3">
             <div className="campo"><label>Forma de pago *</label><input value={form.formaPago} onChange={(event) => setForm((prev) => ({ ...prev, formaPago: event.target.value }))} /></div>
             <div className="campo campo-doble"><label>Lugar de entrega *</label><input value={form.lugarEntrega} onChange={(event) => setForm((prev) => ({ ...prev, lugarEntrega: event.target.value }))} /></div>
             <div className="campo"><label>Referencia</label><input value={form.referencia} onChange={(event) => setForm((prev) => ({ ...prev, referencia: event.target.value }))} /></div>
           </div>
           <div className="fila-form fila-form-1">
-            <div className="campo">
-              <label>Firmado por *</label>
-              <select
-                value={form.firmadoPorId}
-                onChange={(event) => seleccionarFirmante(event.target.value)}
-                className={errores.firmadoPorId ? 'input-error' : ''}
-              >
-                <option value="">Seleccionar...</option>
-                {FIRMANTES.map((f) => (
-                  <option key={f.id} value={f.id}>{f.nombre} — {f.cargo}</option>
-                ))}
-              </select>
-              {errores.firmadoPorId && <span className="mensaje-error">{errores.firmadoPorId}</span>}
-            </div>
+            <label className="compras-check"><input type="checkbox" checked={form.aplicaIgv} onChange={(event) => setForm((prev) => ({ ...prev, aplicaIgv: event.target.checked }))} /> Aplicar IGV 18%</label>
           </div>
+          </div>
+        </div>
 
-          <div className="compras-items-header"><h3>Ítems de compra</h3><button type="button" className="btn-secundario btn-pequeno" onClick={agregarItem}><FiPlus size={14} /> Agregar ítem</button></div>
+        <div className="form-card">
+          <div className="form-card-header"><span className="form-card-icon"><FiPackage size={16} /></span><h3>Ítems de compra</h3></div>
+          <div className="form-card-body">
+          <div className="compras-items-header"><span className="texto-suave">Productos y servicios a comprar</span><button type="button" className="btn-secundario btn-pequeno" onClick={agregarItem}><FiPlus size={14} /> Agregar ítem</button></div>
           {errores.items && <span className="mensaje-error">{errores.items}</span>}
           <datalist id="catalogo-partner-2026">
             {LISTA_PRECIOS_PARTNER_2026.map((producto) => (
@@ -426,18 +451,66 @@ export default function Compras() {
               ))}
             </tbody></table>
           </div>
-
-          <div className="compras-form-bottom">
-            <div className="compras-observaciones">
-              <div className="campo"><label>Observaciones</label><textarea rows="3" value={form.observaciones} onChange={(event) => setForm((prev) => ({ ...prev, observaciones: event.target.value }))} /></div>
-              <label className="compras-check"><input type="checkbox" checked={form.aplicaIgv} onChange={(event) => setForm((prev) => ({ ...prev, aplicaIgv: event.target.checked }))} /> Aplicar IGV 18%</label>
-              <div className="campo"><label>Estado</label><select value={form.estado} onChange={(event) => setForm((prev) => ({ ...prev, estado: event.target.value }))}><option value="Borrador">Borrador</option><option value="Emitida">Emitida</option></select></div>
-            </div>
-            <dl className="compras-totales"><div><dt>Subtotal</dt><dd>{moneda(totales.subtotal, form.moneda)}</dd></div><div><dt>IGV</dt><dd>{moneda(totales.igv, form.moneda)}</dd></div><div className="compras-total-final"><dt>Total</dt><dd>{moneda(totales.total, form.moneda)}</dd></div></dl>
           </div>
-          <div className="acciones-form"><button type="button" className="btn-secundario" onClick={cerrarModal} disabled={guardando}>Cancelar</button><button type="submit" className="btn-principal" disabled={guardando}>{guardando ? 'Guardando de forma segura...' : (editandoId ? 'Guardar cambios' : 'Crear orden y asignar correlativo')}</button></div>
+        </div>
+
+        </div>
+
+        <div className="compras-form-sidebar">
+          <div className="form-card">
+            <div className="form-card-header"><span className="form-card-icon"><FiCheckCircle size={16} /></span><h3>Detalles finales</h3></div>
+            <div className="form-card-body">
+              <div className="campo">
+                <label>Firmado por *</label>
+                <select
+                  value={form.firmadoPorId}
+                  onChange={(event) => seleccionarFirmante(event.target.value)}
+                  className={errores.firmadoPorId ? 'input-error' : ''}
+                >
+                  <option value="">Seleccionar...</option>
+                  {FIRMANTES.map((f) => (
+                    <option key={f.id} value={f.id}>{f.nombre} — {f.cargo}</option>
+                  ))}
+                </select>
+                {errores.firmadoPorId && <span className="mensaje-error">{errores.firmadoPorId}</span>}
+              </div>
+              <div className="campo"><label>Estado</label><select value={form.estado} onChange={(event) => setForm((prev) => ({ ...prev, estado: event.target.value }))}><option value="Borrador">Borrador</option><option value="Emitida">Emitida</option></select></div>
+              {mostrarObservaciones ? (
+                <div className="campo">
+                  <label>Observaciones</label>
+                  <textarea
+                    rows="2"
+                    autoFocus
+                    value={form.observaciones}
+                    onChange={(event) => setForm((prev) => ({ ...prev, observaciones: event.target.value }))}
+                  />
+                </div>
+              ) : (
+                <button type="button" className="btn-secundario btn-pequeno compras-btn-observaciones" onClick={() => setMostrarObservaciones(true)}>
+                  <FiPlus size={14} /> Agregar observación
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="form-card resumen-card">
+            <div className="form-card-header"><span className="form-card-icon"><FiDollarSign size={16} /></span><h3>Resumen de la orden</h3></div>
+            <div className="form-card-body">
+              <div className="total-fila"><span>Subtotal:</span><span className="total-valor">{moneda(totales.subtotal, form.moneda)}</span></div>
+              <div className="total-fila"><span>IGV:</span><span className="total-valor">{moneda(totales.igv, form.moneda)}</span></div>
+              <div className="total-fila total-final"><span>Total:</span><span className="total-valor total-monto">{moneda(totales.total, form.moneda)}</span></div>
+            </div>
+          </div>
+
+          <div className="acciones-form acciones-form-sidebar">
+            <button type="button" className="btn-secundario" onClick={cerrarModal} disabled={guardando}>Cancelar</button>
+            <button type="submit" className="btn-principal" disabled={guardando}>{guardando ? 'Guardando de forma segura...' : (editandoId ? 'Guardar cambios' : 'Crear orden y asignar correlativo')}</button>
+          </div>
+        </div>
+        </div>
         </form>
-      </Modal>
+      </div>
+      )}
 
       <ConfirmDialog isOpen={Boolean(ordenEliminar)} onClose={() => setOrdenEliminar(null)} onConfirm={confirmarEliminar} title="¿Eliminar borrador?" message={`Se eliminará ${ordenEliminar?.codigo || 'la orden'}. Esta acción no se puede deshacer.`} />
     </div>

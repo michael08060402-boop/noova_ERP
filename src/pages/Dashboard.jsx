@@ -18,7 +18,7 @@ import './Dashboard.css';
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
 const COLORES = {
-  azulPrimario: '#2563eb',
+  azulPrimario: '#1d4ed8',
   azulOscuro: '#1e40af',
   verde: '#059669',
   rojo: '#dc2626',
@@ -178,7 +178,7 @@ export default function Dashboard() {
           }).length;
         }),
         borderColor: COLORES.azulPrimario,
-        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+        backgroundColor: 'rgba(29, 78, 216, 0.1)',
         fill: true,
         tension: 0.4,
         pointRadius: 3,

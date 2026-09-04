@@ -171,7 +171,7 @@
 .wsp-textarea:focus {
   outline: none;
   border-color: var(--azul-primario);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
 }
 
 .btn-enviar-whatsapp {

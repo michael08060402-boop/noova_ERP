@@ -97,8 +97,8 @@
 
 .login-field input:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
 }
 
 .login-options {
@@ -120,7 +120,7 @@
 .login-checkbox input {
   width: 0.95rem;
   height: 0.95rem;
-  accent-color: #2563eb;
+  accent-color: #1d4ed8;
   margin: 0;
 }
 
@@ -137,7 +137,7 @@
 .login-submit {
   width: 100%;
   padding: 0.75rem;
-  background: #2563eb;
+  background: #1d4ed8;
   color: white;
   border: none;
   border-radius: 8px;
@@ -152,7 +152,7 @@
 }
 
 .login-submit:hover:not(:disabled) {
-  background: #1d4ed8;
+  background: #1e3a8a;
 }
 
 .login-secure {

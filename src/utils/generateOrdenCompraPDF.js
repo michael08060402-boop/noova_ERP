@@ -101,38 +101,40 @@ function dibujarFooter(doc) {
   const iconY = celesteTop + (yb - celesteTop - iconSize) / 2 + r;
   let cx = 14 + r;
 
-  // Facebook: círculo blanco + "f" transparente (deja ver el celeste de fondo)
+  // Facebook: cuadrado blanco con esquinas redondeadas + "f" transparente
   doc.setFillColor(255, 255, 255);
-  doc.circle(cx, iconY, r, 'F');
+  doc.roundedRect(cx - r, iconY - r, r * 2, r * 2, r * 0.45, r * 0.45, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(r * 4.5);
+  doc.setFontSize(r * 5.8);
   doc.setTextColor(...CELESTE);
-  doc.text('f', cx, iconY + r * 0.42, { align: 'center' });
+  doc.text('f', cx - r * 0.05, iconY + r * 0.72, { align: 'center' });
   cx += iconGap;
 
-  // Instagram: solo el ícono en blanco, sin fondo
-  doc.setDrawColor(255, 255, 255);
+  // Instagram: cuadrado blanco con esquinas redondeadas + cámara transparente
   doc.setFillColor(255, 255, 255);
-  doc.setLineWidth(0.35);
-  doc.roundedRect(cx - r * 0.55, iconY - r * 0.55, r * 1.1, r * 1.1, 0.5, 0.5, 'S');
-  doc.circle(cx, iconY, r * 0.3, 'S');
-  doc.circle(cx + r * 0.4, iconY - r * 0.4, r * 0.08, 'F');
-  cx += iconGap;
-
-  // YouTube: rectángulo ovalado blanco + play transparente
-  doc.setFillColor(255, 255, 255);
-  doc.roundedRect(cx - r * 1.15, iconY - r * 0.8, r * 2.3, r * 1.6, r * 0.8, r * 0.8, 'F');
+  doc.roundedRect(cx - r, iconY - r, r * 2, r * 2, r * 0.45, r * 0.45, 'F');
+  doc.setDrawColor(...CELESTE);
   doc.setFillColor(...CELESTE);
-  doc.triangle(cx - r * 0.3, iconY - r * 0.5, cx - r * 0.3, iconY + r * 0.5, cx + r * 0.55, iconY, 'F');
+  doc.setLineWidth(0.45);
+  doc.roundedRect(cx - r * 0.68, iconY - r * 0.68, r * 1.36, r * 1.36, 0.45, 0.45, 'S');
+  doc.circle(cx, iconY, r * 0.4, 'S');
+  doc.circle(cx + r * 0.5, iconY - r * 0.5, r * 0.11, 'F');
+  cx += iconGap;
+
+  // YouTube: cuadrado blanco con esquinas redondeadas + play transparente
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(cx - r, iconY - r, r * 2, r * 2, r * 0.45, r * 0.45, 'F');
+  doc.setFillColor(...CELESTE);
+  doc.triangle(cx - r * 0.4, iconY - r * 0.65, cx - r * 0.4, iconY + r * 0.65, cx + r * 0.7, iconY, 'F');
   cx += iconGap;
 
   // LinkedIn: cuadrado blanco con esquinas redondeadas + "in" transparente
   doc.setFillColor(255, 255, 255);
   doc.roundedRect(cx - r, iconY - r, r * 2, r * 2, r * 0.45, r * 0.45, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(r * 4.5);
+  doc.setFontSize(r * 5.8);
   doc.setTextColor(...CELESTE);
-  doc.text('in', cx, iconY + r * 0.38, { align: 'center' });
+  doc.text('in', cx + r * 0.06, iconY + r * 0.66, { align: 'center' });
 }
 
 export async function generateOrdenCompraPDF(orden, config = {}) {
@@ -236,13 +238,22 @@ export async function generateOrdenCompraPDF(orden, config = {}) {
     texto(doc, `${simbolo} ${Number(value || 0).toFixed(2)}`, totalesValueX, rowY, { bold: true, size: esTotal ? 9 : 8, align: 'right' });
   });
 
-  texto(doc, `SON: ${numeroALetrasOrden(orden.total, simbolo).toUpperCase()}`, 9, y + 22, { bold: true, size: 8.3 });
-  texto(doc, `OBSERVACIONES: ${(orden.observaciones || '-').toUpperCase()}`, 9, y + 28, { bold: true, size: 7.6 });
+  const anchoTexto = 190;
+  let cursorY = y + 22;
+
+  const sonLineas = doc.splitTextToSize(`SON: ${numeroALetrasOrden(orden.total, simbolo).toUpperCase()}`, anchoTexto);
+  sonLineas.forEach((linea, index) => texto(doc, linea, 9, cursorY + index * 3.8, { bold: true, size: 8.3 }));
+  cursorY += (sonLineas.length - 1) * 3.8 + 6;
+
+  const obsLineas = doc.splitTextToSize(`OBSERVACIONES: ${(orden.observaciones || '-').toUpperCase()}`, anchoTexto);
+  obsLineas.forEach((linea, index) => texto(doc, linea, 9, cursorY + index * 3.6, { bold: true, size: 7.6 }));
+  cursorY += (obsLineas.length - 1) * 3.6 + 5;
+
   if (orden.origenCotizacionCodigo) {
-    texto(doc, `Origen interno: ${orden.origenCotizacionCodigo}`, 9, y + 33, { size: 6.3, color: [90, 90, 90] });
+    texto(doc, `Origen interno: ${orden.origenCotizacionCodigo}`, 9, cursorY, { size: 6.3, color: [90, 90, 90] });
   }
 
-  const firmasY = Math.min(216, Math.max(y + 48, 190));
+  const firmasY = Math.min(216, Math.max(cursorY + 15, 190));
   doc.setFillColor(...CELESTE);
   doc.rect(8, firmasY, 98, 5, 'F');
   doc.rect(110, firmasY, 92, 5, 'F');

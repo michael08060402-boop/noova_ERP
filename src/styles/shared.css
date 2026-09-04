@@ -1,7 +1,7 @@
 /* ── VARIABLES DE COLOR ── */
 :root {
-  --azul-primario: #2563eb;
-  --azul-primario-hover: #1d4ed8;
+  --azul-primario: #1d4ed8;
+  --azul-primario-hover: #1e3a8a;
   --azul-claro: #eff6ff;
   --azul-borde: #dbeafe;
 
@@ -92,7 +92,7 @@
 .barra-busqueda input:focus {
   outline: none;
   border-color: var(--azul-primario);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
 }
 
 /* Selector de orden / filtro */
@@ -119,7 +119,7 @@
 .selector-filtro:focus {
   outline: none;
   border-color: var(--azul-primario);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
 }
 
 /* ── TARJETA DE TABLA ── */
@@ -393,7 +393,7 @@
 .campo textarea:focus {
   outline: none;
   border-color: var(--azul-primario);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
 }
 
 .campo textarea {
