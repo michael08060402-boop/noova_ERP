@@ -1,81 +1,364 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Función helper: usuario autenticado
+    // ============================================================
+    // IDENTIDAD Y ROLES
+    // ============================================================
+
     function isAuth() {
       return request.auth != null;
     }
 
-    // Función helper: es administrador
-    function isAdmin() {
+    function userExists() {
       return isAuth()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'administrador';
+        && exists(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        );
     }
 
-    // Perfil de usuario: cada usuario lee el suyo
-    // Solo admin puede crear/editar/eliminar usuarios
+    function profile() {
+      return get(
+        /databases/$(database)/documents/users/$(request.auth.uid)
+      ).data;
+    }
+
+    // Alias legacy únicamente para hacer la transición sin bloquear cuentas.
+    // No aparecen como roles disponibles en el frontend.
+    function isGerente() {
+      return userExists()
+        && profile().role in ['gerente', 'gerencia'];
+    }
+
+    function isAdministrador() {
+      return userExists()
+        && profile().role in ['administrador', 'admin'];
+    }
+
+    function isSoporteTI() {
+      return userExists()
+        && profile().role in ['soporte_ti', 'sistemas'];
+    }
+
+    function isMarketing() {
+      return userExists()
+        && profile().role in ['responsable_marketing', 'marketing'];
+    }
+
+    function isJefeProyectoMina() {
+      return userExists()
+        && profile().role in ['jefe_proyecto_mina', 'ing_minas'];
+    }
+
+    function isKnownRole() {
+      return isGerente()
+        || isAdministrador()
+        || isSoporteTI()
+        || isMarketing()
+        || isJefeProyectoMina();
+    }
+
+    function isActiveUser() {
+      return userExists()
+        && isKnownRole()
+        && (
+          !('activo' in profile())
+          || profile().activo == true
+        );
+    }
+
+    // Gerente y Administrador tienen acceso completo a módulos de negocio.
+    function canBusinessAll() {
+      return isActiveUser()
+        && (isGerente() || isAdministrador());
+    }
+
+    // Soporte TI tiene Configuración completa según el documento funcional.
+    function canManageUsers() {
+      return isActiveUser()
+        && (isGerente() || isSoporteTI());
+    }
+
+    function canUseMensajeria() {
+      return isActiveUser()
+        && (
+          isGerente()
+          || isAdministrador()
+          || isSoporteTI()
+          || isMarketing()
+        );
+    }
+
+    // Mensajería consume contactos de Clientes aunque Soporte TI no tenga
+    // el módulo Clientes visible. Por eso necesita lectura subyacente.
+    function canReadClientesData() {
+      return canBusinessAll()
+        || (isActiveUser() && isMarketing())
+        || canUseMensajeria();
+    }
+
+    function validOfficialRole(role) {
+      return role in [
+        'gerente',
+        'administrador',
+        'soporte_ti',
+        'responsable_marketing',
+        'jefe_proyecto_mina'
+      ];
+    }
+
+    function validOfficialArea(area) {
+      return area in [
+        'gerencia',
+        'administracion',
+        'marketing',
+        'minas',
+        'contabilidad',
+        'sistemas'
+      ];
+    }
+
+    function userRoleChangeIsValid() {
+      return !(
+        'role' in request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+      )
+      || (
+        'role' in request.resource.data
+        && validOfficialRole(request.resource.data.role)
+      );
+    }
+
+    function userAreaChangeIsValid() {
+      return !(
+        'area' in request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+      )
+      || (
+        'area' in request.resource.data
+        && validOfficialArea(request.resource.data.area)
+      );
+    }
+
+    // ============================================================
+    // USUARIOS
+    // ============================================================
+
     match /users/{userId} {
-      allow read: if isAuth();
-      allow create, update, delete: if isAdmin();
-      // Un usuario puede actualizar SOLO su propio perfil, pero NO su rol
-      allow update: if isAuth() && request.auth.uid == userId
-                    && !('role' in request.resource.data.diff(resource.data).affectedKeys());
+
+      // El propio usuario puede leer su perfil para que AuthContext determine
+      // su rol y estado. Gerente y Soporte TI pueden listar/consultar usuarios.
+      allow get: if isAuth()
+        && (
+          request.auth.uid == userId
+          || canManageUsers()
+        );
+
+      allow list: if canManageUsers();
+
+      // La creación normal pasa por Cloud Functions, pero se mantiene esta
+      // regla para operaciones administrativas directas controladas.
+      allow create: if canManageUsers()
+        && request.auth.uid != userId
+        && ('role' in request.resource.data)
+        && validOfficialRole(request.resource.data.role)
+        && (
+          !('area' in request.resource.data)
+          || validOfficialArea(request.resource.data.area)
+        );
+
+      // Gerente / Soporte TI pueden editar otras cuentas.
+      // Nadie puede cambiar su propio rol desde el cliente.
+      allow update: if canManageUsers()
+        && request.auth.uid != userId
+        && userRoleChangeIsValid()
+        && userAreaChangeIsValid();
+
+      // El usuario solo puede editar sus propios datos personales y únicamente
+      // si su rol tiene Perfil editable: Gerente, Administrador o Soporte TI.
+      allow update: if isActiveUser()
+        && request.auth.uid == userId
+        && (
+          isGerente()
+          || isAdministrador()
+          || isSoporteTI()
+        )
+        && request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+          .hasOnly([
+            'nombre',
+            'cargo',
+            'telefono',
+            'email',
+            'updatedAt'
+          ]);
+
+      allow delete: if canManageUsers()
+        && request.auth.uid != userId;
     }
 
-    // Colecciones de negocio: cualquier autenticado puede leer y escribir
-    // (el ERP es single-tenant, todos los empleados ven todo)
+    // ============================================================
+    // CLIENTES
+    // ============================================================
+
     match /clientes/{docId} {
-      allow read, write: if isAuth();
-    }
-    match /cotizaciones/{docId} {
-      allow read, write: if isAuth();
-    }
-    match /equipos/{docId} {
-      allow read, write: if isAuth();
-    }
-    match /mangas/{docId} {
-      allow read, write: if isAuth();
+
+      // Marketing: solo lectura.
+      // Soporte TI: lectura técnica necesaria para Mensajería.
+      allow read: if canReadClientesData();
+
+      // Solo Gerente/Administrador pueden alterar Clientes.
+      allow create, update, delete: if canBusinessAll();
     }
 
-    // Módulos nuevos de Compras: mismo modelo single-tenant que el ERP actual.
-    // Se añaden sin cambiar las reglas que ya funcionan para las colecciones existentes.
+    // ============================================================
+    // COTIZACIONES
+    // ============================================================
+
+    match /cotizaciones/{docId} {
+      allow read, create, update, delete: if canBusinessAll();
+    }
+
+    // ============================================================
+    // EQUIPOS
+    // ============================================================
+
+    match /equipos/{docId} {
+      allow read, create, update, delete: if canBusinessAll();
+    }
+
+    // ============================================================
+    // MANGAS
+    // ============================================================
+
+    match /mangas/{docId} {
+      allow read, create, update, delete: if canBusinessAll();
+    }
+
+    // ============================================================
+    // MENSAJERÍA
+    // ============================================================
+
+    match /mensajeria/{docId} {
+      allow read, create, update, delete: if canUseMensajeria();
+    }
+
+    // ============================================================
+    // PROVEEDORES / COMPRAS
+    // ============================================================
+
     match /proveedores/{docId} {
-      allow read, write: if isAuth();
+      allow read, create, update, delete: if canBusinessAll();
     }
+
     match /solicitudesCotizacion/{docId} {
-      allow read, write: if isAuth();
+      allow read, create, update, delete: if canBusinessAll();
     }
+
     match /ordenesCompra/{docId} {
-      allow read, create, update: if isAuth();
-      allow delete: if isAuth() && resource.data.estado == 'Borrador';
+      allow read, create, update: if canBusinessAll();
+
+      allow delete: if canBusinessAll()
+        && (
+          !('estado' in resource.data)
+          || resource.data.estado == 'Borrador'
+        );
     }
+
+    // ============================================================
+    // FACTURACIÓN
+    // ============================================================
 
     match /facturacion/{docId} {
-      allow read, write: if isAuth();
-      // NO se pueden eliminar comprobantes ACEPTADOS por SUNAT (es ilegal)
-      allow delete: if isAuth()
-                    && (!exists(/databases/$(database)/documents/facturacion/$(docId))
-                        || get(/databases/$(database)/documents/facturacion/$(docId)).data.estadoSunat != 'ACEPTADA');
+      allow read, create, update: if canBusinessAll();
+
+      // Nunca eliminar comprobantes aceptados por SUNAT.
+      allow delete: if canBusinessAll()
+        && (
+          !('estadoSunat' in resource.data)
+          || resource.data.estadoSunat != 'ACEPTADA'
+        );
     }
+
+    // ============================================================
+    // CONFIGURACIÓN
+    // ============================================================
+
     match /configuracion/{docId} {
-      allow read: if isAuth();
-      // Cualquier usuario autenticado puede editar la configuración (ERP single-tenant).
-      // Si se quiere restringir a admin, cambiar `isAuth()` por `isAdmin()`.
-      allow write: if isAuth();
+
+      // ConfigContext carga configuracion/general al iniciar el ERP.
+      // Por ello todos los roles activos necesitan lectura.
+      allow read: if isActiveUser();
+
+      // Gerente y Soporte TI: Configuración completa.
+      allow create, update: if isActiveUser()
+        && (isGerente() || isSoporteTI());
+
+      // Administrador: únicamente Correlativos.
+      // Configuracion.jsx envía solo cotizacion + ordenCompra en esta pestaña.
+      allow create: if isActiveUser()
+        && isAdministrador()
+        && request.resource.data.keys().hasOnly([
+          'cotizacion',
+          'ordenCompra',
+          'updatedAt'
+        ]);
+
+      allow update: if isActiveUser()
+        && isAdministrador()
+        && request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+          .hasOnly([
+            'cotizacion',
+            'ordenCompra',
+            'updatedAt'
+          ]);
+
+      // Evita borrar por accidente el documento global de configuración.
+      allow delete: if false;
     }
+
+    // ============================================================
+    // AUDITORÍA
+    // ============================================================
+
     match /logs/{docId} {
-      // Append-only: cualquier autenticado puede crear logs, nadie los borra
-      allow read: if isAuth();
-      allow create: if isAuth();
-      allow update, delete: if isAdmin();
+
+      // Todos los roles activos pueden registrar sus acciones.
+      allow create: if isActiveUser();
+
+      // Auditoría pertenece a Configuración completa.
+      allow read: if isActiveUser()
+        && (isGerente() || isSoporteTI());
+
+      // Logs append-only.
+      allow update, delete: if false;
     }
+
+    // ============================================================
+    // COLECCIONES INTERNAS
+    // ============================================================
+
+    // Estas colecciones se gestionan desde Cloud Functions/Admin SDK.
     match /ruc_cache/{docId} {
-      allow read, write: if isAuth();
+      allow read, write: if false;
     }
+
     match /contadores/{docId} {
-      allow read, write: if isAuth();
+      allow read, write: if false;
+    }
+
+    // ============================================================
+    // DENEGACIÓN POR DEFECTO
+    // ============================================================
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

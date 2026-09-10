@@ -3,7 +3,11 @@ import { useAuth } from './context/AuthContext';
 import { lazy, Suspense } from 'react';
 import Loading from './components/Loading';
 import { useConfig } from './context/ConfigContext';
-import { tienePermiso } from './services/userService';
+import {
+  puede,
+  puedeConfiguracion,
+  getRutaInicial
+} from './services/userService';
 import './App.css';
 
 const Login = lazy(() => import('./pages/Login'));
@@ -23,48 +27,82 @@ const Proveedores = lazy(() => import('./pages/Proveedores'));
 
 function RutaProtegida({ children }) {
   const { currentUser, userProfile } = useAuth();
-  if (!currentUser || !userProfile) return <Navigate to="/login" replace />;
+
+  if (!currentUser || !userProfile) {
+    return <Navigate to="/login" replace />;
+  }
+
   return children;
 }
 
 function RutaPublica({ children }) {
-  const { currentUser } = useAuth();
-  if (currentUser) return <Navigate to="/dashboard" replace />;
+  const { currentUser, userProfile } = useAuth();
+
+  if (currentUser && userProfile) {
+    return <Navigate to={getRutaInicial(userProfile)} replace />;
+  }
+
   return children;
 }
 
-// Segundo seguro además del sidebar: si el rol del usuario no tiene este
-// módulo en su navItems (ej. un colaborador de Marketing intentando entrar
-// a /cotizaciones escribiendo la URL directamente), lo manda a Dashboard.
-function RutaConPermiso({ moduloKey, moduloKeys, children }) {
+function InicioPorRol() {
+  const { userProfile } = useAuth();
+  return <Navigate to={getRutaInicial(userProfile)} replace />;
+}
+
+// Segunda capa además del sidebar. Impide entrar escribiendo la URL a mano.
+function RutaConPermiso({ modulo, accion = 'read', children }) {
   const { userProfile } = useAuth();
   const location = useLocation();
-  const permisos = moduloKeys || [moduloKey];
-  const autorizado = permisos.some((key) => tienePermiso(userProfile, key));
-  if (!autorizado) {
-    // Nunca navegar a la misma URL: React Router conserva el layout pero no
-    // monta contenido en el Outlet, que era la pantalla blanca reportada.
-    if (location.pathname === '/dashboard') {
-      return (
-        <section className="pagina" role="alert">
-          <h1 className="pagina-titulo">Acceso pendiente de configuración</h1>
-          <p>Tu cuenta está activa, pero todavía no tiene módulos habilitados. Solicita a un administrador que revise tus permisos.</p>
-        </section>
-      );
-    }
-    return <Navigate to="/dashboard" replace />;
+
+  if (puede(userProfile, modulo, accion)) {
+    return children;
   }
-  return children;
+
+  const destino = getRutaInicial(userProfile);
+
+  // Evita bucles si un perfil está mal configurado.
+  if (location.pathname === destino || destino === '/login') {
+    return (
+      <section className="pagina" role="alert">
+        <h1 className="pagina-titulo">Acceso no autorizado</h1>
+        <p>Tu rol no tiene permiso para acceder a esta sección.</p>
+      </section>
+    );
+  }
+
+  return <Navigate to={destino} replace />;
+}
+
+function RutaSeccionConfiguracion({ seccion, children }) {
+  const { userProfile } = useAuth();
+  const location = useLocation();
+
+  if (puedeConfiguracion(userProfile, seccion)) {
+    return children;
+  }
+
+  const destino = getRutaInicial(userProfile);
+  if (location.pathname === destino || destino === '/login') {
+    return (
+      <section className="pagina" role="alert">
+        <h1 className="pagina-titulo">Acceso no autorizado</h1>
+        <p>Tu rol no tiene permiso para acceder a esta sección de Configuración.</p>
+      </section>
+    );
+  }
+
+  return <Navigate to={destino} replace />;
 }
 
 // Inyecta los datos de la empresa (desde ConfigContext) a Facturacion.
-// Los datos provienen únicamente de la colección configuracion/general.
 function FacturacionWrapper() {
   const { config, loadingConfig, configError, refreshConfig } = useConfig();
 
   if (loadingConfig) {
     return <Loading message="Cargando configuración de la empresa..." />;
   }
+
   if (configError && !config) {
     return <ErrorConfiguracion onRetry={refreshConfig} />;
   }
@@ -75,10 +113,15 @@ function FacturacionWrapper() {
 
 function ComprasWrapper() {
   const { config, loadingConfig, configError, refreshConfig } = useConfig();
+
   if (loadingConfig) {
     return <Loading message="Cargando configuración de compras..." />;
   }
-  if (configError || !config) return <ErrorConfiguracion onRetry={refreshConfig} />;
+
+  if (configError || !config) {
+    return <ErrorConfiguracion onRetry={refreshConfig} />;
+  }
+
   return <Compras />;
 }
 
@@ -87,7 +130,9 @@ function ErrorConfiguracion({ onRetry }) {
     <section className="pagina" role="alert">
       <h1 className="pagina-titulo">No se pudo cargar la configuración</h1>
       <p>Comprueba la conexión con Firebase e inténtalo nuevamente.</p>
-      <button type="button" className="btn-principal" onClick={onRetry}>Reintentar</button>
+      <button type="button" className="btn-principal" onClick={onRetry}>
+        Reintentar
+      </button>
     </section>
   );
 }
@@ -105,6 +150,7 @@ function App() {
               </RutaPublica>
             }
           />
+
           <Route
             path="/"
             element={
@@ -113,23 +159,136 @@ function App() {
               </RutaProtegida>
             }
           >
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<RutaConPermiso moduloKey="dashboard"><Dashboard /></RutaConPermiso>} />
-            <Route path="clientes" element={<RutaConPermiso moduloKey="clientes"><Clientes /></RutaConPermiso>} />
-            <Route path="cotizaciones" element={<RutaConPermiso moduloKey="cotizaciones"><Cotizaciones /></RutaConPermiso>} />
-            <Route path="equipos" element={<RutaConPermiso moduloKey="equipos"><Equipos /></RutaConPermiso>} />
-            <Route path="mangas" element={<RutaConPermiso moduloKey="mangas"><Mangas /></RutaConPermiso>} />
-            <Route path="mensajeria" element={<RutaConPermiso moduloKey="mensajeria"><Mensajeria /></RutaConPermiso>} />
-            <Route path="compras" element={<RutaConPermiso moduloKey="compras"><ComprasWrapper /></RutaConPermiso>} />
-            <Route path="proveedores" element={<RutaConPermiso moduloKey="proveedores"><Proveedores /></RutaConPermiso>} />
+            <Route index element={<InicioPorRol />} />
+
+            <Route
+              path="dashboard"
+              element={
+                <RutaConPermiso modulo="dashboard">
+                  <Dashboard />
+                </RutaConPermiso>
+              }
+            />
+
+            <Route
+              path="clientes"
+              element={
+                <RutaConPermiso modulo="clientes">
+                  <Clientes />
+                </RutaConPermiso>
+              }
+            />
+
+            <Route
+              path="cotizaciones"
+              element={
+                <RutaConPermiso modulo="cotizaciones">
+                  <Cotizaciones />
+                </RutaConPermiso>
+              }
+            />
+
+            <Route
+              path="equipos"
+              element={
+                <RutaConPermiso modulo="equipos">
+                  <Equipos />
+                </RutaConPermiso>
+              }
+            />
+
+            <Route
+              path="mangas"
+              element={
+                <RutaConPermiso modulo="mangas">
+                  <Mangas />
+                </RutaConPermiso>
+              }
+            />
+
+            <Route
+              path="mensajeria"
+              element={
+                <RutaConPermiso modulo="mensajeria">
+                  <Mensajeria />
+                </RutaConPermiso>
+              }
+            />
+
+            <Route
+              path="compras"
+              element={
+                <RutaConPermiso modulo="compras">
+                  <ComprasWrapper />
+                </RutaConPermiso>
+              }
+            />
+
+            <Route
+              path="proveedores"
+              element={
+                <RutaConPermiso modulo="proveedores">
+                  <Proveedores />
+                </RutaConPermiso>
+              }
+            />
+
             <Route path="compras/proveedores" element={<Navigate to="/proveedores" replace />} />
-            <Route path="facturacion" element={<RutaConPermiso moduloKey="facturacion"><FacturacionWrapper /></RutaConPermiso>} />
-            <Route path="configuracion" element={<RutaConPermiso moduloKeys={['configuracion', 'usuarios']}><Configuracion /></RutaConPermiso>} />
-            <Route path="perfil" element={<Perfil />} />
-            <Route path="nube" element={<RutaConPermiso moduloKey="nube"><NubePage /></RutaConPermiso>} />
-            <Route path="usuarios" element={<RutaConPermiso moduloKey="usuarios"><Navigate to="/configuracion?tab=usuarios" replace /></RutaConPermiso>} />
+
+            <Route
+              path="facturacion"
+              element={
+                <RutaConPermiso modulo="facturacion">
+                  <FacturacionWrapper />
+                </RutaConPermiso>
+              }
+            />
+
+            <Route
+              path="configuracion"
+              element={
+                <RutaConPermiso modulo="configuracion">
+                  <Configuracion />
+                </RutaConPermiso>
+              }
+            />
+
+            <Route
+              path="perfil"
+              element={
+                <RutaConPermiso modulo="perfil">
+                  <Perfil />
+                </RutaConPermiso>
+              }
+            />
+
+            <Route
+              path="nube"
+              element={
+                <RutaConPermiso modulo="nube">
+                  <NubePage />
+                </RutaConPermiso>
+              }
+            />
+
+            <Route
+              path="usuarios"
+              element={
+                <RutaSeccionConfiguracion seccion="usuarios">
+                  <Navigate to="/configuracion?tab=usuarios" replace />
+                </RutaSeccionConfiguracion>
+              }
+            />
           </Route>
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+
+          <Route
+            path="*"
+            element={
+              <RutaProtegida>
+                <InicioPorRol />
+              </RutaProtegida>
+            }
+          />
         </Routes>
       </Suspense>
     </div>

@@ -1,59 +1,160 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getPermisosUsuario, tienePermiso } from './accessControl.js';
+import {
+  ROLES,
+  normalizarRol,
+  puede,
+  tienePermiso,
+  puedeConfiguracion,
+  getRutaInicial,
+  getCarpetaNube
+} from './accessControl.js';
 
-test('un administrador con permisos vacíos hereda el acceso de su rol', () => {
-  const permisos = getPermisosUsuario({ role: 'administrador', permissions: [], activo: true });
-  assert.ok(permisos.includes('dashboard'));
-  assert.ok(permisos.includes('clientes'));
-  assert.ok(permisos.includes('configuracion'));
+function perfil(role, extra = {}) {
+  return {
+    role,
+    activo: true,
+    ...extra
+  };
+}
+
+test('solo existen los 5 roles funcionales definidos', () => {
+  assert.deepEqual(
+    Object.keys(ROLES),
+    [
+      'gerente',
+      'administrador',
+      'soporte_ti',
+      'responsable_marketing',
+      'jefe_proyecto_mina'
+    ]
+  );
 });
 
-test('un rol legado admin conserva el acceso completo de administrador', () => {
-  const permisos = getPermisosUsuario({ role: 'admin', permissions: [], activo: true });
-  assert.ok(permisos.includes('clientes'));
-  assert.ok(permisos.includes('usuarios'));
-  assert.ok(permisos.includes('configuracion'));
+test('Gerente tiene acceso completo a los módulos', () => {
+  const user = perfil('gerente');
+
+  for (const modulo of [
+    'dashboard',
+    'clientes',
+    'equipos',
+    'mangas',
+    'cotizaciones',
+    'mensajeria',
+    'proveedores',
+    'compras',
+    'facturacion',
+    'nube',
+    'perfil',
+    'configuracion'
+  ]) {
+    assert.equal(
+      tienePermiso(user, modulo),
+      true,
+      `Gerente debe poder leer ${modulo}`
+    );
+  }
+
+  assert.equal(puede(user, 'clientes', 'delete'), true);
+  assert.equal(puedeConfiguracion(user, 'usuarios'), true);
+  assert.equal(puedeConfiguracion(user, 'logs'), true);
 });
 
-test('un administrador no queda restringido por permissions heredados', () => {
-  const permisos = getPermisosUsuario({ role: 'admin', permissions: ['dashboard'], activo: true });
-  assert.ok(permisos.includes('clientes'));
-  assert.ok(permisos.includes('compras'));
-  assert.ok(permisos.includes('usuarios'));
-  assert.ok(permisos.includes('configuracion'));
-});
+test('Administrador ve todos los módulos pero Configuración solo Correlativos', () => {
+  const user = perfil('administrador');
 
+  assert.equal(tienePermiso(user, 'clientes'), true);
+  assert.equal(tienePermiso(user, 'facturacion'), true);
+  assert.equal(tienePermiso(user, 'configuracion'), true);
+  assert.equal(puedeConfiguracion(user, 'correlativo'), true);
 
-
-test('roles legacy de propietario/creador conservan acceso total', () => {
-  for (const role of ['owner', 'propietario', 'creator', 'creador', 'superadmin', 'super_admin', 'super-admin', 'root']) {
-    const permisos = getPermisosUsuario({ role, permissions: ['dashboard'], activo: true });
-    assert.ok(permisos.includes('clientes'), `${role} debe ver clientes`);
-    assert.ok(permisos.includes('compras'), `${role} debe ver compras`);
-    assert.ok(permisos.includes('usuarios'), `${role} debe ver usuarios`);
-    assert.ok(permisos.includes('configuracion'), `${role} debe ver configuración`);
+  for (const seccion of ['empresa', 'pagos', 'usuarios', 'logs']) {
+    assert.equal(
+      puedeConfiguracion(user, seccion),
+      false,
+      `Administrador no debe acceder a Configuración/${seccion}`
+    );
   }
 });
-test('un permiso personalizado conserva dashboard como inicio seguro', () => {
-  const permisos = getPermisosUsuario({ role: 'operaciones', permissions: ['nube'], activo: true });
-  assert.deepEqual(permisos, ['dashboard', 'nube']);
+
+test('Soporte TI solo recibe Configuración, Perfil, Nube y Mensajería', () => {
+  const user = perfil('soporte_ti');
+
+  for (const modulo of [
+    'configuracion',
+    'perfil',
+    'nube',
+    'mensajeria'
+  ]) {
+    assert.equal(tienePermiso(user, modulo), true);
+  }
+
+  for (const modulo of [
+    'dashboard',
+    'clientes',
+    'equipos',
+    'mangas',
+    'cotizaciones',
+    'proveedores',
+    'compras',
+    'facturacion'
+  ]) {
+    assert.equal(tienePermiso(user, modulo), false);
+  }
+
+  assert.equal(puedeConfiguracion(user, 'usuarios'), true);
+  assert.equal(puedeConfiguracion(user, 'logs'), true);
+  assert.equal(getRutaInicial(user), '/configuracion');
+  assert.equal(getCarpetaNube(user), null);
 });
 
-test('sin_acceso e inactivo nunca reciben permisos', () => {
-  assert.equal(tienePermiso({ role: 'sin_acceso', permissions: ['dashboard'], activo: true }, 'dashboard'), false);
-  assert.equal(tienePermiso({ role: 'administrador', activo: false }, 'dashboard'), false);
+test('Marketing tiene lectura en Dashboard, Clientes y Perfil', () => {
+  const user = perfil('responsable_marketing');
+
+  assert.equal(puede(user, 'dashboard', 'read'), true);
+  assert.equal(puede(user, 'clientes', 'read'), true);
+  assert.equal(puede(user, 'clientes', 'create'), false);
+  assert.equal(puede(user, 'clientes', 'update'), false);
+  assert.equal(puede(user, 'clientes', 'delete'), false);
+
+  assert.equal(puede(user, 'perfil', 'read'), true);
+  assert.equal(puede(user, 'perfil', 'update'), false);
+
+  assert.equal(puede(user, 'mensajeria', 'create'), true);
+  assert.equal(puede(user, 'mensajeria', 'update'), true);
+  assert.equal(puede(user, 'mensajeria', 'delete'), true);
+
+  assert.equal(getCarpetaNube(user), 'Marketing');
+  assert.equal(getRutaInicial(user), '/dashboard');
 });
 
-test('el administrador también ve el módulo independiente Proveedores', () => {
-  const permisos = getPermisosUsuario({ role: 'admin', permissions: ['dashboard'], activo: true });
-  assert.ok(permisos.includes('proveedores'));
+test('Jefe de Proyecto de Mina solo tiene Nube restringida a Mina', () => {
+  const user = perfil('jefe_proyecto_mina');
+
+  assert.equal(tienePermiso(user, 'nube'), true);
+  assert.equal(tienePermiso(user, 'dashboard'), false);
+  assert.equal(tienePermiso(user, 'perfil'), false);
+  assert.equal(tienePermiso(user, 'mensajeria'), false);
+  assert.equal(getCarpetaNube(user), 'Mina');
+  assert.equal(getRutaInicial(user), '/nube');
 });
 
-test('el rol Compras recibe órdenes y proveedores sin exponer administración', () => {
-  const permisos = getPermisosUsuario({ role: 'compras', permissions: [], activo: true });
-  assert.ok(permisos.includes('compras'));
-  assert.ok(permisos.includes('proveedores'));
-  assert.equal(permisos.includes('usuarios'), false);
-  assert.equal(permisos.includes('configuracion'), false);
+test('un usuario inactivo o con rol desconocido no recibe acceso', () => {
+  assert.equal(
+    tienePermiso(perfil('gerente', { activo: false }), 'dashboard'),
+    false
+  );
+
+  assert.equal(
+    tienePermiso(perfil('operaciones'), 'dashboard'),
+    false
+  );
+});
+
+test('aliases legacy inequívocos se normalizan sin crear roles nuevos', () => {
+  assert.equal(normalizarRol('gerencia'), 'gerente');
+  assert.equal(normalizarRol('sistemas'), 'soporte_ti');
+  assert.equal(normalizarRol('marketing'), 'responsable_marketing');
+  assert.equal(normalizarRol('ing_minas'), 'jefe_proyecto_mina');
+  assert.equal(normalizarRol('admin'), 'administrador');
 });

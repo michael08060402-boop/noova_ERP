@@ -2,11 +2,12 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   FiBarChart2, FiUsers, FiFileText, FiSettings,
-  FiMenu, FiLogOut, FiUser, FiX, FiDollarSign, FiBell, FiTool, FiWind, FiMessageCircle, FiCloud, FiShoppingCart, FiTruck
+  FiMenu, FiLogOut, FiUser, FiX, FiDollarSign, FiBell, FiTool,
+  FiWind, FiMessageCircle, FiCloud, FiShoppingCart, FiTruck
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useCotizaciones } from '../hooks/useCotizaciones';
-import { tienePermiso } from '../services/userService';
+import { puede } from '../services/userService';
 import logo from '../assets/logo-blanco.png';
 import '../styles/shared.css';
 import './DashboardLayout.css';
@@ -27,17 +28,21 @@ const ITEMS_MENU = [
 
 function useEsMobile() {
   const [esMobile, setEsMobile] = useState(() => window.innerWidth < 1024);
+
   useEffect(() => {
     const manejarResize = () => setEsMobile(window.innerWidth < 1024);
     window.addEventListener('resize', manejarResize);
     return () => window.removeEventListener('resize', manejarResize);
   }, []);
+
   return esMobile;
 }
 
 export default function DashboardLayout() {
   const { currentUser, userProfile, logout } = useAuth();
-  const { cotizaciones } = useCotizaciones(tienePermiso(userProfile, 'cotizaciones'));
+  const puedeVerCotizaciones = puede(userProfile, 'cotizaciones', 'read');
+  const puedeVerPerfil = puede(userProfile, 'perfil', 'read');
+  const { cotizaciones } = useCotizaciones(puedeVerCotizaciones);
   const navigate = useNavigate();
   const esMobile = useEsMobile();
 
@@ -49,12 +54,9 @@ export default function DashboardLayout() {
   const menuUsuarioRef = useRef(null);
   const notificacionesRef = useRef(null);
 
-  const itemsMenu = ITEMS_MENU.filter((item) => {
-    if (item.path === '/configuracion') {
-      return tienePermiso(userProfile, 'configuracion') || tienePermiso(userProfile, 'usuarios');
-    }
-    return tienePermiso(userProfile, item.key);
-  });
+  const itemsMenu = ITEMS_MENU.filter((item) =>
+    puede(userProfile, item.key, 'read')
+  );
 
   useEffect(() => {
     function manejarClickFuera(e) {
@@ -65,6 +67,7 @@ export default function DashboardLayout() {
         setNotificacionesAbiertas(false);
       }
     }
+
     document.addEventListener('mousedown', manejarClickFuera);
     return () => document.removeEventListener('mousedown', manejarClickFuera);
   }, []);
@@ -82,8 +85,14 @@ export default function DashboardLayout() {
     }
   }
 
-  const nombreUsuario = userProfile?.nombre || currentUser?.email?.split('@')[0] || 'Usuario';
-  const notificacionesPendientes = cotizaciones.filter(c => c.estado === 'Borrador' || c.estado === 'Enviada');
+  const nombreUsuario =
+    userProfile?.nombre ||
+    currentUser?.email?.split('@')[0] ||
+    'Usuario';
+
+  const notificacionesPendientes = puedeVerCotizaciones
+    ? cotizaciones.filter((c) => c.estado === 'Borrador' || c.estado === 'Enviada')
+    : [];
 
   const sidebarClase = [
     'sidebar',
@@ -101,7 +110,10 @@ export default function DashboardLayout() {
   return (
     <div className="dashboard-layout">
       {esMobile && sidebarMobileAbierto && (
-        <div className="sidebar-overlay" onClick={() => setSidebarMobileAbierto(false)} />
+        <div
+          className="sidebar-overlay"
+          onClick={() => setSidebarMobileAbierto(false)}
+        />
       )}
 
       <aside className={sidebarClase}>
@@ -112,8 +124,7 @@ export default function DashboardLayout() {
               if (esMobile) {
                 setSidebarMobileAbierto(false);
               } else {
-                setSidebarColapsado(p => !p);
-                // Usamos requestAnimationFrame para sincronizar con el repintado
+                setSidebarColapsado((p) => !p);
                 requestAnimationFrame(() => {
                   window.dispatchEvent(new Event('resize'));
                 });
@@ -123,6 +134,7 @@ export default function DashboardLayout() {
           >
             {esMobile ? <FiX size={18} /> : <FiMenu size={16} />}
           </button>
+
           <div className="sidebar-logo">
             <img className="sidebar-logo-img" src={logo} alt="Logo de Noova" />
           </div>
@@ -133,7 +145,9 @@ export default function DashboardLayout() {
             <NavLink
               key={item.path}
               to={item.path}
-              className={({ isActive }) => `nav-item ${isActive ? 'nav-item-active' : ''}`}
+              className={({ isActive }) =>
+                `nav-item ${isActive ? 'nav-item-active' : ''}`
+              }
               onClick={() => esMobile && setSidebarMobileAbierto(false)}
               title={sidebarColapsado ? item.label : undefined}
             >
@@ -147,12 +161,13 @@ export default function DashboardLayout() {
           <div className="sidebar-user-wrapper" ref={menuUsuarioRef}>
             <button
               className="sidebar-user-trigger"
-              onClick={() => setMenuUsuarioAbierto(p => !p)}
+              onClick={() => setMenuUsuarioAbierto((p) => !p)}
               title={nombreUsuario}
             >
               <div className="user-icono">
                 <FiUser size={18} />
               </div>
+
               <div className="user-info">
                 <span className="user-name">{nombreUsuario}</span>
                 <span className="user-email-text">{currentUser?.email}</span>
@@ -165,26 +180,43 @@ export default function DashboardLayout() {
                   <span className="dropdown-name">{nombreUsuario}</span>
                   <span className="dropdown-email">{currentUser?.email}</span>
                 </div>
-                <div className="dropdown-divider"></div>
-                <button
-                  className="dropdown-item"
-                  onClick={() => { setMenuUsuarioAbierto(false); navigate('/perfil'); }}
-                >
-                  <FiUser size={16} /><span>Mi Perfil</span>
-                </button>
-                <div className="dropdown-divider"></div>
+
+                {puedeVerPerfil && (
+                  <>
+                    <div className="dropdown-divider" />
+                    <button
+                      className="dropdown-item"
+                      onClick={() => {
+                        setMenuUsuarioAbierto(false);
+                        navigate('/perfil');
+                      }}
+                    >
+                      <FiUser size={16} />
+                      <span>Mi Perfil</span>
+                    </button>
+                  </>
+                )}
+
+                <div className="dropdown-divider" />
+
                 <button
                   className="dropdown-item dropdown-item-danger"
-                  onClick={() => { setMenuUsuarioAbierto(false); cerrarSesion(); }}
+                  onClick={() => {
+                    setMenuUsuarioAbierto(false);
+                    cerrarSesion();
+                  }}
                 >
-                  <FiLogOut size={16} /><span>Cerrar Sesión</span>
+                  <FiLogOut size={16} />
+                  <span>Cerrar Sesión</span>
                 </button>
               </div>
             )}
           </div>
 
           <div className="sidebar-copyright">
-            {sidebarColapsado ? new Date().getFullYear() : `© ${new Date().getFullYear()} NOOVA S.A.C.`}
+            {sidebarColapsado
+              ? new Date().getFullYear()
+              : `© ${new Date().getFullYear()} NOOVA S.A.C.`}
           </div>
         </div>
       </aside>
@@ -205,38 +237,46 @@ export default function DashboardLayout() {
           </div>
 
           <div className="topbar-actions">
-            <div className="notification-wrapper" ref={notificacionesRef}>
-              <button
-                className="notification-btn"
-                onClick={() => setNotificacionesAbiertas(p => !p)}
-                aria-label="Notificaciones"
-              >
-                <FiBell size={18} />
-                {notificacionesPendientes.length > 0 && (
-                  <span className="notification-badge">{notificacionesPendientes.length}</span>
-                )}
-              </button>
-              {notificacionesAbiertas && (
-                <div className="notifications-panel">
-                  <div className="notifications-header">
-                    <span>Notificaciones</span>
-                    <span>{notificacionesPendientes.length} pendientes</span>
-                  </div>
-                  <div className="notifications-list">
-                    {notificacionesPendientes.length === 0 ? (
-                      <div className="notification-empty">No hay elementos pendientes</div>
-                    ) : (
-                      notificacionesPendientes.slice(0, 5).map(cot => (
-                        <div key={cot.id} className="notification-item">
-                          <span>{cot.codigo || 'Sin código'}</span>
-                          <span className="notification-status">{cot.estado}</span>
+            {puedeVerCotizaciones && (
+              <div className="notification-wrapper" ref={notificacionesRef}>
+                <button
+                  className="notification-btn"
+                  onClick={() => setNotificacionesAbiertas((p) => !p)}
+                  aria-label="Notificaciones"
+                >
+                  <FiBell size={18} />
+                  {notificacionesPendientes.length > 0 && (
+                    <span className="notification-badge">
+                      {notificacionesPendientes.length}
+                    </span>
+                  )}
+                </button>
+
+                {notificacionesAbiertas && (
+                  <div className="notifications-panel">
+                    <div className="notifications-header">
+                      <span>Notificaciones</span>
+                      <span>{notificacionesPendientes.length} pendientes</span>
+                    </div>
+
+                    <div className="notifications-list">
+                      {notificacionesPendientes.length === 0 ? (
+                        <div className="notification-empty">
+                          No hay elementos pendientes
                         </div>
-                      ))
-                    )}
+                      ) : (
+                        notificacionesPendientes.slice(0, 5).map((cot) => (
+                          <div key={cot.id} className="notification-item">
+                            <span>{cot.codigo || 'Sin código'}</span>
+                            <span className="notification-status">{cot.estado}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
         </header>
 
@@ -244,7 +284,6 @@ export default function DashboardLayout() {
           <Outlet />
         </main>
       </div>
-
     </div>
   );
 }

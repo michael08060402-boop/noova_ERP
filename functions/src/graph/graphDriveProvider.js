@@ -38,7 +38,7 @@ async function listarCarpeta(carpetaId) {
 
   const params = {
     $select: 'id,name,size,lastModifiedDateTime,folder,file,webUrl',
-    $orderby: 'folder,name',
+    $orderby: 'name',
     $top: 200
   };
 
@@ -117,7 +117,7 @@ async function listarCarpetaPorRuta(rutaCarpeta) {
 
   const params = {
     $select: 'id,name,size,lastModifiedDateTime,folder,file,webUrl',
-    $orderby: 'folder,name',
+    $orderby: 'name',
     $top: 200
   };
 

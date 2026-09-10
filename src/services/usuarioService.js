@@ -1,29 +1,90 @@
 import { db, functions } from '../firebase/config';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { ROLES, updateUserProfile } from './userService';
+import {
+  ROLES,
+  esRolValido,
+  normalizarRol,
+  normalizarArea,
+  getAreaPredeterminada,
+  updateUserProfile
+} from './userService';
 
 const COLECCION = 'users';
 
 export async function getUsuarios() {
   const q = query(collection(db, COLECCION), orderBy('nombre', 'asc'));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((doc) => ({ uid: doc.id, ...doc.data() }));
+
+  return snapshot.docs.map((documento) => {
+    const data = documento.data();
+    const role = normalizarRol(data.role);
+    const area = normalizarArea(data.area)
+      || normalizarArea(data.sector)
+      || getAreaPredeterminada(role);
+
+    return {
+      uid: documento.id,
+      ...data,
+      role,
+      area
+    };
+  });
 }
 
-export async function crearUsuario({ email, password, nombre, cargo, telefono, role }) {
+export async function crearUsuario({
+  email,
+  password,
+  nombre,
+  cargo,
+  telefono,
+  role,
+  area
+}) {
+  const roleNormalizado = normalizarRol(role);
+  if (!esRolValido(roleNormalizado)) {
+    throw new Error('El rol seleccionado no es válido');
+  }
+
+  const areaNormalizada = normalizarArea(area)
+    || getAreaPredeterminada(roleNormalizado);
+
   const fn = httpsCallable(functions, 'usuariosCrear');
-  const resultado = await fn({ email, password, nombre, cargo, telefono, role });
+  const resultado = await fn({
+    email,
+    password,
+    nombre,
+    cargo,
+    telefono,
+    role: roleNormalizado,
+    area: areaNormalizada
+  });
+
   return resultado.data;
 }
 
 export async function cambiarRolUsuario(uid, role) {
-  const definicion = ROLES[role] || ROLES.sin_acceso;
-  await updateUserProfile(uid, { role, sector: definicion.sector, permissions: definicion.navItems });
+  const roleNormalizado = normalizarRol(role);
+
+  if (!ROLES[roleNormalizado]) {
+    throw new Error('El rol seleccionado no es válido');
+  }
+
+  await updateUserProfile(uid, { role: roleNormalizado });
 }
 
-export async function cambiarDatosUsuario(uid, { nombre, cargo, telefono, sector, permissions }) {
-  await updateUserProfile(uid, { nombre, cargo, telefono, sector, permissions });
+export async function cambiarDatosUsuario(uid, {
+  nombre,
+  cargo,
+  telefono,
+  area
+}) {
+  await updateUserProfile(uid, {
+    nombre,
+    cargo,
+    telefono,
+    area: normalizarArea(area)
+  });
 }
 
 export async function cambiarEstadoUsuario(uid, activo) {

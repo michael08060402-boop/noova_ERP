@@ -1,49 +1,101 @@
-// Definiciones y utilidades puras de acceso. Se mantienen separadas de
-// Firebase para poder validarlas sin inicializar red, Auth o Firestore.
+// Fuente única de permisos para el frontend del ERP.
+// Los permisos se derivan exclusivamente del rol. Los campos legacy
+// `permissions` y `sector` de usuarios antiguos se ignoran para autorización.
+
+export const AREAS = {
+  gerencia: { label: 'Gerencia' },
+  administracion: { label: 'Administración' },
+  marketing: { label: 'Marketing' },
+  minas: { label: 'Minas' },
+  contabilidad: { label: 'Contabilidad' },
+  sistemas: { label: 'Sistemas' }
+};
+
+const TODO = ['read', 'create', 'update', 'delete'];
+
+const PERMISOS_TOTALES = {
+  dashboard: ['read'],
+  clientes: TODO,
+  equipos: TODO,
+  mangas: TODO,
+  cotizaciones: TODO,
+  mensajeria: TODO,
+  proveedores: TODO,
+  compras: TODO,
+  facturacion: TODO,
+  nube: TODO,
+  perfil: TODO,
+  configuracion: ['read', 'update']
+};
+
+export const SECCIONES_CONFIGURACION = [
+  { key: 'empresa', label: 'Empresa' },
+  { key: 'pagos', label: 'Condiciones' },
+  { key: 'correlativo', label: 'Correlativos' },
+  { key: 'usuarios', label: 'Usuarios y Roles' },
+  { key: 'logs', label: 'Auditoría' }
+];
+
 export const ROLES = {
+  gerente: {
+    label: 'Gerente',
+    areaPredeterminada: 'gerencia',
+    permissions: { ...PERMISOS_TOTALES },
+    configuracion: ['*'],
+    nubeCarpeta: null,
+    rutaInicial: '/dashboard'
+  },
+
   administrador: {
-    label: 'Administrador', sector: 'Administración',
-    navItems: ['dashboard', 'clientes', 'equipos', 'mangas', 'cotizaciones', 'mensajeria', 'proveedores', 'compras', 'facturacion', 'nube', 'usuarios', 'configuracion'],
-    nubeCarpeta: null, puedeCotizar: true
+    label: 'Administrador',
+    areaPredeterminada: 'administracion',
+    permissions: { ...PERMISOS_TOTALES },
+    // El documento funcional indica: Configuración parcial, solo Correlativos.
+    configuracion: ['correlativo'],
+    nubeCarpeta: null,
+    rutaInicial: '/dashboard'
   },
-  gerencia: {
-    label: 'Gerencia', sector: 'Gerencia',
-    navItems: ['dashboard', 'clientes', 'equipos', 'mangas', 'cotizaciones', 'mensajeria', 'proveedores', 'compras', 'facturacion', 'nube', 'usuarios', 'configuracion'],
-    nubeCarpeta: null, puedeCotizar: true
+
+  soporte_ti: {
+    label: 'Soporte TI',
+    areaPredeterminada: 'sistemas',
+    permissions: {
+      configuracion: ['read', 'update'],
+      perfil: TODO,
+      nube: TODO,
+      mensajeria: TODO
+    },
+    // Como el documento no marca Configuración como parcial para Soporte TI,
+    // se interpreta acceso completo a sus secciones.
+    configuracion: ['*'],
+    nubeCarpeta: null,
+    rutaInicial: '/configuracion'
   },
-  comercial: {
-    label: 'Comercial', sector: 'Ventas',
-    navItems: ['dashboard', 'clientes', 'equipos', 'mangas', 'cotizaciones', 'mensajeria', 'compras', 'facturacion', 'nube'],
-    nubeCarpeta: null, puedeCotizar: true
+
+  responsable_marketing: {
+    label: 'Responsable de Marketing',
+    areaPredeterminada: 'marketing',
+    permissions: {
+      dashboard: ['read'],
+      clientes: ['read'],
+      mensajeria: TODO,
+      perfil: ['read'],
+      nube: TODO
+    },
+    configuracion: [],
+    nubeCarpeta: 'Marketing',
+    rutaInicial: '/dashboard'
   },
-  compras: {
-    label: 'Compras', sector: 'Compras',
-    navItems: ['dashboard', 'proveedores', 'compras', 'equipos', 'mangas', 'nube'],
-    nubeCarpeta: 'Compras', puedeCotizar: false
-  },
-  operaciones: {
-    label: 'Operaciones', sector: 'Operaciones',
-    navItems: ['dashboard', 'clientes', 'equipos', 'mangas', 'mensajeria', 'compras', 'nube'],
-    nubeCarpeta: 'Operaciones', puedeCotizar: false
-  },
-  marketing: {
-    label: 'Marketing', sector: 'Marketing',
-    navItems: ['dashboard', 'mensajeria', 'nube'],
-    nubeCarpeta: 'Marketing', puedeCotizar: false
-  },
-  sistemas: {
-    label: 'Sistemas', sector: 'Sistemas',
-    navItems: ['dashboard', 'nube', 'usuarios'],
-    nubeCarpeta: 'Sistemas', puedeCotizar: false
-  },
-  ing_minas: {
-    label: 'Ingeniería de Minas', sector: 'Ingeniería',
-    navItems: ['dashboard', 'mensajeria', 'nube'],
-    nubeCarpeta: 'Ingeniería de Minas', puedeCotizar: false
-  },
-  sin_acceso: {
-    label: 'Sin acceso', sector: 'Sin asignar', navItems: [],
-    nubeCarpeta: 'Sin acceso', puedeCotizar: false
+
+  jefe_proyecto_mina: {
+    label: 'Jefe de Proyecto de Mina',
+    areaPredeterminada: 'minas',
+    permissions: {
+      nube: TODO
+    },
+    configuracion: [],
+    nubeCarpeta: 'Mina',
+    rutaInicial: '/nube'
   }
 };
 
@@ -58,22 +110,18 @@ export const MODULOS = [
   { key: 'compras', label: 'Órdenes de compra' },
   { key: 'facturacion', label: 'Boletas y facturas' },
   { key: 'nube', label: 'Nube' },
-  { key: 'usuarios', label: 'Usuarios y roles' },
-  { key: 'configuracion', label: 'Configuración y auditoría' }
+  { key: 'perfil', label: 'Perfil' },
+  { key: 'configuracion', label: 'Configuración' }
 ];
 
+// Alias únicamente para una transición segura desde valores antiguos que
+// tienen una equivalencia inequívoca. No crea roles adicionales en la UI.
 const ALIAS_ROL = {
   admin: 'administrador',
-  administrator: 'administrador',
-  owner: 'administrador',
-  propietario: 'administrador',
-  creator: 'administrador',
-  creador: 'administrador',
-  superadmin: 'administrador',
-  super_admin: 'administrador',
-  'super-admin': 'administrador',
-  root: 'administrador',
-  ventas: 'comercial'
+  gerencia: 'gerente',
+  marketing: 'responsable_marketing',
+  sistemas: 'soporte_ti',
+  ing_minas: 'jefe_proyecto_mina'
 };
 
 export function normalizarRol(role) {
@@ -81,26 +129,105 @@ export function normalizarRol(role) {
   return ALIAS_ROL[valor] || valor;
 }
 
-export function getPermisosUsuario(profile) {
-  const role = normalizarRol(profile?.role);
-  if (!profile || profile.activo === false || role === 'sin_acceso') return [];
-
-  const permisosRol = ROLES[role]?.navItems || [];
-
-  // El administrador es el propietario funcional del ERP y nunca debe
-  // quedar bloqueado por una lista permissions heredada o incompleta.
-  // Los permisos personalizados se reservan para los demás colaboradores.
-  if (role === 'administrador') {
-    return [...new Set(permisosRol)];
-  }
-
-  const permisosConfigurados = Array.isArray(profile.permissions) && profile.permissions.length > 0
-    ? profile.permissions
-    : permisosRol;
-
-  return [...new Set(['dashboard', ...permisosConfigurados])];
+export function esRolValido(role) {
+  return Boolean(ROLES[normalizarRol(role)]);
 }
 
+export function normalizarArea(area) {
+  const valor = String(area || '').trim().toLowerCase();
+  const alias = {
+    'administración': 'administracion',
+    'mina': 'minas',
+    'minería': 'minas',
+    'ingenieria': 'minas',
+    'ingeniería': 'minas'
+  };
+  const normalizada = alias[valor] || valor;
+  return Object.prototype.hasOwnProperty.call(AREAS, normalizada)
+    ? normalizada
+    : '';
+}
+
+export function getDefinicionRol(profileOrRole) {
+  const role = typeof profileOrRole === 'string'
+    ? normalizarRol(profileOrRole)
+    : normalizarRol(profileOrRole?.role);
+
+  return ROLES[role] || null;
+}
+
+export function esUsuarioActivo(profile) {
+  return Boolean(
+    profile &&
+    profile.activo !== false &&
+    getDefinicionRol(profile)
+  );
+}
+
+export function puede(profile, modulo, accion = 'read') {
+  if (!esUsuarioActivo(profile)) return false;
+
+  const definicion = getDefinicionRol(profile);
+  const acciones = definicion?.permissions?.[modulo];
+
+  if (!Array.isArray(acciones)) return false;
+  return acciones.includes('all') || acciones.includes(accion);
+}
+
+// Compatibilidad con componentes existentes: equivale a poder leer/entrar.
 export function tienePermiso(profile, modulo) {
-  return getPermisosUsuario(profile).includes(modulo);
+  return puede(profile, modulo, 'read');
+}
+
+// Compatibilidad con código que todavía espera una lista plana de módulos.
+export function getPermisosUsuario(profile) {
+  if (!esUsuarioActivo(profile)) return [];
+
+  return MODULOS
+    .map((modulo) => modulo.key)
+    .filter((modulo) => puede(profile, modulo, 'read'));
+}
+
+export function puedeConfiguracion(profile, seccion) {
+  if (!puede(profile, 'configuracion', 'read')) return false;
+
+  const definicion = getDefinicionRol(profile);
+  const secciones = definicion?.configuracion || [];
+
+  return secciones.includes('*') || secciones.includes(seccion);
+}
+
+export function puedeEditarConfiguracion(profile, seccion) {
+  return puede(profile, 'configuracion', 'update')
+    && puedeConfiguracion(profile, seccion);
+}
+
+export function puedeGestionarUsuarios(profile) {
+  return puedeConfiguracion(profile, 'usuarios');
+}
+
+export function getRutaInicial(profile) {
+  if (!esUsuarioActivo(profile)) return '/login';
+
+  const definicion = getDefinicionRol(profile);
+  const preferida = definicion?.rutaInicial;
+
+  if (preferida) return preferida;
+
+  const primera = MODULOS.find((modulo) => puede(profile, modulo.key, 'read'));
+  return primera ? `/${primera.key}` : '/login';
+}
+
+export function getCarpetaNube(profile) {
+  if (!puede(profile, 'nube', 'read')) return undefined;
+  return getDefinicionRol(profile)?.nubeCarpeta;
+}
+
+export function getAreaPredeterminada(role) {
+  return getDefinicionRol(role)?.areaPredeterminada || '';
+}
+
+export function getNombreArea(area) {
+  const normalizada = normalizarArea(area);
+  return normalizada ? AREAS[normalizada].label : '';
 }

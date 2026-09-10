@@ -1,9 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { updateUserProfile } from '../services/userService';
+import { puede, updateUserProfile } from '../services/userService';
 import { addLog } from '../services/logService';
-import { sanitizarTexto, esCelularValido, contienePatronPeligroso } from '../utils/validation';
-import { EmailAuthProvider, reauthenticateWithCredential, updateEmail, updatePassword } from 'firebase/auth';
+import {
+  sanitizarTexto,
+  esCelularValido,
+  contienePatronPeligroso
+} from '../utils/validation';
+import {
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updateEmail,
+  updatePassword
+} from 'firebase/auth';
 import logo from '../assets/noova-logo.png';
 import '../styles/shared.css';
 import './Perfil.css';
@@ -12,24 +21,27 @@ const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 export default function Perfil() {
   const { currentUser, userProfile, refreshProfile } = useAuth();
+  const puedeEditarPerfil = puede(userProfile, 'perfil', 'update');
+
   const [form, setForm] = useState({
     nombre: '',
     cargo: '',
     telefono: '',
     email: ''
   });
+
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState(null);
   const [errorCampo, setErrorCampo] = useState({});
 
-  // Cambio de correo (requiere reautenticación con la contraseña actual)
+  // Cambio de correo.
   const [editandoEmail, setEditandoEmail] = useState(false);
   const [nuevoEmail, setNuevoEmail] = useState('');
   const [passwordActual, setPasswordActual] = useState('');
   const [guardandoEmail, setGuardandoEmail] = useState(false);
   const [errorEmail, setErrorEmail] = useState('');
 
-  // Cambio de contraseña (requiere reautenticación con la contraseña actual)
+  // Cambio de contraseña.
   const [editandoPassword, setEditandoPassword] = useState(false);
   const [passwordActualCambio, setPasswordActualCambio] = useState('');
   const [passwordNueva, setPasswordNueva] = useState('');
@@ -37,7 +49,6 @@ export default function Perfil() {
   const [guardandoPassword, setGuardandoPassword] = useState(false);
   const [errorPassword, setErrorPassword] = useState('');
 
-  // Carga los datos del perfil al montar
   useEffect(() => {
     if (userProfile) {
       setForm({
@@ -49,19 +60,29 @@ export default function Perfil() {
     }
   }, [userProfile, currentUser]);
 
+  useEffect(() => {
+    if (!puedeEditarPerfil) {
+      setEditandoEmail(false);
+      setEditandoPassword(false);
+    }
+  }, [puedeEditarPerfil]);
+
   function handleChange(campo, valor) {
-    // Sanitización en vivo
+    if (!puedeEditarPerfil) return;
+
     const limites = { nombre: 100, cargo: 80, telefono: 20 };
     const valorLimpio = sanitizarTexto(valor, limites[campo] || 200);
-    setForm(prev => ({ ...prev, [campo]: valorLimpio }));
-    // Limpia el error del campo cuando se edita
+
+    setForm((prev) => ({ ...prev, [campo]: valorLimpio }));
+
     if (errorCampo[campo]) {
-      setErrorCampo(prev => ({ ...prev, [campo]: null }));
+      setErrorCampo((prev) => ({ ...prev, [campo]: null }));
     }
   }
 
   function validarFormulario() {
     const errores = {};
+
     if (!form.nombre.trim()) {
       errores.nombre = 'El nombre es requerido';
     } else if (form.nombre.length < 2) {
@@ -69,49 +90,79 @@ export default function Perfil() {
     } else if (contienePatronPeligroso(form.nombre)) {
       errores.nombre = 'El nombre contiene caracteres no permitidos';
     }
+
     if (form.cargo && contienePatronPeligroso(form.cargo)) {
       errores.cargo = 'El cargo contiene caracteres no permitidos';
     }
+
     if (form.telefono && !esCelularValido(form.telefono)) {
       errores.telefono = 'Formato inválido. Use 9XXXXXXXX o +51 9XXXXXXXX';
     }
+
     if (form.email && !EMAIL_REGEX.test(form.email)) {
       errores.email = 'Email inválido';
     }
+
     setErrorCampo(errores);
     return Object.keys(errores).length === 0;
   }
 
-  // Guarda los cambios del perfil
   async function handleSubmit(e) {
     e.preventDefault();
     setMensaje(null);
-    if (!validarFormulario()) {
-      setMensaje({ tipo: 'error', texto: 'Corrija los errores antes de guardar' });
+
+    if (!puedeEditarPerfil) {
+      setMensaje({
+        tipo: 'error',
+        texto: 'Tu rol tiene acceso de solo lectura al perfil.'
+      });
       return;
     }
+
+    if (!validarFormulario()) {
+      setMensaje({
+        tipo: 'error',
+        texto: 'Corrija los errores antes de guardar'
+      });
+      return;
+    }
+
     setGuardando(true);
+
     try {
-      // Sanitización final antes de enviar a Firestore
       const datosLimpios = {
         nombre: sanitizarTexto(form.nombre, 100),
         cargo: sanitizarTexto(form.cargo, 80),
         telefono: sanitizarTexto(form.telefono, 20)
       };
+
       await updateUserProfile(currentUser.uid, datosLimpios);
-      await addLog({ usuario: datosLimpios.nombre, accion: 'editar_perfil' });
+      await addLog({
+        usuario: datosLimpios.nombre,
+        accion: 'editar_perfil'
+      });
       await refreshProfile();
-      setMensaje({ tipo: 'success', texto: 'Perfil actualizado correctamente' });
+
+      setMensaje({
+        tipo: 'success',
+        texto: 'Perfil actualizado correctamente'
+      });
       setTimeout(() => setMensaje(null), 3000);
     } catch (err) {
       console.error('Error actualizando perfil:', err);
-      setMensaje({ tipo: 'error', texto: 'Error al actualizar perfil' });
+      setMensaje({
+        tipo: 'error',
+        texto: err?.code === 'permission-denied'
+          ? 'Tu rol no permite modificar el perfil.'
+          : 'Error al actualizar perfil'
+      });
     } finally {
       setGuardando(false);
     }
   }
 
   function abrirEdicionEmail() {
+    if (!puedeEditarPerfil) return;
     setNuevoEmail(form.email);
     setPasswordActual('');
     setErrorEmail('');
@@ -125,37 +176,65 @@ export default function Perfil() {
   }
 
   async function guardarNuevoEmail() {
+    if (!puedeEditarPerfil) {
+      setErrorEmail('Tu rol tiene acceso de solo lectura al perfil.');
+      return;
+    }
+
     setErrorEmail('');
-    const emailLimpio = sanitizarTexto(nuevoEmail, 120).trim().toLowerCase();
+    const emailLimpio = sanitizarTexto(nuevoEmail, 120)
+      .trim()
+      .toLowerCase();
+
     if (!EMAIL_REGEX.test(emailLimpio)) {
       setErrorEmail('Email inválido');
       return;
     }
+
     if (!passwordActual) {
       setErrorEmail('Ingrese su contraseña actual para confirmar el cambio');
       return;
     }
+
     setGuardandoEmail(true);
+
     try {
-      const credential = EmailAuthProvider.credential(currentUser.email, passwordActual);
+      const credential = EmailAuthProvider.credential(
+        currentUser.email,
+        passwordActual
+      );
+
       await reauthenticateWithCredential(currentUser, credential);
       await updateEmail(currentUser, emailLimpio);
       await updateUserProfile(currentUser.uid, { email: emailLimpio });
-      await addLog({ usuario: form.nombre, accion: 'cambiar_correo_erp' });
+      await addLog({
+        usuario: form.nombre,
+        accion: 'cambiar_correo_erp'
+      });
       await refreshProfile();
+
       setForm((prev) => ({ ...prev, email: emailLimpio }));
       setEditandoEmail(false);
       setPasswordActual('');
-      setMensaje({ tipo: 'success', texto: 'Correo actualizado correctamente' });
+      setMensaje({
+        tipo: 'success',
+        texto: 'Correo actualizado correctamente'
+      });
       setTimeout(() => setMensaje(null), 3000);
     } catch (err) {
       console.error('Error actualizando correo:', err);
-      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+
+      if (
+        err.code === 'auth/wrong-password' ||
+        err.code === 'auth/invalid-credential'
+      ) {
         setErrorEmail('Contraseña incorrecta');
       } else if (err.code === 'auth/email-already-in-use') {
         setErrorEmail('Ese correo ya está en uso');
       } else if (err.code === 'auth/requires-recent-login') {
         setErrorEmail('Por seguridad, vuelva a iniciar sesión e intente de nuevo');
+      } else if (err.code === 'permission-denied') {
+        setErrorEmail('Tu rol no permite modificar el perfil');
       } else {
         setErrorEmail('No se pudo actualizar el correo');
       }
@@ -165,6 +244,8 @@ export default function Perfil() {
   }
 
   function abrirEdicionPassword() {
+    if (!puedeEditarPerfil) return;
+
     setPasswordActualCambio('');
     setPasswordNueva('');
     setPasswordConfirmar('');
@@ -181,35 +262,61 @@ export default function Perfil() {
   }
 
   async function guardarNuevaPassword() {
+    if (!puedeEditarPerfil) {
+      setErrorPassword('Tu rol tiene acceso de solo lectura al perfil.');
+      return;
+    }
+
     setErrorPassword('');
+
     if (!passwordActualCambio) {
       setErrorPassword('Ingrese su contraseña actual');
       return;
     }
+
     if (passwordNueva.length < 6) {
       setErrorPassword('La nueva contraseña debe tener al menos 6 caracteres');
       return;
     }
+
     if (passwordNueva !== passwordConfirmar) {
       setErrorPassword('Las contraseñas no coinciden');
       return;
     }
+
     if (passwordNueva === passwordActualCambio) {
       setErrorPassword('La nueva contraseña debe ser diferente a la actual');
       return;
     }
+
     setGuardandoPassword(true);
+
     try {
-      const credential = EmailAuthProvider.credential(currentUser.email, passwordActualCambio);
+      const credential = EmailAuthProvider.credential(
+        currentUser.email,
+        passwordActualCambio
+      );
+
       await reauthenticateWithCredential(currentUser, credential);
       await updatePassword(currentUser, passwordNueva);
-      await addLog({ usuario: form.nombre, accion: 'cambiar_password_erp' });
+      await addLog({
+        usuario: form.nombre,
+        accion: 'cambiar_password_erp'
+      });
+
       cerrarEdicionPassword();
-      setMensaje({ tipo: 'success', texto: 'Contraseña actualizada correctamente' });
+      setMensaje({
+        tipo: 'success',
+        texto: 'Contraseña actualizada correctamente'
+      });
       setTimeout(() => setMensaje(null), 3000);
     } catch (err) {
       console.error('Error actualizando contraseña:', err);
-      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+
+      if (
+        err.code === 'auth/wrong-password' ||
+        err.code === 'auth/invalid-credential'
+      ) {
         setErrorPassword('Contraseña actual incorrecta');
       } else if (err.code === 'auth/requires-recent-login') {
         setErrorPassword('Por seguridad, vuelva a iniciar sesión e intente de nuevo');
@@ -228,7 +335,11 @@ export default function Perfil() {
       <div className="pagina-header">
         <div>
           <h1 className="pagina-titulo">Mi Perfil</h1>
-          <p className="pagina-subtitle">Gestiona tu información personal</p>
+          <p className="pagina-subtitle">
+            {puedeEditarPerfil
+              ? 'Gestiona tu información personal'
+              : 'Información de perfil · acceso de solo lectura'}
+          </p>
         </div>
       </div>
 
@@ -239,16 +350,16 @@ export default function Perfil() {
       )}
 
       <div className="perfil-card">
-        {/* Sección del logo Noova */}
         <div className="perfil-avatar-section">
           <img className="perfil-logo" src={logo} alt="Noova" />
           <div className="perfil-avatar-info">
             <span className="perfil-name">{form.nombre || 'Sin nombre'}</span>
-            <span className="perfil-email">{form.email || currentUser?.email}</span>
+            <span className="perfil-email">
+              {form.email || currentUser?.email}
+            </span>
           </div>
         </div>
 
-        {/* Formulario de edición */}
         <form onSubmit={handleSubmit} className="formulario">
           <div className="fila-form">
             <div className="campo">
@@ -260,10 +371,22 @@ export default function Perfil() {
                 placeholder="Nombre completo"
                 required
                 maxLength={100}
-                className={errorCampo.nombre ? 'input-error' : ''}
+                readOnly={!puedeEditarPerfil}
+                className={
+                  !puedeEditarPerfil
+                    ? 'input-solo-lectura'
+                    : errorCampo.nombre
+                      ? 'input-error'
+                      : ''
+                }
               />
-              {errorCampo.nombre && <span className="mensaje-error">{errorCampo.nombre}</span>}
+              {errorCampo.nombre && (
+                <span className="mensaje-error">
+                  {errorCampo.nombre}
+                </span>
+              )}
             </div>
+
             <div className="campo">
               <label>Cargo</label>
               <input
@@ -272,9 +395,20 @@ export default function Perfil() {
                 onChange={(e) => handleChange('cargo', e.target.value)}
                 placeholder="Ej: Ejecutivo Comercial"
                 maxLength={80}
-                className={errorCampo.cargo ? 'input-error' : ''}
+                readOnly={!puedeEditarPerfil}
+                className={
+                  !puedeEditarPerfil
+                    ? 'input-solo-lectura'
+                    : errorCampo.cargo
+                      ? 'input-error'
+                      : ''
+                }
               />
-              {errorCampo.cargo && <span className="mensaje-error">{errorCampo.cargo}</span>}
+              {errorCampo.cargo && (
+                <span className="mensaje-error">
+                  {errorCampo.cargo}
+                </span>
+              )}
             </div>
           </div>
 
@@ -287,13 +421,26 @@ export default function Perfil() {
                 onChange={(e) => handleChange('telefono', e.target.value)}
                 placeholder="+51 999 999 999"
                 maxLength={20}
-                className={errorCampo.telefono ? 'input-error' : ''}
+                readOnly={!puedeEditarPerfil}
+                className={
+                  !puedeEditarPerfil
+                    ? 'input-solo-lectura'
+                    : errorCampo.telefono
+                      ? 'input-error'
+                      : ''
+                }
               />
-              {errorCampo.telefono && <span className="mensaje-error">{errorCampo.telefono}</span>}
+              {errorCampo.telefono && (
+                <span className="mensaje-error">
+                  {errorCampo.telefono}
+                </span>
+              )}
             </div>
+
             <div className="campo">
               <label>Correo Electrónico (correo del ERP)</label>
-              {editandoEmail ? (
+
+              {editandoEmail && puedeEditarPerfil ? (
                 <div className="email-edicion">
                   <input
                     type="email"
@@ -303,6 +450,7 @@ export default function Perfil() {
                     maxLength={120}
                     className={errorEmail ? 'input-error' : ''}
                   />
+
                   <input
                     type="password"
                     value={passwordActual}
@@ -311,91 +459,153 @@ export default function Perfil() {
                     className={errorEmail ? 'input-error' : ''}
                     style={{ marginTop: 6 }}
                   />
-                  {errorEmail && <span className="mensaje-error">{errorEmail}</span>}
+
+                  {errorEmail && (
+                    <span className="mensaje-error">{errorEmail}</span>
+                  )}
+
                   <div className="acciones-form" style={{ marginTop: 6 }}>
-                    <button type="button" className="btn-secundario btn-pequeno" onClick={cerrarEdicionEmail} disabled={guardandoEmail}>
+                    <button
+                      type="button"
+                      className="btn-secundario btn-pequeno"
+                      onClick={cerrarEdicionEmail}
+                      disabled={guardandoEmail}
+                    >
                       Cancelar
                     </button>
-                    <button type="button" className="btn-principal btn-pequeno" onClick={guardarNuevoEmail} disabled={guardandoEmail}>
+
+                    <button
+                      type="button"
+                      className="btn-principal btn-pequeno"
+                      onClick={guardarNuevoEmail}
+                      disabled={guardandoEmail}
+                    >
                       {guardandoEmail ? 'Guardando...' : 'Guardar correo'}
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="email-solo-lectura-wrap">
-                  <input type="email" value={form.email} readOnly className="input-solo-lectura" />
-                  <button type="button" className="btn-secundario btn-pequeno" onClick={abrirEdicionEmail}>
-                    Cambiar correo
-                  </button>
+                  <input
+                    type="email"
+                    value={form.email}
+                    readOnly
+                    className="input-solo-lectura"
+                  />
+
+                  {puedeEditarPerfil && (
+                    <button
+                      type="button"
+                      className="btn-secundario btn-pequeno"
+                      onClick={abrirEdicionEmail}
+                    >
+                      Cambiar correo
+                    </button>
+                  )}
                 </div>
               )}
             </div>
           </div>
 
-          <div className="acciones-form">
-            <button type="submit" className="btn-principal" disabled={guardando}>
-              {guardando ? 'Guardando...' : 'Guardar Cambios'}
-            </button>
-          </div>
+          {puedeEditarPerfil && (
+            <div className="acciones-form">
+              <button
+                type="submit"
+                className="btn-principal"
+                disabled={guardando}
+              >
+                {guardando ? 'Guardando...' : 'Guardar Cambios'}
+              </button>
+            </div>
+          )}
         </form>
       </div>
 
-      {/* Sección de seguridad: cambiar contraseña */}
-      <div className="perfil-card">
-        <h2 className="perfil-seccion-titulo">Seguridad</h2>
-        {editandoPassword ? (
-          <div className="password-edicion">
-            <div className="campo">
-              <label>Contraseña actual</label>
-              <input
-                type="password"
-                value={passwordActualCambio}
-                onChange={(e) => setPasswordActualCambio(e.target.value)}
-                placeholder="Ingrese su contraseña actual"
-                className={errorPassword ? 'input-error' : ''}
-              />
-            </div>
-            <div className="fila-form">
+      {puedeEditarPerfil && (
+        <div className="perfil-card">
+          <h2 className="perfil-seccion-titulo">Seguridad</h2>
+
+          {editandoPassword ? (
+            <div className="password-edicion">
               <div className="campo">
-                <label>Nueva contraseña</label>
+                <label>Contraseña actual</label>
                 <input
                   type="password"
-                  value={passwordNueva}
-                  onChange={(e) => setPasswordNueva(e.target.value)}
-                  placeholder="Mínimo 6 caracteres"
+                  value={passwordActualCambio}
+                  onChange={(e) => setPasswordActualCambio(e.target.value)}
+                  placeholder="Ingrese su contraseña actual"
                   className={errorPassword ? 'input-error' : ''}
                 />
               </div>
-              <div className="campo">
-                <label>Confirmar nueva contraseña</label>
-                <input
-                  type="password"
-                  value={passwordConfirmar}
-                  onChange={(e) => setPasswordConfirmar(e.target.value)}
-                  placeholder="Repita la nueva contraseña"
-                  className={errorPassword ? 'input-error' : ''}
-                />
+
+              <div className="fila-form">
+                <div className="campo">
+                  <label>Nueva contraseña</label>
+                  <input
+                    type="password"
+                    value={passwordNueva}
+                    onChange={(e) => setPasswordNueva(e.target.value)}
+                    placeholder="Mínimo 6 caracteres"
+                    className={errorPassword ? 'input-error' : ''}
+                  />
+                </div>
+
+                <div className="campo">
+                  <label>Confirmar nueva contraseña</label>
+                  <input
+                    type="password"
+                    value={passwordConfirmar}
+                    onChange={(e) => setPasswordConfirmar(e.target.value)}
+                    placeholder="Repita la nueva contraseña"
+                    className={errorPassword ? 'input-error' : ''}
+                  />
+                </div>
+              </div>
+
+              {errorPassword && (
+                <span className="mensaje-error">{errorPassword}</span>
+              )}
+
+              <div className="acciones-form">
+                <button
+                  type="button"
+                  className="btn-secundario"
+                  onClick={cerrarEdicionPassword}
+                  disabled={guardandoPassword}
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="button"
+                  className="btn-principal"
+                  onClick={guardarNuevaPassword}
+                  disabled={guardandoPassword}
+                >
+                  {guardandoPassword
+                    ? 'Guardando...'
+                    : 'Actualizar contraseña'}
+                </button>
               </div>
             </div>
-            {errorPassword && <span className="mensaje-error">{errorPassword}</span>}
-            <div className="acciones-form">
-              <button type="button" className="btn-secundario" onClick={cerrarEdicionPassword} disabled={guardandoPassword}>
-                Cancelar
-              </button>
-              <button type="button" className="btn-principal" onClick={guardarNuevaPassword} disabled={guardandoPassword}>
-                {guardandoPassword ? 'Guardando...' : 'Actualizar contraseña'}
+          ) : (
+            <div className="password-solo-lectura-wrap">
+              <span className="pista">
+                Por seguridad, tu contraseña no se muestra. Puedes cambiarla
+                cuando quieras.
+              </span>
+
+              <button
+                type="button"
+                className="btn-secundario btn-pequeno"
+                onClick={abrirEdicionPassword}
+              >
+                Cambiar contraseña
               </button>
             </div>
-          </div>
-        ) : (
-          <div className="password-solo-lectura-wrap">
-            <span className="pista">Por seguridad, tu contraseña no se muestra. Puedes cambiarla cuando quieras.</span>
-            <button type="button" className="btn-secundario btn-pequeno" onClick={abrirEdicionPassword}>
-              Cambiar contraseña
-            </button>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

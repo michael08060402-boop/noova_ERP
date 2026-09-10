@@ -7,7 +7,6 @@ import {
   cambiarEstadoUsuario,
   resetearPasswordUsuario
 } from '../services/usuarioService';
-import { ROLES } from '../services/userService';
 
 export function useUsuarios() {
   const [usuarios, setUsuarios] = useState([]);
@@ -35,32 +34,33 @@ export function useUsuarios() {
   const addUsuario = useCallback(async (datos) => {
     setError(null);
     const nuevo = await crearUsuario(datos);
-    setUsuarios((prev) => [...prev, nuevo].sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '')));
+    setUsuarios((prev) => [...prev, nuevo]
+      .sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '')));
     return nuevo;
   }, []);
 
   const editRol = useCallback(async (uid, role) => {
     setError(null);
     await cambiarRolUsuario(uid, role);
-    const definicion = ROLES[role] || ROLES.sin_acceso;
-    setUsuarios((prev) => prev.map((u) => (u.uid === uid ? {
-      ...u,
-      role,
-      sector: definicion.sector,
-      permissions: definicion.navItems
-    } : u)));
+    setUsuarios((prev) => prev.map((u) => (
+      u.uid === uid ? { ...u, role } : u
+    )));
   }, []);
 
   const editDatos = useCallback(async (uid, datos) => {
     setError(null);
     await cambiarDatosUsuario(uid, datos);
-    setUsuarios((prev) => prev.map((u) => (u.uid === uid ? { ...u, ...datos } : u)));
+    setUsuarios((prev) => prev.map((u) => (
+      u.uid === uid ? { ...u, ...datos } : u
+    )));
   }, []);
 
   const editEstado = useCallback(async (uid, activo) => {
     setError(null);
     await cambiarEstadoUsuario(uid, activo);
-    setUsuarios((prev) => prev.map((u) => (u.uid === uid ? { ...u, activo } : u)));
+    setUsuarios((prev) => prev.map((u) => (
+      u.uid === uid ? { ...u, activo } : u
+    )));
   }, []);
 
   const resetPassword = useCallback(async (uid, nuevaPassword) => {
