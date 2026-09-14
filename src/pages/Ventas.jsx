@@ -10,22 +10,40 @@ import './Ventas.css';
 
 const MONEDAS_FORMATO = { 'US$': formatUSD, 'S/': formatCurrency };
 
+function estadoCalibracion(cot, item) {
+  if (!Number(item.intervaloCalibracionDias)) return 'sin-calibracion';
+  const dias = diasHasta(calcularProximaCalibracion(cot.fechaAceptacion || cot.updatedAt, item.intervaloCalibracionDias));
+  if (dias === null) return 'sin-fecha';
+  if (dias < 0) return 'vencidas';
+  return dias <= 30 ? 'proximas' : 'vigentes';
+}
+
 export default function Ventas() {
   const { cotizaciones, loading, editCotizacion } = useCotizaciones();
   const [terminoBusqueda, setTerminoBusqueda] = useState('');
   const [guardandoKey, setGuardandoKey] = useState(null);
+  const [filtroCalibracion, setFiltroCalibracion] = useState('todas');
+  const ventasAceptadas = useMemo(() => cotizaciones.filter((c) => c.estado === 'Aceptada'), [cotizaciones]);
+  const filtros = [
+    { valor: 'todas', etiqueta: 'Todas' },
+    { valor: 'proximas', etiqueta: 'Próximas', detalle: 'Ventas con ítems que vencen en los próximos 30 días' },
+    { valor: 'sin-calibracion', etiqueta: 'Sin calibración', detalle: 'Ventas con al menos un ítem marcado como No aplica' },
+    { valor: 'vencidas', etiqueta: 'Vencidas', detalle: 'Ventas con al menos un ítem vencido' }
+  ].map((filtro) => ({ ...filtro, cantidad: filtro.valor === 'todas' ? ventasAceptadas.length
+    : ventasAceptadas.filter((cot) => (cot.items || []).some((item) => estadoCalibracion(cot, item) === filtro.valor)).length }));
 
-  const ventas = useMemo(() => {
+  const ventas = (() => {
     const term = terminoBusqueda.trim().toLowerCase();
-    return cotizaciones
-      .filter((c) => c.estado === 'Aceptada')
+    return ventasAceptadas
+      .filter((c) => filtroCalibracion === 'todas'
+        || (c.items || []).some((item) => estadoCalibracion(c, item) === filtroCalibracion))
       .filter((c) => {
         if (!term) return true;
         return (c.codigo || '').toLowerCase().includes(term)
           || (c.cliente?.razonSocial || '').toLowerCase().includes(term);
       })
       .sort((a, b) => String(b.fechaAceptacion || b.updatedAt || '').localeCompare(String(a.fechaAceptacion || a.updatedAt || '')));
-  }, [cotizaciones, terminoBusqueda]);
+  })();
 
   async function cambiarIntervalo(cot, itemIndex, valor) {
     const key = `${cot.id}-${itemIndex}`;
@@ -47,31 +65,44 @@ export default function Ventas() {
   if (loading) return <Loading message="Cargando ventas..." />;
 
   return (
-    <div className="pagina">
+    <div className="pagina ventas-pagina">
       <div className="pagina-header">
         <div>
           <h1 className="pagina-titulo">Ventas</h1>
-          <p className="pagina-subtitulo">{ventas.length} cotizaciones aceptadas</p>
+          <p className="pagina-subtitulo">Seguimiento de ventas y calibraciones</p>
         </div>
       </div>
 
-      <div className="filtros-barra">
+      <div className="filtros-barra ventas-filtros">
+        <div className="ventas-pestanas" role="group" aria-label="Filtrar ventas por calibración">
+          {filtros.map((filtro) => (
+            <button type="button" key={filtro.valor}
+              className={`ventas-pestana${filtroCalibracion === filtro.valor ? ' activa' : ''}`}
+              aria-pressed={filtroCalibracion === filtro.valor}
+              title={filtro.detalle}
+              onClick={() => setFiltroCalibracion(filtro.valor)}>
+              {filtro.etiqueta} <span>{filtro.cantidad}</span>
+            </button>
+          ))}
+        </div>
         <div className="barra-busqueda">
           <FiSearch className="icono-busqueda" size={18} />
           <input
             type="text"
+            aria-label="Buscar ventas por código o cliente"
             placeholder="Buscar por código o cliente..."
             value={terminoBusqueda}
             onChange={(e) => setTerminoBusqueda(e.target.value)}
           />
         </div>
       </div>
+      <p className="ventas-resultados">Mostrando {ventas.length} de {ventasAceptadas.length} ventas</p>
 
       {ventas.length === 0 ? (
         <div className="tarjeta-tabla">
           <div className="estado-vacio">
-            <p>Todavía no hay cotizaciones aceptadas</p>
-            <p className="pista">En cuanto una cotización pase a "Aceptada" (al generar una orden de compra o emitir el comprobante), va a aparecer acá.</p>
+            <p>{ventasAceptadas.length ? 'No hay ventas que coincidan con los filtros' : 'Todavía no hay cotizaciones aceptadas'}</p>
+            <p className="pista">{ventasAceptadas.length ? 'Prueba otro código, cliente o estado de calibración.' : 'En cuanto una cotización pase a "Aceptada" (al generar una orden de compra o emitir el comprobante), va a aparecer acá.'}</p>
           </div>
         </div>
       ) : (

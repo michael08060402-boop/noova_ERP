@@ -405,7 +405,7 @@ export default function Configuracion() {
       )}
 
       <div className="config-layout">
-        <div className="config-tabs">
+        <div className="config-tabs config-tabs-horizontal">
           {pestanas.map((tab) => (
             <button
               key={tab.id}

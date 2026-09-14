@@ -80,7 +80,7 @@ export default function Proveedores() {
   if (loading) return <Loading message="Cargando proveedores..." />;
 
   return (
-    <div className="pagina">
+    <div className="pagina proveedores-pagina">
       <div className="pagina-header">
         <div>
           <h1 className="pagina-titulo">Proveedores</h1>

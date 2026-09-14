@@ -1146,6 +1146,8 @@ exports.usuariosCambiarEstado = onCall(
 // las reglas de Firestore, que hoy bloquean el borrado desde el cliente).
 const LOGS_RETENCION_DIAS = 7;
 
+
+
 exports.limpiarLogsAntiguos = onSchedule(
   { schedule: '0 3 * * 0', timeZone: 'America/Lima', region: 'us-central1', memory: '256MiB' },
   async () => {

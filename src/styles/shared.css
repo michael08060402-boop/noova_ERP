@@ -143,16 +143,16 @@
 }
 
 .tabla-datos thead tr {
-  background: var(--gris-header);
-  border-bottom: 1px solid var(--gris-borde);
+  background: #1f4a43;
+  border-bottom: 1px solid #1a3d39;
 }
 
 .tabla-datos th {
   padding: 0.75rem 1rem;
   text-align: left;
   font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--texto-medio);
+  font-weight: 700;
+  color: #f5faf7;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   white-space: nowrap;
@@ -160,7 +160,7 @@
 
 .tabla-datos td {
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--gris-borde-claro);
+  border-bottom: 1px solid #d7e0dc;
   color: var(--texto-medio);
   vertical-align: middle;
 }
@@ -170,11 +170,21 @@
 }
 
 .tabla-datos tbody tr:hover {
-  background: var(--gris-fondo);
+  background: #f2f7f5;
 }
 
 .tabla-datos tbody tr:last-child td {
   border-bottom: none;
+}
+
+.tabla-datos td:nth-child(2),
+.tabla-datos th:nth-child(2) {
+  font-variant-numeric: tabular-nums;
+}
+
+.tabla-datos td:nth-child(2) {
+  font-weight: 600;
+  color: #1f2937;
 }
 
 /* ── HELPERS DE TEXTO ── */
@@ -211,24 +221,35 @@
   padding: 0.2rem 0.6rem;
   border-radius: 999px;
   font-size: 0.72rem;
-  font-weight: 600;
-  color: #fff;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  color: #1f2937;
+  border: 1px solid transparent;
 }
 
 .badge-estado.borrador {
-  background: var(--texto-muy-suave);
+  background: #f3f4f6;
+  border-color: #e5e7eb;
+  color: #4b5563;
 }
 
 .badge-estado.enviada {
-  background: var(--azul-primario);
+  background: #dbeafe;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
 }
 
 .badge-estado.aprobada {
-  background: var(--verde);
+  background: #eaf5ee;
+  border-color: #cfe2d6;
+  color: #1e5b43;
 }
 
 .badge-estado.rechazada {
-  background: var(--rojo);
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #991b1b;
 }
 
 /* ── BOTONES PRIMARIOS ── */

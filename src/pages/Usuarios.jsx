@@ -320,7 +320,7 @@ export default function Usuarios({ embebido = false }) {
         </div>
 
         <button
-          className="btn-principal"
+          className="btn-principal usuarios-btn-nuevo"
           onClick={() => {
             reset(USUARIO_VACIO);
             setMostrarModalNuevo(true);
@@ -453,25 +453,26 @@ export default function Usuarios({ embebido = false }) {
                             <FiKey size={16} />
                           </button>
 
-                          {usuario.uid !== userProfile?.uid && (
-                            <button
-                              className={`btn-accion ${
-                                usuario.activo === false
-                                  ? ''
-                                  : 'btn-eliminar'
-                              }`}
-                              onClick={() => setUsuarioEstado(usuario)}
-                              title={
-                                usuario.activo === false
+                          <button
+                            className={`btn-accion ${
+                              usuario.activo === false
+                                ? 'btn-reactivar'
+                                : 'btn-eliminar'
+                            }`}
+                            onClick={() => setUsuarioEstado(usuario)}
+                            disabled={usuario.uid === userProfile?.uid}
+                            title={
+                              usuario.uid === userProfile?.uid
+                                ? 'No puedes desactivar tu propio usuario'
+                                : usuario.activo === false
                                   ? 'Reactivar'
                                   : 'Desactivar'
-                              }
-                            >
-                              {usuario.activo === false
-                                ? <FiUserCheck size={16} />
-                                : <FiUserX size={16} />}
-                            </button>
-                          )}
+                            }
+                          >
+                            {usuario.activo === false
+                              ? <FiUserCheck size={16} />
+                              : <FiUserX size={16} />}
+                          </button>
                         </div>
                       </td>
                     </tr>

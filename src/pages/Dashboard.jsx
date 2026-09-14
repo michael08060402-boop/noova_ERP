@@ -18,12 +18,12 @@ import './Dashboard.css';
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
 const COLORES = {
-  azulPrimario: '#1d4ed8',
-  azulOscuro: '#1e40af',
-  verde: '#059669',
-  rojo: '#dc2626',
-  amarillo: '#d97706',
-  gris: '#6b7280'
+  azulPrimario: '#264943',
+  azulOscuro: '#293f3d',
+  verde: '#62977b',
+  rojo: '#bb5b53',
+  amarillo: '#c69b2b',
+  gris: '#85938c'
 };
 
 const ESTADOS = ['Borrador', 'Enviada', 'Aprobada', 'Rechazada'];
@@ -42,8 +42,8 @@ const opcionesGrafico = {
   maintainAspectRatio: false,
   plugins: { legend: { display: false } },
   scales: {
-    x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 11 } } },
-    y: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { color: '#9ca3af', font: { size: 11 }, stepSize: 1 }, beginAtZero: true }
+    x: { grid: { display: false }, ticks: { color: '#61736a', font: { size: 11 } } },
+    y: { grid: { color: 'rgba(54,94,76,0.07)' }, ticks: { color: '#61736a', font: { size: 11 }, stepSize: 1 }, beginAtZero: true }
   }
 };
 
@@ -63,8 +63,8 @@ const opcionesLine = {
     legend: { position: 'top', align: 'end', labels: { usePointStyle: true, pointStyleWidth: 10, font: { size: 11 }, padding: 16 } }
   },
   scales: {
-    x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10 } } },
-    y: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { color: '#9ca3af', font: { size: 11 }, stepSize: 1 }, beginAtZero: true }
+    x: { grid: { display: false }, ticks: { color: '#61736a', font: { size: 10 } } },
+    y: { grid: { color: 'rgba(54,94,76,0.07)' }, ticks: { color: '#61736a', font: { size: 11 }, stepSize: 1 }, beginAtZero: true }
   }
 };
 
@@ -178,7 +178,7 @@ export default function Dashboard() {
           }).length;
         }),
         borderColor: COLORES.azulPrimario,
-        backgroundColor: 'rgba(29, 78, 216, 0.1)',
+        backgroundColor: 'rgba(38, 73, 67, 0.08)',
         fill: true,
         tension: 0.4,
         pointRadius: 3,
@@ -194,7 +194,7 @@ export default function Dashboard() {
           }).length;
         }),
         borderColor: COLORES.verde,
-        backgroundColor: 'rgba(5, 150, 105, 0.05)',
+        backgroundColor: 'rgba(98, 151, 123, 0.06)',
         fill: true,
         tension: 0.4,
         pointRadius: 3,

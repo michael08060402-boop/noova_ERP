@@ -1264,10 +1264,10 @@
 
 /* Aceptada: verde claro */
 .tabla-datos tbody tr.fila-aceptada {
-  background: #d1fae5;
+  background: #deefe2;
 }
 .tabla-datos tbody tr.fila-aceptada:hover {
-  background: #a7f3d0;
+  background: #cfe8d7;
 }
 
 /* Error: rojo claro */

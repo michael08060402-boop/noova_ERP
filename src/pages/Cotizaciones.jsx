@@ -948,7 +948,7 @@ export default function Cotizaciones() {
                       </td>
                       <td>{cot.responsable || '-'}</td>
                       <td>{cot.condicionPago || '-'}</td>
-                      <td className="texto-derecha texto-negrita">{formatMoneda(cot.total || 0, cot.moneda)}</td>
+                      <td className="texto-derecha texto-negrita cotizacion-total-lista">{formatMoneda(cot.total || 0, cot.moneda)}</td>
                       <td className="texto-centro">
                         <span
                           className={`badge-estado-sunat estado-${(cot.estado || 'Generada').toLowerCase()}`}

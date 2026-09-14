@@ -5,53 +5,57 @@
 /* ── LAYOUT DE CONFIGURACIÓN ── */
 .config-layout {
   display: flex;
-  gap: 1.25rem;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
 }
 
-/* ── PESTAÑAS LATERALES ── */
+/* ── PESTAÑAS HORIZONTALES ── */
 .config-tabs {
   display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  width: 200px;
-  flex-shrink: 0;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  width: 100%;
+  background: #eaf1ee;
+  border: 1px solid #cfe0d8;
+  border-radius: 10px;
   padding: 0.5rem;
+  overflow-x: auto;
 }
 
 .config-tab {
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.625rem;
-  padding: 0.625rem 0.75rem;
-  border: none;
-  background: none;
-  color: #6b7280;
-  font-size: 0.875rem;
-  font-weight: 500;
-  text-align: left;
-  border-radius: 6px;
+  padding: 0.7rem 1rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #4b5563;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-align: center;
+  border-radius: 8px;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .config-tab:hover {
-  background: #f9fafb;
+  background: #edf3f1;
   color: #1f2937;
 }
 
 .config-tab-activa {
-  background: #eff6ff;
-  color: #1d4ed8;
-  font-weight: 600;
+  background: #d8ecdf;
+  color: #0f5132;
+  border-color: #b8d5c2;
+  box-shadow: inset 0 0 0 1px rgba(15, 81, 50, 0.08);
 }
 
 .config-tab-activa:hover {
-  background: #dbeafe;
-  color: #1e3a8a;
+  background: #cfe7d6;
+  color: #0b3f2a;
 }
 
 .tab-icon {
@@ -61,15 +65,18 @@
 
 /* ── CONTENIDO ── */
 .config-contenido {
-  flex: 1;
+  width: 100%;
   min-width: 0;
 }
 
 .config-seccion {
   background: #fff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #d7dfe3;
   border-radius: 8px;
   padding: 1.25rem;
+  width: 100%;
+  box-sizing: border-box;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.02);
 }
 
 .seccion-titulo {
@@ -201,17 +208,18 @@
 
 /* ── RESPONSIVE ── */
 @media (max-width: 768px) {
-  .config-layout {
-    flex-direction: column;
-  }
-
   .config-tabs {
     width: 100%;
     flex-direction: row;
     overflow-x: auto;
+    scrollbar-width: thin;
   }
 
   .config-tab {
     white-space: nowrap;
+  }
+
+  .config-seccion {
+    padding: 1rem;
   }
 }

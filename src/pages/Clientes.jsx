@@ -512,7 +512,7 @@ export default function Clientes() {
   }
 
   return (
-    <div className="pagina">
+    <div className="pagina clientes-pagina">
       <div className="pagina-header">
         <div>
           <h1 className="pagina-titulo">Clientes</h1>
@@ -697,7 +697,7 @@ export default function Clientes() {
 
                               {puedeEditarCliente && (
                                 <button
-                                  className="btn-accion"
+                                  className="btn-accion btn-editar-cliente"
                                   onClick={() =>
                                     editarCliente(cliente)
                                   }

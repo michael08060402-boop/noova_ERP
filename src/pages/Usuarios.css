@@ -21,6 +21,18 @@
   border-color: #fca5a5;
 }
 
+.usuarios-btn-nuevo {
+  background: #d9b35a;
+  color: #1f2a2d;
+  border: 1px solid #c79c40;
+  box-shadow: 0 1px 0 rgba(31, 42, 45, 0.08);
+}
+
+.usuarios-btn-nuevo:hover {
+  background: #caa24b;
+  color: #1f2a2d;
+}
+
 .usuarios-select-rol {
   padding: 0.35rem 0.5rem;
   border: 1px solid var(--gris-borde);
@@ -51,7 +63,29 @@
 }
 
 .fila-inactiva {
-  opacity: 0.55;
+  opacity: 0.7;
+}
+
+.btn-accion:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: auto;
+}
+
+.btn-accion:disabled:hover {
+  background: transparent;
+  border-color: transparent;
+  color: var(--texto-suave);
+}
+
+.btn-reactivar {
+  color: var(--verde);
+}
+
+.btn-reactivar:hover {
+  background: var(--verde-claro);
+  border-color: #bbf7d0;
+  color: var(--verde);
 }
 
 .usuarios-permisos {

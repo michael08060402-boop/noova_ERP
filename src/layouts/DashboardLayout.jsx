@@ -12,6 +12,7 @@ import { obtenerCalibracionesProximas } from '../utils/calibracion';
 import logo from '../assets/logo-blanco.png';
 import '../styles/shared.css';
 import './DashboardLayout.css';
+import '../styles/paleta-preview.css';
 
 const ITEMS_MENU = [
   { path: '/dashboard', label: 'Dashboard', icon: <FiBarChart2 />, key: 'dashboard' },
@@ -131,7 +132,7 @@ export default function DashboardLayout() {
   ].filter(Boolean).join(' ');
 
   return (
-    <div className="dashboard-layout">
+    <div className="dashboard-layout paleta-preview">
       {esMobile && sidebarMobileAbierto && (
         <div
           className="sidebar-overlay"
