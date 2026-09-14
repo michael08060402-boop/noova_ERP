@@ -8,12 +8,12 @@ const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 const TIMEOUT_MS = 30000;
 
 // Realizar petición GET a Graph API
-async function get(endpoint, params = {}) {
+async function get(endpoint, params = {}, headers = {}) {
   const token = await obtenerToken();
 
   const url = `${GRAPH_BASE}${endpoint}`;
   const config = {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${token}`, ...headers },
     params,
     timeout: TIMEOUT_MS
   };
@@ -76,14 +76,15 @@ async function post(endpoint, body, params = {}) {
 }
 
 // Realizar petición PATCH a Graph API
-async function patch(endpoint, body) {
+async function patch(endpoint, body, headers = {}) {
   const token = await obtenerToken();
 
   const url = `${GRAPH_BASE}${endpoint}`;
   const config = {
     headers: {
       Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      ...headers
     },
     timeout: TIMEOUT_MS
   };
@@ -93,12 +94,12 @@ async function patch(endpoint, body) {
 }
 
 // Realizar petición DELETE a Graph API
-async function del(endpoint) {
+async function del(endpoint, headers = {}) {
   const token = await obtenerToken();
 
   const url = `${GRAPH_BASE}${endpoint}`;
   const config = {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${token}`, ...headers },
     timeout: TIMEOUT_MS
   };
 

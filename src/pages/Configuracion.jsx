@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   FiHome,
@@ -75,13 +75,7 @@ export default function Configuracion() {
     }
   }, [searchParams]);
 
-  useEffect(() => {
-    if (pestanaActiva === 'logs' && puedeLogs) {
-      cargarLogs();
-    }
-  }, [pestanaActiva, puedeLogs]);
-
-  async function cargarLogs() {
+  const cargarLogs = useCallback(async () => {
     if (!puedeLogs) return;
 
     setCargandoLogs(true);
@@ -95,7 +89,13 @@ export default function Configuracion() {
     } finally {
       setCargandoLogs(false);
     }
-  }
+  }, [puedeLogs]);
+
+  useEffect(() => {
+    if (pestanaActiva === 'logs' && puedeLogs) {
+      cargarLogs();
+    }
+  }, [pestanaActiva, puedeLogs, cargarLogs]);
 
   const logsPaginados = useMemo(() => {
     const inicio = (paginaLogs - 1) * porPaginaLogs;
@@ -281,47 +281,17 @@ export default function Configuracion() {
     }));
   }
 
-  const pestanas = [];
+  const pestanas = useMemo(() => {
+    const disponibles = [];
 
-  if (puedeEmpresa) {
-    pestanas.push({
-      id: 'empresa',
-      label: 'Empresa',
-      icon: <FiHome />
-    });
-  }
+    if (puedeEmpresa) disponibles.push({ id: 'empresa', label: 'Empresa', icon: <FiHome /> });
+    if (puedePagos) disponibles.push({ id: 'pagos', label: 'Condiciones', icon: <FiCreditCard /> });
+    if (puedeCorrelativo) disponibles.push({ id: 'correlativo', label: 'Correlativos', icon: <FiHash /> });
+    if (puedeUsuarios) disponibles.push({ id: 'usuarios', label: 'Usuarios y Roles', icon: <FiUsers /> });
+    if (puedeLogs) disponibles.push({ id: 'logs', label: 'Auditoría', icon: <FiShield /> });
 
-  if (puedePagos) {
-    pestanas.push({
-      id: 'pagos',
-      label: 'Condiciones',
-      icon: <FiCreditCard />
-    });
-  }
-
-  if (puedeCorrelativo) {
-    pestanas.push({
-      id: 'correlativo',
-      label: 'Correlativos',
-      icon: <FiHash />
-    });
-  }
-
-  if (puedeUsuarios) {
-    pestanas.push({
-      id: 'usuarios',
-      label: 'Usuarios y Roles',
-      icon: <FiUsers />
-    });
-  }
-
-  if (puedeLogs) {
-    pestanas.push({
-      id: 'logs',
-      label: 'Auditoría',
-      icon: <FiShield />
-    });
-  }
+    return disponibles;
+  }, [puedeEmpresa, puedePagos, puedeCorrelativo, puedeUsuarios, puedeLogs]);
 
   useEffect(() => {
     if (
@@ -338,14 +308,7 @@ export default function Configuracion() {
         { replace: true }
       );
     }
-  }, [
-    pestanaActiva,
-    puedeEmpresa,
-    puedePagos,
-    puedeCorrelativo,
-    puedeUsuarios,
-    puedeLogs
-  ]);
+  }, [pestanaActiva, pestanas, setSearchParams]);
 
   if (loadingConfig) {
     return <Loading message="Cargando configuración..." />;

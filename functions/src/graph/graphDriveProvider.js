@@ -28,13 +28,57 @@ function obtenerPrefijoDrive() {
   }
 }
 
-// Listar contenido de una carpeta
-// Si carpetaId es null, lista la raíz del drive
+function codificarItemId(itemId) {
+  const id = String(itemId || '').trim();
+  if (!id) throw new Error('Se requiere un itemId de Microsoft Graph.');
+  return encodeURIComponent(id);
+}
+
+function codificarRuta(ruta) {
+  const segmentos = String(ruta || '')
+    .split('/')
+    .map((segmento) => segmento.trim())
+    .filter(Boolean);
+
+  if (segmentos.length === 0) {
+    throw new Error('Se requiere una ruta lógica de Nube.');
+  }
+
+  return segmentos.map(encodeURIComponent).join('/');
+}
+
+// Resuelve una carpeta lógica existente sin listar ni crear nada en la raíz
+// real del drive.
+async function obtenerCarpetaPorRuta(rutaCarpeta) {
+  const prefijo = obtenerPrefijoDrive();
+  const data = await graphClient.get(
+    `${prefijo}/root:/${codificarRuta(rutaCarpeta)}`,
+    { $select: 'id,name,folder,parentReference' }
+  );
+
+  if (!data.folder) {
+    throw new Error(`La ruta de Nube configurada no es una carpeta: ${rutaCarpeta}`);
+  }
+
+  return {
+    id: data.id,
+    nombre: data.name,
+    parentId: data.parentReference?.id || null
+  };
+}
+
+async function obtenerItem(itemId) {
+  const prefijo = obtenerPrefijoDrive();
+  return graphClient.get(`${prefijo}/items/${codificarItemId(itemId)}`, {
+    $select: 'id,name,folder,file,parentReference,webUrl,eTag'
+  });
+}
+
+// Listar contenido de una carpeta lógica ya autorizada. El provider nunca
+// interpreta null como permiso para exponer la raíz física del drive.
 async function listarCarpeta(carpetaId) {
   const prefijo = obtenerPrefijoDrive();
-  const endpoint = carpetaId
-    ? `${prefijo}/items/${carpetaId}/children`
-    : `${prefijo}/root/children`;
+  const endpoint = `${prefijo}/items/${codificarItemId(carpetaId)}/children`;
 
   const params = {
     $select: 'id,name,size,lastModifiedDateTime,folder,file,webUrl',
@@ -59,13 +103,15 @@ async function listarCarpeta(carpetaId) {
 
 // Obtener link de descarga de un archivo
 // Graph devuelve @microsoft.graph.downloadUrl con URL temporal
-async function obtenerLinkDescarga(itemId) {
+async function obtenerLinkDescarga(itemId, eTag) {
   const prefijo = obtenerPrefijoDrive();
-  const endpoint = `${prefijo}/items/${itemId}`;
+  const endpoint = `${prefijo}/items/${codificarItemId(itemId)}`;
 
-  const data = await graphClient.get(endpoint, {
-    $select: 'id,name,@microsoft.graph.downloadUrl,size,file'
-  });
+  const data = await graphClient.get(
+    endpoint,
+    { $select: 'id,name,@microsoft.graph.downloadUrl,size,file' },
+    eTag ? { 'If-Match': eTag } : {}
+  );
 
   return {
     id: data.id,
@@ -76,17 +122,19 @@ async function obtenerLinkDescarga(itemId) {
   };
 }
 
-// Buscar documentos en todo el drive
-async function buscarDocumentos(termino) {
+// Buscar únicamente dentro de una carpeta lógica ya autorizada.
+async function buscarDocumentos(termino, carpetaRaizId) {
   const prefijo = obtenerPrefijoDrive();
-  const endpoint = `${prefijo}/root/search(q='${encodeURIComponent(termino)}')`;
+  const terminoCodificado = encodeURIComponent(termino).replace(/'/g, '%27');
+  const endpoint = `${prefijo}/items/${codificarItemId(carpetaRaizId)}/search(q='${terminoCodificado}')`;
 
   const params = {
     $select: 'id,name,size,lastModifiedDateTime,folder,file,webUrl,parentReference',
     $top: 50
   };
 
-  const items = await graphClient.getPaginado(endpoint, params);
+  const data = await graphClient.get(endpoint, params);
+  const items = Array.isArray(data.value) ? data.value : [];
 
   return items.map(item => {
     const rutaPadre = (item.parentReference?.path || '').split('/root:').pop().replace(/^\//, '');
@@ -100,7 +148,8 @@ async function buscarDocumentos(termino) {
       extension: item.file ? item.name.split('.').pop().toLowerCase() : null,
       mimeType: item.file?.mimeType || null,
       ruta: rutaPadre ? `${rutaPadre}/${item.name}` : item.name,
-      _rutaPadreCompleta: rutaPadre
+      _rutaPadreCompleta: rutaPadre,
+      _parentId: item.parentReference?.id || null
     };
   });
 }
@@ -109,64 +158,14 @@ async function buscarDocumentos(termino) {
 // Se usa para llevar a un usuario de rol restringido directo a la carpeta
 // de su área (ej. "Marketing") sin tener que listar la raíz primero.
 async function listarCarpetaPorRuta(rutaCarpeta) {
-  const prefijo = obtenerPrefijoDrive();
-  const rutaLimpia = String(rutaCarpeta || '').split('/').filter(Boolean).join('/');
-  const endpoint = rutaLimpia
-    ? `${prefijo}/root:/${encodeURIComponent(rutaLimpia).replace(/%2F/g, '/')}:/children`
-    : `${prefijo}/root/children`;
-
-  const params = {
-    $select: 'id,name,size,lastModifiedDateTime,folder,file,webUrl',
-    $orderby: 'name',
-    $top: 200
-  };
-
-  try {
-    const items = await graphClient.getPaginado(endpoint, params);
-    return items.map(item => ({
-      id: item.id,
-      nombre: item.name,
-      tipo: item.folder ? 'carpeta' : 'archivo',
-      tamaño: item.size || 0,
-      fechaModificacion: item.lastModifiedDateTime,
-      urlWeb: item.webUrl || null,
-      extension: item.file ? item.name.split('.').pop().toLowerCase() : null,
-      mimeType: item.file?.mimeType || null
-    }));
-  } catch (err) {
-    if (err.response?.status === 404) {
-      // La carpeta del área todavía no existe en el drive: se crea vacía.
-      await crearCarpeta(null, rutaLimpia);
-      return [];
-    }
-    throw err;
-  }
+  const carpeta = await obtenerCarpetaPorRuta(rutaCarpeta);
+  return listarCarpeta(carpeta.id);
 }
 
-// Obtener (o crear si no existe) el ID de la carpeta raíz de un área,
-// dado su nombre (ej. "Marketing"). Se usa como carpeta padre por defecto
-// para que un rol restringido solo pueda crear/subir dentro de su área.
-async function obtenerOCrearCarpetaRaizArea(nombreArea) {
-  const prefijo = obtenerPrefijoDrive();
-  const endpoint = `${prefijo}/root:/${encodeURIComponent(nombreArea)}`;
-  try {
-    const data = await graphClient.get(endpoint, { $select: 'id,name' });
-    return data.id;
-  } catch (err) {
-    if (err.response?.status === 404) {
-      const nueva = await crearCarpeta(null, nombreArea);
-      return nueva.id;
-    }
-    throw err;
-  }
-}
-
-// Crear una carpeta nueva. carpetaPadreId null = raíz del drive.
+// Crear una carpeta nueva dentro de un padre lógico ya autorizado.
 async function crearCarpeta(carpetaPadreId, nombre) {
   const prefijo = obtenerPrefijoDrive();
-  const endpoint = carpetaPadreId
-    ? `${prefijo}/items/${carpetaPadreId}/children`
-    : `${prefijo}/root/children`;
+  const endpoint = `${prefijo}/items/${codificarItemId(carpetaPadreId)}/children`;
 
   const data = await graphClient.post(endpoint, {
     name: nombre,
@@ -197,9 +196,7 @@ async function subirArchivo(carpetaPadreId, nombre, contenidoBase64, mimeType) {
   }
 
   const nombreCodificado = encodeURIComponent(nombre);
-  const endpoint = carpetaPadreId
-    ? `${prefijo}/items/${carpetaPadreId}:/${nombreCodificado}:/content`
-    : `${prefijo}/root:/${nombreCodificado}:/content`;
+  const endpoint = `${prefijo}/items/${codificarItemId(carpetaPadreId)}:/${nombreCodificado}:/content`;
 
   const data = await graphClient.putBinario(endpoint, buffer, mimeType);
 
@@ -216,16 +213,23 @@ async function subirArchivo(carpetaPadreId, nombre, contenidoBase64, mimeType) {
 }
 
 // Renombrar un archivo o carpeta existente
-async function renombrarItem(itemId, nuevoNombre) {
+async function renombrarItem(itemId, nuevoNombre, eTag) {
   const prefijo = obtenerPrefijoDrive();
-  const data = await graphClient.patch(`${prefijo}/items/${itemId}`, { name: nuevoNombre });
+  const data = await graphClient.patch(
+    `${prefijo}/items/${codificarItemId(itemId)}`,
+    { name: nuevoNombre },
+    eTag ? { 'If-Match': eTag } : {}
+  );
   return { id: data.id, nombre: data.name };
 }
 
 // Eliminar un archivo o carpeta (va a la papelera de reciclaje de OneDrive/SharePoint)
-async function eliminarItem(itemId) {
+async function eliminarItem(itemId, eTag) {
   const prefijo = obtenerPrefijoDrive();
-  await graphClient.del(`${prefijo}/items/${itemId}`);
+  await graphClient.del(
+    `${prefijo}/items/${codificarItemId(itemId)}`,
+    eTag ? { 'If-Match': eTag } : {}
+  );
   return { eliminado: true };
 }
 
@@ -238,15 +242,16 @@ async function eliminarItem(itemId) {
 // comparar el nombre/ruta como texto — el formato de `parentReference.path`
 // que devuelve Graph varía según el tipo de drive (sitio, usuario, grupo) y
 // una comparación de texto puede fallar aunque el item sí esté en el área.
-async function estaDentroDeArea(itemId, nombreArea) {
-  const raizId = await obtenerOCrearCarpetaRaizArea(nombreArea);
-  if (itemId === raizId) return true;
+async function estaDentroDeCarpeta(itemId, carpetaRaizId) {
+  const raizId = String(carpetaRaizId || '').trim();
+  let actualId = String(itemId || '').trim();
+  if (!raizId || !actualId) return false;
+  if (actualId === raizId) return true;
 
   const prefijo = obtenerPrefijoDrive();
-  let actualId = itemId;
 
-  for (let intentos = 0; intentos < 20; intentos++) {
-    const data = await graphClient.get(`${prefijo}/items/${actualId}`, {
+  for (let intentos = 0; intentos < 100; intentos++) {
+    const data = await graphClient.get(`${prefijo}/items/${codificarItemId(actualId)}`, {
       $select: 'id,parentReference'
     });
     const padreId = data.parentReference?.id;
@@ -263,11 +268,12 @@ module.exports = {
   obtenerLinkDescarga,
   buscarDocumentos,
   listarCarpetaPorRuta,
-  obtenerOCrearCarpetaRaizArea,
+  obtenerCarpetaPorRuta,
+  obtenerItem,
   crearCarpeta,
   subirArchivo,
   renombrarItem,
   eliminarItem,
-  estaDentroDeArea,
+  estaDentroDeCarpeta,
   LIMITE_SUBIDA_BYTES
 };

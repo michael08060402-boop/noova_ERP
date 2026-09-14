@@ -9,9 +9,17 @@ const { enviarASunat } = require('./src/sunatClient');
 const { validarRuc, consultarRucCompleto } = require('./src/consultarRuc');
 const {
   listarCarpeta, obtenerLinkDescarga,
-  obtenerOCrearCarpetaRaizArea, crearCarpeta, subirArchivo,
-  renombrarItem, eliminarItem, estaDentroDeArea, buscarDocumentos
+  obtenerCarpetaPorRuta, obtenerItem, crearCarpeta, subirArchivo,
+  renombrarItem, eliminarItem, estaDentroDeCarpeta, buscarDocumentos
 } = require('./src/graph/graphDriveProvider');
+const {
+  normalizarRol,
+  esRolValido,
+  getAreaPredeterminada,
+  getNombreArea,
+  getCarpetaNubePerfil,
+  crearAccessControl
+} = require('./src/accessControl');
 const { enviarCorreo } = require('./src/graph/graphMailProvider');
 const AdmZip = require('adm-zip');
 
@@ -22,74 +30,54 @@ if (getApps().length === 0) {
 }
 
 const db = getFirestore();
-
-const PERMISOS_POR_ROL = {
-  administrador: ['dashboard', 'clientes', 'equipos', 'mangas', 'cotizaciones', 'mensajeria', 'proveedores', 'compras', 'facturacion', 'nube', 'usuarios', 'configuracion'],
-  gerencia: ['dashboard', 'clientes', 'equipos', 'mangas', 'cotizaciones', 'mensajeria', 'proveedores', 'compras', 'facturacion', 'nube', 'usuarios', 'configuracion'],
-  comercial: ['dashboard', 'clientes', 'equipos', 'mangas', 'cotizaciones', 'mensajeria', 'compras', 'facturacion', 'nube'],
-  compras: ['dashboard', 'proveedores', 'compras', 'equipos', 'mangas', 'nube'],
-  operaciones: ['dashboard', 'clientes', 'equipos', 'mangas', 'mensajeria', 'compras', 'nube'],
-  marketing: ['dashboard', 'mensajeria', 'nube'],
-  sistemas: ['dashboard', 'nube', 'usuarios'],
-  ing_minas: ['dashboard', 'mensajeria', 'nube']
-};
-
-async function obtenerPerfilActivo(uid) {
-  const snapshot = await db.collection('users').doc(uid).get();
-  if (!snapshot.exists || snapshot.data().activo === false) {
-    throw new HttpsError('permission-denied', 'El usuario no tiene un perfil activo');
-  }
-  return snapshot.data();
-}
-
-function permisosEfectivos(perfil) {
-  const role = normalizarRol(perfil?.role);
-  const permisosRol = PERMISOS_POR_ROL[role] || [];
-  if (role === 'administrador') return permisosRol;
-  return Array.isArray(perfil?.permissions) && perfil.permissions.length > 0
-    ? perfil.permissions
-    : permisosRol;
-}
-
-async function exigirPermiso(uid, permiso) {
-  const perfil = await obtenerPerfilActivo(uid);
-  const permisos = permisosEfectivos(perfil);
-  const autorizado = permiso === 'dashboard' || permisos.includes(permiso);
-  if (!autorizado) {
-    throw new HttpsError('permission-denied', `No tienes permiso para acceder a ${permiso}`);
-  }
-  return perfil;
-}
-
-async function exigirAlgunoPermisos(uid, permisosRequeridos) {
-  const perfil = await obtenerPerfilActivo(uid);
-  const permisos = permisosEfectivos(perfil);
-  if (!permisosRequeridos.some((permiso) => permisos.includes(permiso))) {
-    throw new HttpsError('permission-denied', `No tienes permiso para acceder a ${permisosRequeridos.join(' o ')}`);
-  }
-  return perfil;
-}
-
-function normalizarRol(role) {
-  const valor = String(role || '').trim().toLowerCase();
-  return ({
-    admin: 'administrador',
-    administrator: 'administrador',
-    owner: 'administrador',
-    propietario: 'administrador',
-    creator: 'administrador',
-    creador: 'administrador',
-    superadmin: 'administrador',
-    super_admin: 'administrador',
-    'super-admin': 'administrador',
-    root: 'administrador',
-    ventas: 'comercial'
-  })[valor] || valor;
-}
+const {
+  obtenerPerfilActivo,
+  exigirPermiso,
+  exigirAlgunoPermisos,
+  exigirSeccionConfiguracion
+} = crearAccessControl(db);
 
 function textoSeguro(valor, maximo = 300) {
   return String(valor || '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').trim().slice(0, maximo);
 }
+
+exports.logsCrear = onCall(
+  { region: 'us-central1', timeoutSeconds: 10, memory: '256MiB' },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
+
+    const perfil = await obtenerPerfilActivo(request.auth.uid);
+    const accion = textoSeguro(request.data?.accion, 100);
+    const detalle = textoSeguro(request.data?.detalle, 1000);
+    if (!accion) throw new HttpsError('invalid-argument', 'La acción es requerida');
+
+    const email = textoSeguro(request.auth.token?.email, 200).toLowerCase();
+    const nombre = textoSeguro(perfil.nombre, 100);
+    const usuario = email ? `${nombre || email} (${email})` : request.auth.uid;
+    const ahora = new Date();
+    const partesHora = new Intl.DateTimeFormat('es-PE', {
+      timeZone: 'America/Lima',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23'
+    }).format(ahora);
+
+    await db.collection('logs').add({
+      usuarioUid: request.auth.uid,
+      usuarioEmail: email,
+      usuarioNombre: nombre,
+      usuario,
+      accion,
+      detalle,
+      fecha: ahora.toLocaleDateString('en-CA', { timeZone: 'America/Lima' }),
+      hora: partesHora,
+      createdAt: ahora.toISOString()
+    });
+
+    return { registrado: true };
+  }
+);
 
 function normalizarItemsCompra(items) {
   if (!Array.isArray(items) || items.length < 1 || items.length > 100) {
@@ -632,6 +620,9 @@ function convertirErrorGraph(err, fallback) {
   if (status === 404 || /itemNotFound|resourceNotFound/i.test(`${graphCode} ${detalle}`)) {
     return new HttpsError('not-found', 'No se encontró el OneDrive/SharePoint configurado. Revisa GRAPH_DRIVE_TYPE y GRAPH_DRIVE_ID.');
   }
+  if (status === 412) {
+    return new HttpsError('aborted', 'El elemento cambió en OneDrive durante la operación. Actualiza la carpeta e inténtalo nuevamente.');
+  }
   if (/timeout|ECONNRESET|ENOTFOUND|EAI_AGAIN/i.test(detalle)) {
     return new HttpsError('unavailable', 'No se pudo conectar con Microsoft Graph. Reintenta y revisa conectividad/configuración.');
   }
@@ -643,7 +634,8 @@ function convertirErrorGraph(err, fallback) {
 // Usan client credentials (app-only) — no requieren que el usuario
 // tenga sesión Microsoft, solo Firebase Auth.
 
-// Listar carpetas y archivos de una carpeta (null = raíz)
+// Listar carpetas y archivos. null siempre significa la raíz lógica asignada
+// por rol; nunca la raíz física del drive.
 exports.nubeListarCarpeta = onCall(
   {
     region: 'us-central1',
@@ -655,13 +647,18 @@ exports.nubeListarCarpeta = onCall(
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'No autenticado');
     }
-    await exigirPermiso(request.auth.uid, 'nube');
-
     const { carpetaId } = request.data || {};
 
     try {
-      await verificarAccesoNube(request.auth.uid, carpetaId || null);
-      const items = await listarCarpeta(carpetaId || null);
+      const contexto = await obtenerContextoNube(request.auth.uid);
+      const idAutorizado = await verificarAccesoNube(contexto, carpetaId);
+      let items = await listarCarpeta(idAutorizado);
+      await verificarAccesoNube(contexto, idAutorizado);
+
+      if (contexto.role === 'administrador' && contexto.confidencialId) {
+        items = items.filter((item) => item.id !== contexto.confidencialId);
+      }
+
       return { items };
     } catch (err) {
       console.error('Error en nubeListarCarpeta:', err.message);
@@ -682,8 +679,6 @@ exports.nubeObtenerLinkDescarga = onCall(
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'No autenticado');
     }
-    await exigirPermiso(request.auth.uid, 'nube');
-
     const { itemId } = request.data || {};
 
     if (!itemId) {
@@ -691,8 +686,11 @@ exports.nubeObtenerLinkDescarga = onCall(
     }
 
     try {
-      await verificarAccesoNube(request.auth.uid, itemId);
-      const resultado = await obtenerLinkDescarga(itemId);
+      const contexto = await obtenerContextoNube(request.auth.uid);
+      await verificarAccesoNube(contexto, itemId);
+      const itemActual = await obtenerItem(itemId);
+      await verificarAccesoNube(contexto, itemActual.id);
+      const resultado = await obtenerLinkDescarga(itemActual.id, itemActual.eTag);
       return resultado;
     } catch (err) {
       console.error('Error en nubeObtenerLinkDescarga:', err.message);
@@ -702,55 +700,143 @@ exports.nubeObtenerLinkDescarga = onCall(
 );
 
 // ── Nube: control de acceso por rol ──
-// Debe reflejar exactamente el mapa `ROLES` de src/services/userService.js
-// (campo nubeCarpeta). null = acceso completo al drive; un nombre de
-// carpeta = el rol queda restringido a esa carpeta (y subcarpetas).
-const NUBE_CARPETA_POR_ROL = {
-  administrador: null,
-  gerencia: null,
-  comercial: null,
-  compras: 'Compras',
-  operaciones: 'Operaciones',
-  marketing: 'Marketing',
-  sistemas: 'Sistemas',
-  ing_minas: 'Ingeniería de Minas'
-};
+const GRAPH_SECRETS_NUBE = ['GRAPH_TENANT_ID', 'GRAPH_CLIENT_ID', 'GRAPH_CLIENT_SECRET', 'GRAPH_DRIVE_TYPE', 'GRAPH_DRIVE_ID'];
+const RUTA_CONFIDENCIAL = 'NOOVA SAC/09. CONFIDENCIAL';
+const ROLES_NUBE_RESTRINGIDA = new Set([
+  'soporte_ti',
+  'responsable_marketing',
+  'jefe_proyecto_mina'
+]);
 
-async function obtenerCarpetaAreaDeUsuario(uid) {
-  const snap = await db.collection('users').doc(uid).get();
-  if (!snap.exists || snap.data().activo === false) {
-    throw new HttpsError('permission-denied', 'El usuario no tiene un perfil activo');
-  }
-  const role = normalizarRol(snap.data().role);
-  if (!Object.prototype.hasOwnProperty.call(NUBE_CARPETA_POR_ROL, role)) {
-    throw new HttpsError('permission-denied', 'El rol no tiene un área de Nube configurada');
-  }
-  return NUBE_CARPETA_POR_ROL[role];
+function esNombreConfidencial(nombre) {
+  return String(nombre || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase() === '09. CONFIDENCIAL';
 }
 
-const GRAPH_SECRETS_NUBE = ['GRAPH_TENANT_ID', 'GRAPH_CLIENT_ID', 'GRAPH_CLIENT_SECRET', 'GRAPH_DRIVE_TYPE', 'GRAPH_DRIVE_ID'];
+async function obtenerContextoNube(uid) {
+  const perfil = await exigirPermiso(uid, 'nube');
+  const role = normalizarRol(perfil.role);
+  const rutaRaiz = getCarpetaNubePerfil(perfil);
 
-// Devuelve al frontend si el usuario está restringido a una carpeta de área
-// y, de ser así, el ID de esa carpeta (creándola en el drive si no existe).
-// Buscar documentos en el drive (restringido a su área si el rol aplica)
+  if (!rutaRaiz) {
+    throw new HttpsError('permission-denied', 'El rol no tiene una raíz lógica de Nube configurada');
+  }
+
+  const raiz = await obtenerCarpetaPorRuta(rutaRaiz);
+  let confidencialId = null;
+
+  if (role === 'administrador') {
+    try {
+      confidencialId = (await obtenerCarpetaPorRuta(RUTA_CONFIDENCIAL)).id;
+    } catch (err) {
+      if (Number(err?.response?.status || 0) !== 404) throw err;
+    }
+  }
+
+  return {
+    perfil,
+    role,
+    rutaRaiz,
+    raizId: raiz.id,
+    confidencialId
+  };
+}
+
+async function verificarAccesoNube(contexto, itemId, { permitirRaiz = true } = {}) {
+  const objetivoId = String(itemId || contexto.raizId).trim();
+
+  try {
+    const dentroDeRaiz = await estaDentroDeCarpeta(objetivoId, contexto.raizId);
+    if (!dentroDeRaiz) {
+      throw new HttpsError('permission-denied', 'No tienes acceso a ese elemento de Nube.');
+    }
+
+    if (!permitirRaiz && objetivoId === contexto.raizId) {
+      throw new HttpsError('permission-denied', 'No puedes modificar la carpeta raíz asignada a tu rol.');
+    }
+
+    if (
+      contexto.role === 'administrador'
+      && contexto.confidencialId
+      && await estaDentroDeCarpeta(objetivoId, contexto.confidencialId)
+    ) {
+      throw new HttpsError('permission-denied', 'No tienes acceso a ese elemento de Nube.');
+    }
+
+    return objetivoId;
+  } catch (err) {
+    if (err instanceof HttpsError) throw err;
+    if (Number(err?.response?.status || 0) === 404) {
+      throw new HttpsError('permission-denied', 'No tienes acceso a ese elemento de Nube.');
+    }
+    throw err;
+  }
+}
+
+function verificarNombreReservado(contexto, padreId, nombre) {
+  if (
+    contexto.role === 'administrador'
+    && padreId === contexto.raizId
+    && esNombreConfidencial(nombre)
+  ) {
+    throw new HttpsError('permission-denied', 'No puedes crear ni renombrar la carpeta confidencial.');
+  }
+}
+
+async function filtrarFueraDeCarpeta(items, carpetaBloqueadaId) {
+  const permitidos = [];
+  const TAMANO_LOTE = 5;
+
+  for (let inicio = 0; inicio < items.length; inicio += TAMANO_LOTE) {
+    const lote = items.slice(inicio, inicio + TAMANO_LOTE);
+    const bloqueados = await Promise.all(
+      lote.map((item) => estaDentroDeCarpeta(item.id, carpetaBloqueadaId))
+    );
+
+    lote.forEach((item, index) => {
+      if (!bloqueados[index]) permitidos.push(item);
+    });
+  }
+
+  return permitidos;
+}
+
+async function asegurarResultadoAutorizado(contexto, item) {
+  try {
+    await verificarAccesoNube(contexto, item?.id, { permitirRaiz: false });
+  } catch (err) {
+    if (item?.id) {
+      try {
+        await eliminarItem(item.id);
+      } catch (cleanupError) {
+        console.error('No se pudo revertir un elemento creado fuera de la raíz autorizada:', cleanupError.message);
+      }
+    }
+    throw err;
+  }
+}
+
+// Buscar documentos dentro de la raíz lógica asignada al rol.
 exports.nubeBuscarDocumentos = onCall(
-  { region: 'us-central1', timeoutSeconds: 30, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
+  { region: 'us-central1', timeoutSeconds: 60, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
-    await exigirPermiso(request.auth.uid, 'nube');
     const { termino } = request.data || {};
     if (!termino || termino.trim().length < 2) {
       throw new HttpsError('invalid-argument', 'El término de búsqueda debe tener al menos 2 caracteres');
     }
     try {
-      const carpetaArea = await obtenerCarpetaAreaDeUsuario(request.auth.uid);
-      let items = await buscarDocumentos(termino.trim());
-      if (carpetaArea) {
-        items = items.filter((it) =>
-          it._rutaPadreCompleta === carpetaArea || it._rutaPadreCompleta?.startsWith(`${carpetaArea}/`)
-        );
+      const contexto = await obtenerContextoNube(request.auth.uid);
+      let items = await buscarDocumentos(termino.trim(), contexto.raizId);
+
+      if (contexto.role === 'administrador' && contexto.confidencialId) {
+        items = await filtrarFueraDeCarpeta(items, contexto.confidencialId);
       }
-      items = items.map(({ _rutaPadreCompleta, ...resto }) => resto);
+
+      items = items.map(({ _rutaPadreCompleta, _parentId, ...resto }) => resto);
       return { items };
     } catch (err) {
       console.error('Error en nubeBuscarDocumentos:', err.message);
@@ -763,12 +849,15 @@ exports.nubeObtenerContexto = onCall(
   { region: 'us-central1', timeoutSeconds: 20, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
-    await exigirPermiso(request.auth.uid, 'nube');
     try {
-      const carpetaArea = await obtenerCarpetaAreaDeUsuario(request.auth.uid);
-      if (!carpetaArea) return { carpetaArea: null, carpetaId: null };
-      const carpetaId = await obtenerOCrearCarpetaRaizArea(carpetaArea);
-      return { carpetaArea, carpetaId };
+      const contexto = await obtenerContextoNube(request.auth.uid);
+      return {
+        carpetaArea: ROLES_NUBE_RESTRINGIDA.has(contexto.role)
+          ? contexto.rutaRaiz
+          : null,
+        carpetaRaiz: contexto.rutaRaiz,
+        carpetaId: contexto.raizId
+      };
     } catch (err) {
       console.error('Error en nubeObtenerContexto:', err.message);
       throw convertirErrorGraph(err, 'Error obteniendo el contexto de Nube');
@@ -776,39 +865,20 @@ exports.nubeObtenerContexto = onCall(
   }
 );
 
-// Verifica que, si el usuario tiene un rol restringido, el itemId objetivo
-// esté dentro de su carpeta de área. Lanza HttpsError si no.
-async function verificarAccesoNube(uid, itemId) {
-  const carpetaArea = await obtenerCarpetaAreaDeUsuario(uid);
-  if (!carpetaArea) return; // acceso completo
-  if (!itemId) {
-    throw new HttpsError('permission-denied', 'Tu rol solo tiene acceso a la carpeta de tu área.');
-  }
-  const dentro = await estaDentroDeArea(itemId, carpetaArea);
-  if (!dentro) {
-    throw new HttpsError('permission-denied', 'No tienes acceso a esa carpeta.');
-  }
-}
-
 // Crear carpeta
 exports.nubeCrearCarpeta = onCall(
   { region: 'us-central1', timeoutSeconds: 20, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
-    await exigirPermiso(request.auth.uid, 'nube');
     const { carpetaPadreId, nombre } = request.data || {};
     if (!nombre || !nombre.trim()) throw new HttpsError('invalid-argument', 'El nombre de la carpeta es requerido');
 
     try {
-      let padreId = carpetaPadreId || null;
-      const carpetaArea = await obtenerCarpetaAreaDeUsuario(request.auth.uid);
-      if (carpetaArea) {
-        // Rol restringido: si no manda padre, se crea en la raíz de su área;
-        // si manda uno, se verifica que esté dentro de su área.
-        padreId = padreId || await obtenerOCrearCarpetaRaizArea(carpetaArea);
-        await verificarAccesoNube(request.auth.uid, padreId);
-      }
+      const contexto = await obtenerContextoNube(request.auth.uid);
+      const padreId = await verificarAccesoNube(contexto, carpetaPadreId);
+      verificarNombreReservado(contexto, padreId, nombre);
       const item = await crearCarpeta(padreId, nombre.trim());
+      await asegurarResultadoAutorizado(contexto, item);
       return { item };
     } catch (err) {
       console.error('Error en nubeCrearCarpeta:', err.message);
@@ -822,20 +892,16 @@ exports.nubeSubirArchivo = onCall(
   { region: 'us-central1', timeoutSeconds: 60, memory: '512MiB', secrets: GRAPH_SECRETS_NUBE },
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
-    await exigirPermiso(request.auth.uid, 'nube');
     const { carpetaPadreId, nombre, contenidoBase64, mimeType } = request.data || {};
     if (!nombre || !contenidoBase64) {
       throw new HttpsError('invalid-argument', 'nombre y contenidoBase64 son requeridos');
     }
 
     try {
-      let padreId = carpetaPadreId || null;
-      const carpetaArea = await obtenerCarpetaAreaDeUsuario(request.auth.uid);
-      if (carpetaArea) {
-        padreId = padreId || await obtenerOCrearCarpetaRaizArea(carpetaArea);
-        await verificarAccesoNube(request.auth.uid, padreId);
-      }
+      const contexto = await obtenerContextoNube(request.auth.uid);
+      const padreId = await verificarAccesoNube(contexto, carpetaPadreId);
       const item = await subirArchivo(padreId, nombre, contenidoBase64, mimeType);
+      await asegurarResultadoAutorizado(contexto, item);
       return { item };
     } catch (err) {
       console.error('Error en nubeSubirArchivo:', err.message);
@@ -849,14 +915,22 @@ exports.nubeRenombrarItem = onCall(
   { region: 'us-central1', timeoutSeconds: 20, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
-    await exigirPermiso(request.auth.uid, 'nube');
     const { itemId, nuevoNombre } = request.data || {};
     if (!itemId || !nuevoNombre || !nuevoNombre.trim()) {
       throw new HttpsError('invalid-argument', 'itemId y nuevoNombre son requeridos');
     }
     try {
-      await verificarAccesoNube(request.auth.uid, itemId);
-      const item = await renombrarItem(itemId, nuevoNombre.trim());
+      const contexto = await obtenerContextoNube(request.auth.uid);
+      await verificarAccesoNube(contexto, itemId, { permitirRaiz: false });
+      const itemActual = await obtenerItem(itemId);
+      verificarNombreReservado(
+        contexto,
+        itemActual.parentReference?.id || null,
+        nuevoNombre
+      );
+      await verificarAccesoNube(contexto, itemActual.id, { permitirRaiz: false });
+      const item = await renombrarItem(itemId, nuevoNombre.trim(), itemActual.eTag);
+      await verificarAccesoNube(contexto, item.id, { permitirRaiz: false });
       return { item };
     } catch (err) {
       console.error('Error en nubeRenombrarItem:', err.message);
@@ -870,12 +944,14 @@ exports.nubeEliminarItem = onCall(
   { region: 'us-central1', timeoutSeconds: 20, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
-    await exigirPermiso(request.auth.uid, 'nube');
     const { itemId } = request.data || {};
     if (!itemId) throw new HttpsError('invalid-argument', 'itemId es requerido');
     try {
-      await verificarAccesoNube(request.auth.uid, itemId);
-      await eliminarItem(itemId);
+      const contexto = await obtenerContextoNube(request.auth.uid);
+      await verificarAccesoNube(contexto, itemId, { permitirRaiz: false });
+      const itemActual = await obtenerItem(itemId);
+      await verificarAccesoNube(contexto, itemActual.id, { permitirRaiz: false });
+      await eliminarItem(itemActual.id, itemActual.eTag);
       return { eliminado: true };
     } catch (err) {
       console.error('Error en nubeEliminarItem:', err.message);
@@ -1031,7 +1107,7 @@ exports.solicitudCotizacionEnviarCorreo = onCall(
 );
 
 async function esGestorUsuarios(uid) {
-  await exigirPermiso(uid, 'usuarios');
+  await exigirSeccionConfiguracion(uid, 'usuarios');
   return true;
 }
 
@@ -1051,7 +1127,8 @@ exports.usuariosCrear = onCall(
     if (!email || !password || !nombre || !role) {
       throw new HttpsError('invalid-argument', 'email, password, nombre y role son requeridos');
     }
-    if (!Object.prototype.hasOwnProperty.call(PERMISOS_POR_ROL, role) && role !== 'sin_acceso') {
+    const roleNormalizado = normalizarRol(role);
+    if (!esRolValido(roleNormalizado)) {
       throw new HttpsError('invalid-argument', 'El rol seleccionado no es válido');
     }
     if (password.length < 6) {
@@ -1066,14 +1143,15 @@ exports.usuariosCrear = onCall(
       });
 
       const ahora = new Date().toISOString();
+      const area = getAreaPredeterminada(roleNormalizado);
       const perfil = {
         email: email.trim(),
         nombre: nombre.trim(),
         cargo: cargo || '',
         telefono: telefono || '',
-        role,
-        sector: request.data?.sector || ({ administrador: 'Administración', gerencia: 'Gerencia', comercial: 'Ventas', compras: 'Compras', operaciones: 'Operaciones', marketing: 'Marketing', sistemas: 'Sistemas', ing_minas: 'Ingeniería' }[role] || 'Sin asignar'),
-        permissions: PERMISOS_POR_ROL[role] || [],
+        role: roleNormalizado,
+        area,
+        sector: getNombreArea(area),
         activo: true,
         createdAt: ahora,
         updatedAt: ahora
@@ -1156,16 +1234,13 @@ exports.limpiarLogsAntiguos = onSchedule(
     const corteIso = corte.toISOString();
 
     let totalBorrados = 0;
-    let quedan = true;
-
-    while (quedan) {
+    while (true) {
       const snapshot = await db.collection('logs')
         .where('createdAt', '<', corteIso)
         .limit(400)
         .get();
 
       if (snapshot.empty) {
-        quedan = false;
         break;
       }
 
@@ -1174,7 +1249,7 @@ exports.limpiarLogsAntiguos = onSchedule(
       await batch.commit();
 
       totalBorrados += snapshot.size;
-      quedan = snapshot.size === 400;
+      if (snapshot.size < 400) break;
     }
 
     console.log(`limpiarLogsAntiguos: ${totalBorrados} logs eliminados (anteriores a ${corteIso})`);

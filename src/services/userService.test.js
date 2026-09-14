@@ -7,7 +7,8 @@ import {
   tienePermiso,
   puedeConfiguracion,
   getRutaInicial,
-  getCarpetaNube
+  getCarpetaNube,
+  getAreaPredeterminada
 } from './accessControl.js';
 
 function perfil(role, extra = {}) {
@@ -22,7 +23,7 @@ test('solo existen los 5 roles funcionales definidos', () => {
   assert.deepEqual(
     Object.keys(ROLES),
     [
-      'gerente',
+      'gerencia',
       'administrador',
       'soporte_ti',
       'responsable_marketing',
@@ -31,8 +32,8 @@ test('solo existen los 5 roles funcionales definidos', () => {
   );
 });
 
-test('Gerente tiene acceso completo a los módulos', () => {
-  const user = perfil('gerente');
+test('Gerencia tiene acceso completo a los módulos', () => {
+  const user = perfil('gerencia');
 
   for (const modulo of [
     'dashboard',
@@ -51,7 +52,7 @@ test('Gerente tiene acceso completo a los módulos', () => {
     assert.equal(
       tienePermiso(user, modulo),
       true,
-      `Gerente debe poder leer ${modulo}`
+      `Gerencia debe poder leer ${modulo}`
     );
   }
 
@@ -105,7 +106,7 @@ test('Soporte TI solo recibe Configuración, Perfil, Nube y Mensajería', () => 
   assert.equal(puedeConfiguracion(user, 'usuarios'), true);
   assert.equal(puedeConfiguracion(user, 'logs'), true);
   assert.equal(getRutaInicial(user), '/configuracion');
-  assert.equal(getCarpetaNube(user), null);
+  assert.equal(getCarpetaNube(user), 'NOOVA SAC/10. SISTEMAS');
 });
 
 test('Marketing tiene lectura en Dashboard, Clientes y Perfil', () => {
@@ -124,24 +125,24 @@ test('Marketing tiene lectura en Dashboard, Clientes y Perfil', () => {
   assert.equal(puede(user, 'mensajeria', 'update'), true);
   assert.equal(puede(user, 'mensajeria', 'delete'), true);
 
-  assert.equal(getCarpetaNube(user), 'Marketing');
+  assert.equal(getCarpetaNube(user), 'NOOVA SAC/04. MARKETING');
   assert.equal(getRutaInicial(user), '/dashboard');
 });
 
-test('Jefe de Proyecto de Mina solo tiene Nube restringida a Mina', () => {
+test('Jefe de Proyecto de Mina solo tiene Nube restringida a Técnica', () => {
   const user = perfil('jefe_proyecto_mina');
 
   assert.equal(tienePermiso(user, 'nube'), true);
   assert.equal(tienePermiso(user, 'dashboard'), false);
   assert.equal(tienePermiso(user, 'perfil'), false);
   assert.equal(tienePermiso(user, 'mensajeria'), false);
-  assert.equal(getCarpetaNube(user), 'Mina');
+  assert.equal(getCarpetaNube(user), 'NOOVA SAC/03. TÉCNICA');
   assert.equal(getRutaInicial(user), '/nube');
 });
 
 test('un usuario inactivo o con rol desconocido no recibe acceso', () => {
   assert.equal(
-    tienePermiso(perfil('gerente', { activo: false }), 'dashboard'),
+    tienePermiso(perfil('gerencia', { activo: false }), 'dashboard'),
     false
   );
 
@@ -152,9 +153,25 @@ test('un usuario inactivo o con rol desconocido no recibe acceso', () => {
 });
 
 test('aliases legacy inequívocos se normalizan sin crear roles nuevos', () => {
-  assert.equal(normalizarRol('gerencia'), 'gerente');
+  assert.equal(normalizarRol('gerente'), 'gerencia');
   assert.equal(normalizarRol('sistemas'), 'soporte_ti');
   assert.equal(normalizarRol('marketing'), 'responsable_marketing');
   assert.equal(normalizarRol('ing_minas'), 'jefe_proyecto_mina');
   assert.equal(normalizarRol('admin'), 'administrador');
+});
+
+test('cada rol usa su área y raíz lógica canónicas', () => {
+  assert.deepEqual(
+    Object.fromEntries(Object.keys(ROLES).map((role) => [role, {
+      area: getAreaPredeterminada(role),
+      nube: getCarpetaNube(perfil(role))
+    }])),
+    {
+      gerencia: { area: 'gerencia', nube: 'NOOVA SAC' },
+      administrador: { area: 'administracion', nube: 'NOOVA SAC' },
+      soporte_ti: { area: 'sistemas', nube: 'NOOVA SAC/10. SISTEMAS' },
+      responsable_marketing: { area: 'marketing', nube: 'NOOVA SAC/04. MARKETING' },
+      jefe_proyecto_mina: { area: 'minas', nube: 'NOOVA SAC/03. TÉCNICA' }
+    }
+  );
 });

@@ -11,8 +11,15 @@ import {
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 
+function sinControles(valor) {
+  return Array.from(String(valor || '')).filter((caracter) => {
+    const codigo = caracter.codePointAt(0);
+    return codigo === 9 || codigo === 10 || codigo === 13 || (codigo >= 32 && codigo !== 127);
+  }).join('');
+}
+
 function limpiar(valor, maximo = 5000) {
-  return String(valor || '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').trim().slice(0, maximo);
+  return sinControles(valor).trim().slice(0, maximo);
 }
 
 function normalizarSolicitud(data = {}) {

@@ -28,8 +28,15 @@ const DEMO = {
   notaInterna: 'Proveedor inicial de prueba. Editar con los datos comerciales reales antes de emitir una OC definitiva.'
 };
 
+function sinControles(valor) {
+  return Array.from(String(valor || '')).filter((caracter) => {
+    const codigo = caracter.codePointAt(0);
+    return codigo === 9 || codigo === 10 || codigo === 13 || (codigo >= 32 && codigo !== 127);
+  }).join('');
+}
+
 function limpiar(valor, maximo = 300) {
-  return String(valor || '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').trim().slice(0, maximo);
+  return sinControles(valor).trim().slice(0, maximo);
 }
 
 function normalizarProveedor(data = {}) {

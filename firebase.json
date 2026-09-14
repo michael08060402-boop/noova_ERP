@@ -5,6 +5,9 @@
   "hosting": {
     "site": "noova-sac-erp",
     "public": "dist",
+    "predeploy": [
+      "npm run build"
+    ],
     "ignore": [
       "firebase.json",
       "**/.*",

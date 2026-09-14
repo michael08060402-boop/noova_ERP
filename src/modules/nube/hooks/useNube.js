@@ -35,13 +35,19 @@ export default function useNube() {
     if (carpetaId) return carpetaId;
     if (!contextoListo.current) {
       const ctx = await obtenerContexto();
+      if (!ctx?.carpetaId) {
+        throw new Error('Nube no devolvió una carpeta raíz válida para tu rol.');
+      }
       contextoListo.current = true;
+      raizForzadaId.current = ctx.carpetaId;
       if (ctx.carpetaArea) {
         setCarpetaArea(ctx.carpetaArea);
-        raizForzadaId.current = ctx.carpetaId;
       }
     }
-    return raizForzadaId.current || null;
+    if (!raizForzadaId.current) {
+      throw new Error('No se pudo determinar la carpeta raíz de Nube.');
+    }
+    return raizForzadaId.current;
   }, []);
 
   // Cargar contenido de una carpeta

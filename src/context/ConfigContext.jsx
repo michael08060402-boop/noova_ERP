@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { getConfig as fetchConfig, updateConfig as saveConfig } from '../services/configService';
+import { puede } from '../services/accessControl';
 import { useAuth } from './AuthContext';
 
 const ConfigContext = createContext();
@@ -15,7 +16,14 @@ export function ConfigProvider({ children }) {
   const [configError, setConfigError] = useState(null);
 
   useEffect(() => {
-    if (!currentUser || !userProfile) {
+    const requiereConfig = [
+      'configuracion',
+      'cotizaciones',
+      'compras',
+      'facturacion'
+    ].some((modulo) => puede(userProfile, modulo, 'read'));
+
+    if (!currentUser || !userProfile || !requiereConfig) {
       setConfig(null);
       setConfigError(null);
       setLoadingConfig(false);
