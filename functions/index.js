@@ -1,4 +1,5 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { initializeApp, getApps } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
@@ -1136,5 +1137,76 @@ exports.usuariosCambiarEstado = onCall(
       console.error('Error en usuariosCambiarEstado:', err.message);
       throw new HttpsError('internal', err.message || 'Error actualizando el estado del usuario');
     }
+  }
+);
+
+// ── Limpieza automática de auditoría ──
+// Corre sola una vez por semana y borra los logs de más de 7 días, para que
+// la colección `logs` no crezca sin límite. Usa el Admin SDK (no pasa por
+// las reglas de Firestore, que hoy bloquean el borrado desde el cliente).
+const LOGS_RETENCION_DIAS = 7;
+
+exports.limpiarLogsAntiguos = onSchedule(
+  { schedule: '0 3 * * 0', timeZone: 'America/Lima', region: 'us-central1', memory: '256MiB' },
+  async () => {
+    const corte = new Date();
+    corte.setDate(corte.getDate() - LOGS_RETENCION_DIAS);
+    const corteIso = corte.toISOString();
+
+    let totalBorrados = 0;
+    let quedan = true;
+
+    while (quedan) {
+      const snapshot = await db.collection('logs')
+        .where('createdAt', '<', corteIso)
+        .limit(400)
+        .get();
+
+      if (snapshot.empty) {
+        quedan = false;
+        break;
+      }
+
+      const batch = db.batch();
+      snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+
+      totalBorrados += snapshot.size;
+      quedan = snapshot.size === 400;
+    }
+
+    console.log(`limpiarLogsAntiguos: ${totalBorrados} logs eliminados (anteriores a ${corteIso})`);
+  }
+);
+
+// ── Backup diario de la base de datos ──
+// Corre sola todos los días y exporta toda Firestore a un bucket de Cloud
+// Storage. Es una operación asíncrona administrada por Google (el export
+// real sigue corriendo aunque esta función ya haya terminado).
+// Requiere la variable de entorno BACKUP_BUCKET (ver ONEDRIVE_SETUP.md /
+// documentación de despliegue para cómo configurarla).
+const { v1: FirestoreAdminV1 } = require('@google-cloud/firestore');
+
+exports.backupFirestoreDiario = onSchedule(
+  { schedule: '0 9 * * *', timeZone: 'America/Lima', region: 'us-central1', memory: '256MiB', timeoutSeconds: 300 },
+  async () => {
+    const bucket = process.env.BACKUP_BUCKET;
+    if (!bucket) {
+      throw new Error('Falta la variable de entorno BACKUP_BUCKET (bucket de Cloud Storage donde guardar los backups)');
+    }
+
+    const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT;
+    const client = new FirestoreAdminV1.FirestoreAdminClient();
+    const databaseName = client.databasePath(projectId, '(default)');
+    const fecha = new Date().toISOString().split('T')[0];
+    const outputUriPrefix = `gs://${bucket}/backups/${fecha}`;
+
+    const [operation] = await client.exportDocuments({
+      name: databaseName,
+      outputUriPrefix,
+      collectionIds: []
+    });
+
+    console.log(`backupFirestoreDiario: exportación iniciada -> ${outputUriPrefix}`, operation.name || operation);
   }
 );

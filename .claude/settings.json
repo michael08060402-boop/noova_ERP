@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ' *)",
+      "Bash(curl -sf http://localhost:5173)",
+      "Bash(node --check functions/index.js)",
+      "Bash(node -e \"require\\('firebase-functions/v2/scheduler'\\); console.log\\('module resolves OK'\\)\")",
+      "Bash(echo \"exit: $?\")"
+    ]
+  }
+}

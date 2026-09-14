@@ -74,7 +74,7 @@ function drawFieldRow(doc, x, y, label, value, labelW = 24, contentW = 182) {
 }
 
 export function generateCotizacionPDF(cotizacion, config = {}) {
-  const doc = new jsPDF({ format: 'a4', unit: 'mm' });
+  const doc = new jsPDF({ format:'a4', unit: 'mm' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 14;
@@ -316,11 +316,22 @@ export function generateCotizacionPDF(cotizacion, config = {}) {
     ...lineasTiempoEntrega,
     `4.- Validez de Oferta: ${validez}.`,
     '5.- Observación: Para la atención del pedido se solicita el envío de la OC. por parte del cliente.',
-    `6.- Lugar de entrega: ${String(direccion || '').trim().replace(/\.+$/, '')}.`,
-    '7.- Garantía: NOOVA brinda doce (12) meses de garantía que cubren únicamente defectos de fabricación.',
-    '8.- Stock: Sujeto a disponibilidad.',
-    '9.- Capacitación: Gratuita online en el uso básico de los equipos.'
+    `6.- Lugar de entrega: ${String(direccion || '').trim().replace(/\.+$/, '')}.`
   ];
+
+  // Garantía de fábrica, stock y capacitación en el uso del equipo no
+  // aplican si la cotización es 100% de servicios (todas las filas son
+  // de tipo "transporte": sin código de catálogo, no se vende ni entrega
+  // ningún equipo).
+  const esCotizacionDeServicios = todosLosItems.length > 0
+    && todosLosItems.every((it) => it.tipo === 'transporte');
+  if (!esCotizacionDeServicios) {
+    condiciones.push(
+      '7.- Garantía: NOOVA brinda doce (12) meses de garantía que cubren únicamente defectos de fabricación.',
+      '8.- Stock: Sujeto a disponibilidad.',
+      '9.- Capacitación: Gratuita online en el uso básico de los equipos.'
+    );
+  }
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);

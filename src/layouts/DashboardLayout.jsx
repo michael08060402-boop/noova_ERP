@@ -3,11 +3,12 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   FiBarChart2, FiUsers, FiFileText, FiSettings,
   FiMenu, FiLogOut, FiUser, FiX, FiDollarSign, FiBell, FiTool,
-  FiWind, FiMessageCircle, FiCloud, FiShoppingCart, FiTruck
+  FiWind, FiMessageCircle, FiCloud, FiShoppingCart, FiTruck, FiTrendingUp
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useCotizaciones } from '../hooks/useCotizaciones';
 import { puede } from '../services/userService';
+import { obtenerCalibracionesProximas } from '../utils/calibracion';
 import logo from '../assets/logo-blanco.png';
 import '../styles/shared.css';
 import './DashboardLayout.css';
@@ -18,6 +19,7 @@ const ITEMS_MENU = [
   { path: '/equipos', label: 'Equipos', icon: <FiTool />, key: 'equipos' },
   { path: '/mangas', label: 'Mangas', icon: <FiWind />, key: 'mangas' },
   { path: '/cotizaciones', label: 'Cotizaciones', icon: <FiFileText />, key: 'cotizaciones' },
+  { path: '/ventas', label: 'Ventas', icon: <FiTrendingUp />, key: 'ventas' },
   { path: '/mensajeria', label: 'Mensajería', icon: <FiMessageCircle />, key: 'mensajeria' },
   { path: '/proveedores', label: 'Proveedores', icon: <FiTruck />, key: 'proveedores' },
   { path: '/compras', label: 'Órdenes de compra', icon: <FiShoppingCart />, key: 'compras' },
@@ -42,7 +44,7 @@ export default function DashboardLayout() {
   const { currentUser, userProfile, logout } = useAuth();
   const puedeVerCotizaciones = puede(userProfile, 'cotizaciones', 'read');
   const puedeVerPerfil = puede(userProfile, 'perfil', 'read');
-  const { cotizaciones } = useCotizaciones(puedeVerCotizaciones);
+  const { cotizaciones, fetchCotizaciones } = useCotizaciones(puedeVerCotizaciones);
   const navigate = useNavigate();
   const esMobile = useEsMobile();
 
@@ -90,9 +92,30 @@ export default function DashboardLayout() {
     currentUser?.email?.split('@')[0] ||
     'Usuario';
 
-  const notificacionesPendientes = puedeVerCotizaciones
+  const cotizacionesPendientes = puedeVerCotizaciones
     ? cotizaciones.filter((c) => c.estado === 'Borrador' || c.estado === 'Enviada')
     : [];
+
+  const calibracionesProximas = puedeVerCotizaciones
+    ? obtenerCalibracionesProximas(cotizaciones)
+    : [];
+
+  const notificacionesPendientes = [
+    ...cotizacionesPendientes.map((cot) => ({
+      key: `cot-${cot.id}`,
+      tipo: 'cotizacion',
+      texto: cot.codigo || 'Sin código',
+      subtexto: cot.estado
+    })),
+    ...calibracionesProximas.map((cal) => ({
+      key: `cal-${cal.cotizacionId}-${cal.itemIndex}`,
+      tipo: 'calibracion',
+      texto: `${cal.cotizacionCodigo} · ${cal.descripcion}`,
+      subtexto: cal.dias < 0
+        ? `Vencida hace ${Math.abs(cal.dias)} días · ${cal.cliente}`
+        : `Vence en ${cal.dias} días · ${cal.cliente}`
+    }))
+  ];
 
   const sidebarClase = [
     'sidebar',
@@ -241,7 +264,10 @@ export default function DashboardLayout() {
               <div className="notification-wrapper" ref={notificacionesRef}>
                 <button
                   className="notification-btn"
-                  onClick={() => setNotificacionesAbiertas((p) => !p)}
+                  onClick={() => {
+                    setNotificacionesAbiertas((p) => !p);
+                    fetchCotizaciones();
+                  }}
                   aria-label="Notificaciones"
                 >
                   <FiBell size={18} />
@@ -265,10 +291,14 @@ export default function DashboardLayout() {
                           No hay elementos pendientes
                         </div>
                       ) : (
-                        notificacionesPendientes.slice(0, 5).map((cot) => (
-                          <div key={cot.id} className="notification-item">
-                            <span>{cot.codigo || 'Sin código'}</span>
-                            <span className="notification-status">{cot.estado}</span>
+                        notificacionesPendientes.slice(0, 5).map((n) => (
+                          <div key={n.key} className="notification-item">
+                            <span className="notification-texto">{n.texto}</span>
+                            {n.tipo === 'cotizacion' ? (
+                              <span className="notification-status">{n.subtexto}</span>
+                            ) : (
+                              <span className="notification-detail">{n.subtexto}</span>
+                            )}
                           </div>
                         ))
                       )}

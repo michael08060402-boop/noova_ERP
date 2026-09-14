@@ -331,6 +331,7 @@ export default function Facturacion({ empresaData }) {
           const cotRef = doc(db, 'cotizaciones', cotizacionSeleccionada.id);
           await updateDoc(cotRef, {
             estado: nuevoEstadoCotizacion,
+            ...(nuevoEstadoCotizacion === 'Aceptada' ? { fechaAceptacion: new Date().toISOString() } : {}),
             motivoRechazoSunat: resultado.mensajeSunat || '',
             codigoRechazoSunat: resultado.codigo || '',
             facturaIdAsociada: resultado.id || '',
@@ -433,6 +434,7 @@ export default function Facturacion({ empresaData }) {
           const cotRef = doc(db, 'cotizaciones', factura.cotizacionId);
           await updateDoc(cotRef, {
             estado: nuevoEstadoCot,
+            ...(nuevoEstadoCot === 'Aceptada' ? { fechaAceptacion: new Date().toISOString() } : {}),
             motivoRechazoSunat: mensajeSunat || '',
             updatedAt: new Date().toISOString(),
           });

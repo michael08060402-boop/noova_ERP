@@ -233,20 +233,29 @@ async function eliminarItem(itemId) {
 // de un área (o sea esa misma carpeta). Se usa para que roles restringidos
 // no puedan crear, subir, renombrar ni eliminar fuera de su propia área,
 // incluso si alguien intenta llamar a la función directamente con otro ID.
+//
+// Compara por ID de carpeta, subiendo por la cadena de padres, en vez de
+// comparar el nombre/ruta como texto — el formato de `parentReference.path`
+// que devuelve Graph varía según el tipo de drive (sitio, usuario, grupo) y
+// una comparación de texto puede fallar aunque el item sí esté en el área.
 async function estaDentroDeArea(itemId, nombreArea) {
+  const raizId = await obtenerOCrearCarpetaRaizArea(nombreArea);
+  if (itemId === raizId) return true;
+
   const prefijo = obtenerPrefijoDrive();
-  const data = await graphClient.get(`${prefijo}/items/${itemId}`, {
-    $select: 'id,name,parentReference'
-  });
+  let actualId = itemId;
 
-  const rutaPadre = data.parentReference?.path || ''; // ej: "/drive/root:/Marketing"
-  const marcador = `/root:/${nombreArea}`;
+  for (let intentos = 0; intentos < 20; intentos++) {
+    const data = await graphClient.get(`${prefijo}/items/${actualId}`, {
+      $select: 'id,parentReference'
+    });
+    const padreId = data.parentReference?.id;
+    if (!padreId) return false;
+    if (padreId === raizId) return true;
+    actualId = padreId;
+  }
 
-  // El item ES la carpeta raíz del área, o está dentro de ella (ruta empieza igual o con "/subcarpeta")
-  const esLaPropiaCarpeta = data.name === nombreArea && rutaPadre.endsWith('/root:');
-  const estaAdentro = rutaPadre === marcador || rutaPadre.startsWith(`${marcador}/`);
-
-  return esLaPropiaCarpeta || estaAdentro;
+  return false;
 }
 
 module.exports = {

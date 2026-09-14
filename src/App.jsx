@@ -15,6 +15,7 @@ const DashboardLayout = lazy(() => import('./layouts/DashboardLayout'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Clientes = lazy(() => import('./pages/Clientes'));
 const Cotizaciones = lazy(() => import('./pages/Cotizaciones'));
+const Ventas = lazy(() => import('./pages/Ventas'));
 const Equipos = lazy(() => import('./pages/Equipos'));
 const Mangas = lazy(() => import('./pages/Mangas'));
 const Configuracion = lazy(() => import('./pages/Configuracion'));
@@ -184,6 +185,15 @@ function App() {
               element={
                 <RutaConPermiso modulo="cotizaciones">
                   <Cotizaciones />
+                </RutaConPermiso>
+              }
+            />
+
+            <Route
+              path="ventas"
+              element={
+                <RutaConPermiso modulo="ventas">
+                  <Ventas />
                 </RutaConPermiso>
               }
             />

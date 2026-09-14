@@ -389,6 +389,13 @@ export default function Cotizaciones() {
     }
   }
 
+  // Al cambiar el tipo de cotización, los items del catálogo anterior
+  // (equipoId, código, etc.) ya no tienen sentido. Se reinicia la tabla
+  // con una fila en blanco.
+  function cambiarTipoItem(valor) {
+    setForm((prev) => ({ ...prev, tipoItem: valor, items: [{ ...ITEM_VACIO }] }));
+  }
+
   function cambiarItem(index, campo, valor) {
     setForm((prev) => {
       const items = [...prev.items];
@@ -456,8 +463,8 @@ export default function Cotizaciones() {
   function agregarItem(tipo = 'producto') {
     const nuevo = { ...ITEM_VACIO, tipo };
     if (tipo === 'transporte') {
-      nuevo.codigo = '6000 0001';
-      nuevo.descripcion = 'Transporte';
+      // Fila de servicio: sin código de catálogo, el usuario escribe la
+      // descripción (transporte, calibración, capacitación, etc.).
       nuevo.cantidad = 1;
       nuevo.unidadMedida = 'SERVICIO';
       nuevo.esAccesorio = false;
@@ -1287,7 +1294,7 @@ export default function Cotizaciones() {
               <label>Tipo de item</label>
               <select
                 value={form.tipoItem}
-                onChange={(e) => handleChange('tipoItem', e.target.value)}
+                onChange={(e) => cambiarTipoItem(e.target.value)}
                 className="selector-tipo-item"
               >
                 <option value="equipo">Equipos</option>
@@ -1341,7 +1348,7 @@ export default function Cotizaciones() {
                   </button>
                 )}
                 <button type="button" className="btn-secundario btn-pequeno" onClick={() => agregarItem('transporte')}>
-                  <FiPlus size={14} /> Agregar Transporte
+                  <FiPlus size={14} /> Agregar Servicio
                 </button>
               </div>
             </div>
@@ -1369,7 +1376,7 @@ export default function Cotizaciones() {
                     const etiquetaTipo = item.tipo === 'accesorio'
                       ? `Accesorio #${numeroEnGrupo}`
                       : item.tipo === 'transporte'
-                        ? `Transporte #${numeroEnGrupo}`
+                        ? `Servicio #${numeroEnGrupo}`
                         : (form.tipoItem === 'manga' ? `Manga #${numeroEnGrupo}` : `Equipo #${numeroEnGrupo}`);
                     const finGrupoEnMain = item.tipo === 'transporte';
                     return (
@@ -1389,7 +1396,7 @@ export default function Cotizaciones() {
                             value={item.codigo}
                             onChange={(e) => cambiarItem(index, 'codigo', e.target.value)}
                             onBlur={(e) => e.target.value && buscarEquipoPorCodigo(index, e.target.value)}
-                            placeholder={item.tipo === 'transporte' ? 'Ej: 6000 0001' : 'Código'}
+                            placeholder={item.tipo === 'transporte' ? 'Opcional' : 'Código'}
                             readOnly={item.tipo !== 'transporte'}
                             title={item.codigo}
                             className={`${item.tipo !== 'transporte' ? 'input-solo-lectura' : ''} ${buscandoCodigo[index] ? 'input-cargando' : ''}`}
@@ -1419,7 +1426,7 @@ export default function Cotizaciones() {
                           type="text"
                           value={item.descripcion}
                           onChange={(e) => cambiarItem(index, 'descripcion', e.target.value)}
-                          placeholder={item.tipo === 'transporte' ? 'Ej: Transporte a obra' : (item.tipo === 'accesorio' ? 'Ej: Codo, Conector tipo Y' : 'Descripción')}
+                          placeholder={item.tipo === 'transporte' ? 'Ej: Transporte a obra / Calibración en sitio' : (item.tipo === 'accesorio' ? 'Ej: Codo, Conector tipo Y' : 'Descripción')}
                           className={erroresForm[`item_${index}_descripcion`] ? 'input-error' : ''}
                         />
                         {erroresForm[`item_${index}_descripcion`] && (
