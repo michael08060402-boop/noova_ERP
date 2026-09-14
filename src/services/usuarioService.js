@@ -19,9 +19,10 @@ export async function getUsuarios() {
   return snapshot.docs.map((documento) => {
     const data = documento.data();
     const role = normalizarRol(data.role);
-    const area = normalizarArea(data.area)
+    const area = getAreaPredeterminada(role)
+      || normalizarArea(data.area)
       || normalizarArea(data.sector)
-      || getAreaPredeterminada(role);
+      || '';
 
     return {
       uid: documento.id,
@@ -57,7 +58,7 @@ export async function crearUsuario({
     cargo,
     telefono,
     role: roleNormalizado,
-    area: areaNormalizada
+    area: getAreaPredeterminada(roleNormalizado) || areaNormalizada
   });
 
   return resultado.data;
@@ -70,20 +71,20 @@ export async function cambiarRolUsuario(uid, role) {
     throw new Error('El rol seleccionado no es válido');
   }
 
-  await updateUserProfile(uid, { role: roleNormalizado });
+  const area = getAreaPredeterminada(roleNormalizado);
+  await updateUserProfile(uid, { role: roleNormalizado, area });
+  return { role: roleNormalizado, area };
 }
 
 export async function cambiarDatosUsuario(uid, {
   nombre,
   cargo,
-  telefono,
-  area
+  telefono
 }) {
   await updateUserProfile(uid, {
     nombre,
     cargo,
-    telefono,
-    area: normalizarArea(area)
+    telefono
   });
 }
 

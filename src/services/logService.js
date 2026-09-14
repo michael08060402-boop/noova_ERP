@@ -1,19 +1,13 @@
-import { db } from '../firebase/config';
-import { collection, addDoc, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { db, functions } from '../firebase/config';
+import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 
 const COLLECTION = 'logs';
 
-// Registra una acción en la colección de logs (append-only).
-export async function addLog({ usuario, accion, detalle = '' }) {
-  const now = new Date();
-  await addDoc(collection(db, COLLECTION), {
-    usuario,
-    accion,
-    detalle,
-    fecha: now.toISOString().split('T')[0],
-    hora: now.toLocaleTimeString('es-PE', { hour12: false }),
-    createdAt: now.toISOString()
-  });
+// La identidad y la fecha se sellan en backend para mantener la auditoría confiable.
+export async function addLog({ accion, detalle = '' }) {
+  const crearLog = httpsCallable(functions, 'logsCrear');
+  await crearLog({ accion, detalle });
 }
 
 export async function getLogs(limitCount = 100) {

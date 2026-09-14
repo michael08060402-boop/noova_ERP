@@ -39,7 +39,10 @@ async function llamar(nombre, datos = {}) {
   }
 }
 
-async function listarCarpeta(carpetaId = null) {
+async function listarCarpeta(carpetaId) {
+  if (!carpetaId) {
+    throw new Error('No se recibió una carpeta raíz válida para Nube.');
+  }
   const data = await llamar('nubeListarCarpeta', { carpetaId });
   return data.items;
 }

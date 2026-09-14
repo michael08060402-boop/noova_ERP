@@ -1,5 +1,5 @@
 import { db } from '../firebase/config';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { deleteField, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import {
   AREAS,
   ROLES,
@@ -61,9 +61,10 @@ export async function getUserProfile(uid) {
 
   const data = snapshot.data();
   const role = normalizarRol(data.role);
-  const area = normalizarArea(data.area)
+  const area = getAreaPredeterminada(role)
+    || normalizarArea(data.area)
     || normalizarArea(data.sector)
-    || getAreaPredeterminada(role);
+    || '';
 
   return {
     uid,
@@ -76,13 +77,15 @@ export async function getUserProfile(uid) {
 
 export async function createUserProfile(uid, data = {}) {
   const role = normalizarRol(data.role);
-  const area = normalizarArea(data.area) || getAreaPredeterminada(role);
+  if (!esRolValido(role)) throw new Error('El rol seleccionado no es válido');
+  const area = getAreaPredeterminada(role);
 
   const perfil = {
     ...PERFIL_DEFECTO,
     ...data,
     role,
     area,
+    sector: getNombreArea(area),
     email: data.email || '',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -103,7 +106,14 @@ export async function updateUserProfile(uid, data) {
   delete payload.permissions;
 
   if ('role' in payload) payload.role = normalizarRol(payload.role);
-  if ('area' in payload) payload.area = normalizarArea(payload.area);
+  if ('role' in payload) {
+    if (!esRolValido(payload.role)) throw new Error('El rol seleccionado no es válido');
+    payload.area = getAreaPredeterminada(payload.role);
+    payload.sector = getNombreArea(payload.area);
+    payload.permissions = deleteField();
+  } else if ('area' in payload) {
+    payload.area = normalizarArea(payload.area);
+  }
 
   await updateDoc(docRef, payload);
 }

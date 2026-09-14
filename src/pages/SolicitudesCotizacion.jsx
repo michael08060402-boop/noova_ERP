@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import {
   FiPlus, FiSearch, FiTrash2, FiEdit2, FiSend, FiEye, FiClock,
-  FiFileText, FiRefreshCw
+  FiRefreshCw
 } from 'react-icons/fi';
 import { useSolicitudesCotizacion } from '../hooks/useSolicitudesCotizacion';
 import { useProveedores } from '../hooks/useProveedores';

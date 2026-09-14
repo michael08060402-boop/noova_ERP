@@ -14,8 +14,15 @@ import { calcularTotalesOrden, formatearCodigoOrden } from '../utils/ordenCompra
 
 const COLLECTION_NAME = 'ordenesCompra';
 
+function sinControles(valor) {
+  return Array.from(String(valor || '')).filter((caracter) => {
+    const codigo = caracter.codePointAt(0);
+    return codigo === 9 || codigo === 10 || codigo === 13 || (codigo >= 32 && codigo !== 127);
+  }).join('');
+}
+
 function limpiar(valor, maximo = 300) {
-  return String(valor || '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').trim().slice(0, maximo);
+  return sinControles(valor).trim().slice(0, maximo);
 }
 
 function normalizarItems(items = []) {
@@ -185,7 +192,9 @@ export async function updateOrdenCompra(id, data) {
     origenCotizacionId: actual.data().origenCotizacionId,
     origenCotizacionCodigo: actual.data().origenCotizacionCodigo
   }, proveedorSnap.data());
-  const { origenCotizacionId, origenCotizacionCodigo, ...camposEditables } = editable;
+  const camposEditables = { ...editable };
+  delete camposEditables.origenCotizacionId;
+  delete camposEditables.origenCotizacionCodigo;
   await updateDoc(ref, { ...camposEditables, updatedAt: new Date().toISOString() });
 }
 

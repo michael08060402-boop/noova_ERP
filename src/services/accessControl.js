@@ -38,12 +38,12 @@ export const SECCIONES_CONFIGURACION = [
 ];
 
 export const ROLES = {
-  gerente: {
-    label: 'Gerente',
+  gerencia: {
+    label: 'Gerencia',
     areaPredeterminada: 'gerencia',
     permissions: { ...PERMISOS_TOTALES },
     configuracion: ['*'],
-    nubeCarpeta: null,
+    nubeCarpeta: 'NOOVA SAC',
     rutaInicial: '/dashboard'
   },
 
@@ -53,7 +53,7 @@ export const ROLES = {
     permissions: { ...PERMISOS_TOTALES },
     // El documento funcional indica: Configuración parcial, solo Correlativos.
     configuracion: ['correlativo'],
-    nubeCarpeta: null,
+    nubeCarpeta: 'NOOVA SAC',
     rutaInicial: '/dashboard'
   },
 
@@ -69,7 +69,7 @@ export const ROLES = {
     // Como el documento no marca Configuración como parcial para Soporte TI,
     // se interpreta acceso completo a sus secciones.
     configuracion: ['*'],
-    nubeCarpeta: null,
+    nubeCarpeta: 'NOOVA SAC/10. SISTEMAS',
     rutaInicial: '/configuracion'
   },
 
@@ -84,7 +84,7 @@ export const ROLES = {
       nube: TODO
     },
     configuracion: [],
-    nubeCarpeta: 'Marketing',
+    nubeCarpeta: 'NOOVA SAC/04. MARKETING',
     rutaInicial: '/dashboard'
   },
 
@@ -95,7 +95,7 @@ export const ROLES = {
       nube: TODO
     },
     configuracion: [],
-    nubeCarpeta: 'Mina',
+    nubeCarpeta: 'NOOVA SAC/03. TÉCNICA',
     rutaInicial: '/nube'
   }
 };
@@ -120,7 +120,7 @@ export const MODULOS = [
 // tienen una equivalencia inequívoca. No crea roles adicionales en la UI.
 const ALIAS_ROL = {
   admin: 'administrador',
-  gerencia: 'gerente',
+  gerente: 'gerencia',
   marketing: 'responsable_marketing',
   sistemas: 'soporte_ti',
   ing_minas: 'jefe_proyecto_mina'

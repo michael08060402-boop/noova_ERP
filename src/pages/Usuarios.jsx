@@ -32,7 +32,7 @@ const USUARIO_VACIO = {
   nombre: '',
   cargo: '',
   telefono: '',
-  role: 'gerente',
+  role: 'gerencia',
   area: 'gerencia'
 };
 
@@ -41,9 +41,10 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function obtenerAreaUsuario(usuario) {
   const role = normalizarRol(usuario?.role);
 
-  return normalizarArea(usuario?.area)
+  return getAreaPredeterminada(role)
+    || normalizarArea(usuario?.area)
     || normalizarArea(usuario?.sector)
-    || getAreaPredeterminada(role);
+    || '';
 }
 
 function etiquetaNube(usuario) {
@@ -58,8 +59,8 @@ function etiquetaNube(usuario) {
 
   const carpeta = getCarpetaNube(profile);
 
-  if (carpeta === null) {
-    return { texto: 'Todo', completo: true };
+  if (carpeta === 'NOOVA SAC') {
+    return { texto: 'NOOVA SAC', completo: true };
   }
 
   return { texto: carpeta || 'Sin acceso', completo: false };
@@ -93,8 +94,10 @@ export default function Usuarios({ embebido = false }) {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors }
   } = useForm({ defaultValues: USUARIO_VACIO });
+  const rolNuevo = watch('role');
 
   async function alCrearUsuario(data) {
     setCreando(true);
@@ -103,7 +106,7 @@ export default function Usuarios({ embebido = false }) {
       await addUsuario({
         ...data,
         role: normalizarRol(data.role),
-        area: normalizarArea(data.area)
+        area: getAreaPredeterminada(data.role)
       });
 
       await addLog({
@@ -141,8 +144,7 @@ export default function Usuarios({ embebido = false }) {
     defaultValues: {
       nombre: '',
       cargo: '',
-      telefono: '',
-      area: ''
+      telefono: ''
     }
   });
 
@@ -152,8 +154,7 @@ export default function Usuarios({ embebido = false }) {
     resetEdit({
       nombre: usuario.nombre || '',
       cargo: usuario.cargo || '',
-      telefono: usuario.telefono || '',
-      area: obtenerAreaUsuario(usuario)
+      telefono: usuario.telefono || ''
     });
   }
 
@@ -164,8 +165,7 @@ export default function Usuarios({ embebido = false }) {
       await editDatos(usuarioEditar.uid, {
         nombre: data.nombre,
         cargo: data.cargo,
-        telefono: data.telefono,
-        area: normalizarArea(data.area)
+        telefono: data.telefono
       });
 
       mostrarMensaje('success', 'Datos actualizados correctamente');
@@ -561,13 +561,11 @@ export default function Usuarios({ embebido = false }) {
 
           <div className="campo">
             <label>Área *</label>
-            <select {...register('area', { required: true })}>
-              {Object.entries(AREAS).map(([clave, cfg]) => (
-                <option key={clave} value={clave}>
-                  {cfg.label}
-                </option>
-              ))}
-            </select>
+            <input
+              value={AREAS[getAreaPredeterminada(rolNuevo)]?.label || ''}
+              readOnly
+              className="input-solo-lectura"
+            />
           </div>
 
           <div className="campo">
@@ -628,13 +626,11 @@ export default function Usuarios({ embebido = false }) {
 
           <div className="campo">
             <label>Área *</label>
-            <select {...registerEdit('area', { required: true })}>
-              {Object.entries(AREAS).map(([clave, cfg]) => (
-                <option key={clave} value={clave}>
-                  {cfg.label}
-                </option>
-              ))}
-            </select>
+            <input
+              value={AREAS[obtenerAreaUsuario(usuarioEditar)]?.label || ''}
+              readOnly
+              className="input-solo-lectura"
+            />
           </div>
 
           <div className="usuarios-permisos">

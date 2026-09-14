@@ -41,10 +41,11 @@ export function useUsuarios() {
 
   const editRol = useCallback(async (uid, role) => {
     setError(null);
-    await cambiarRolUsuario(uid, role);
+    const actualizado = await cambiarRolUsuario(uid, role);
     setUsuarios((prev) => prev.map((u) => (
-      u.uid === uid ? { ...u, role } : u
+      u.uid === uid ? { ...u, ...actualizado } : u
     )));
+    return actualizado;
   }, []);
 
   const editDatos = useCallback(async (uid, datos) => {

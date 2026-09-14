@@ -8,6 +8,7 @@ const PERMISOS_TOTALES = {
   equipos: TODO,
   mangas: TODO,
   cotizaciones: TODO,
+  ventas: TODO,
   mensajeria: TODO,
   proveedores: TODO,
   compras: TODO,
@@ -27,12 +28,12 @@ const AREAS = {
 };
 
 const ROLES = {
-  gerente: {
-    label: 'Gerente',
+  gerencia: {
+    label: 'Gerencia',
     areaPredeterminada: 'gerencia',
     permissions: { ...PERMISOS_TOTALES },
     configuracion: ['*'],
-    nubeCarpeta: null
+    nubeCarpeta: 'NOOVA SAC'
   },
 
   administrador: {
@@ -40,7 +41,7 @@ const ROLES = {
     areaPredeterminada: 'administracion',
     permissions: { ...PERMISOS_TOTALES },
     configuracion: ['correlativo'],
-    nubeCarpeta: null
+    nubeCarpeta: 'NOOVA SAC'
   },
 
   soporte_ti: {
@@ -53,7 +54,7 @@ const ROLES = {
       mensajeria: TODO
     },
     configuracion: ['*'],
-    nubeCarpeta: null
+    nubeCarpeta: 'NOOVA SAC/10. SISTEMAS'
   },
 
   responsable_marketing: {
@@ -67,7 +68,7 @@ const ROLES = {
       nube: TODO
     },
     configuracion: [],
-    nubeCarpeta: 'Marketing'
+    nubeCarpeta: 'NOOVA SAC/04. MARKETING'
   },
 
   jefe_proyecto_mina: {
@@ -77,13 +78,13 @@ const ROLES = {
       nube: TODO
     },
     configuracion: [],
-    nubeCarpeta: 'Mina'
+    nubeCarpeta: 'NOOVA SAC/03. TÉCNICA'
   }
 };
 
 const ALIAS_ROL = {
   admin: 'administrador',
-  gerencia: 'gerente',
+  gerente: 'gerencia',
   marketing: 'responsable_marketing',
   sistemas: 'soporte_ti',
   ing_minas: 'jefe_proyecto_mina'

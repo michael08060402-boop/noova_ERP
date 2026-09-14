@@ -28,7 +28,7 @@ service cloud.firestore {
     // No aparecen como roles disponibles en el frontend.
     function isGerente() {
       return userExists()
-        && profile().role in ['gerente', 'gerencia'];
+        && profile().role in ['gerencia', 'gerente'];
     }
 
     function isAdministrador() {
@@ -100,7 +100,7 @@ service cloud.firestore {
 
     function validOfficialRole(role) {
       return role in [
-        'gerente',
+        'gerencia',
         'administrador',
         'soporte_ti',
         'responsable_marketing',
@@ -143,6 +143,42 @@ service cloud.firestore {
       );
     }
 
+    function roleAreaCombinationIsValid(data) {
+      return (
+        data.role == 'gerencia' && data.area == 'gerencia'
+      ) || (
+        data.role == 'administrador' && data.area == 'administracion'
+      ) || (
+        data.role == 'soporte_ti' && data.area == 'sistemas'
+      ) || (
+        data.role == 'responsable_marketing' && data.area == 'marketing'
+      ) || (
+        data.role == 'jefe_proyecto_mina' && data.area == 'minas'
+      );
+    }
+
+    function userRoleOrAreaChangeIsCoherent() {
+      return !request.resource.data
+        .diff(resource.data)
+        .affectedKeys()
+        .hasAny(['role', 'area'])
+        || (
+          ('role' in request.resource.data)
+          && ('area' in request.resource.data)
+          && validOfficialRole(request.resource.data.role)
+          && validOfficialArea(request.resource.data.area)
+          && roleAreaCombinationIsValid(request.resource.data)
+        );
+    }
+
+    function permissionsChangeOnlyRemovesLegacyField() {
+      return !request.resource.data
+        .diff(resource.data)
+        .affectedKeys()
+        .hasAny(['permissions'])
+        || !('permissions' in request.resource.data);
+    }
+
     // ============================================================
     // USUARIOS
     // ============================================================
@@ -164,18 +200,46 @@ service cloud.firestore {
       allow create: if canManageUsers()
         && request.auth.uid != userId
         && ('role' in request.resource.data)
+        && ('area' in request.resource.data)
         && validOfficialRole(request.resource.data.role)
-        && (
-          !('area' in request.resource.data)
-          || validOfficialArea(request.resource.data.area)
-        );
+        && validOfficialArea(request.resource.data.area)
+        && roleAreaCombinationIsValid(request.resource.data)
+        && request.resource.data.keys().hasOnly([
+          'nombre',
+          'cargo',
+          'telefono',
+          'email',
+          'role',
+          'area',
+          'sector',
+          'activo',
+          'createdAt',
+          'updatedAt'
+        ]);
 
       // Gerente / Soporte TI pueden editar otras cuentas.
       // Nadie puede cambiar su propio rol desde el cliente.
       allow update: if canManageUsers()
         && request.auth.uid != userId
         && userRoleChangeIsValid()
-        && userAreaChangeIsValid();
+        && userAreaChangeIsValid()
+        && userRoleOrAreaChangeIsCoherent()
+        && permissionsChangeOnlyRemovesLegacyField()
+        && request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+          .hasOnly([
+            'nombre',
+            'cargo',
+            'telefono',
+            'email',
+            'role',
+            'area',
+            'sector',
+            'permissions',
+            'activo',
+            'updatedAt'
+          ]);
 
       // El usuario solo puede editar sus propios datos personales y únicamente
       // si su rol tiene Perfil editable: Gerente, Administrador o Soporte TI.
@@ -290,9 +354,10 @@ service cloud.firestore {
 
     match /configuracion/{docId} {
 
-      // ConfigContext carga configuracion/general al iniciar el ERP.
-      // Por ello todos los roles activos necesitan lectura.
-      allow read: if isActiveUser();
+      // Solo roles que consumen módulos de negocio o Configuración cargan
+      // este documento; Marketing y Mina no reciben sus datos por Firestore.
+      allow read: if isActiveUser()
+        && (isGerente() || isAdministrador() || isSoporteTI());
 
       // Gerente y Soporte TI: Configuración completa.
       allow create, update: if isActiveUser()
@@ -329,8 +394,8 @@ service cloud.firestore {
 
     match /logs/{docId} {
 
-      // Todos los roles activos pueden registrar sus acciones.
-      allow create: if isActiveUser();
+      // Solo Cloud Functions registra identidad y fecha confiables con Admin SDK.
+      allow create: if false;
 
       // Auditoría pertenece a Configuración completa.
       allow read: if isActiveUser()
