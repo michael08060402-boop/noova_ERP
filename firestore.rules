@@ -249,6 +249,7 @@ service cloud.firestore {
           isGerente()
           || isAdministrador()
           || isSoporteTI()
+          || isJefeProyectoMina()
         )
         && request.resource.data
           .diff(resource.data)

@@ -38,28 +38,25 @@ export function construirUrlWhatsApp(celular, mensaje) {
 
 /**
  * Abre WhatsApp con el número y mensaje indicados.
- * Usa un <a target="_blank"> oculto con dispatch de click — este patrón
- * NO es bloqueado por los navegadores porque proviene de un gesto directo
- * del usuario (a diferencia de window.open con noopener en el 3er arg).
- * Retorna { ok: true } si se ejecutó correctamente.
+ * Detecta ventanas bloqueadas, también en aperturas programadas sin gesto
+ * del usuario. `ok` indica ventana abierta, no mensaje enviado.
  */
 export function abrirWhatsApp(celular, mensaje) {
   const { url, error } = construirUrlWhatsApp(celular, mensaje);
   if (error || !url) return { ok: false, error };
 
   try {
-    const link = document.createElement('a');
+    const ventana = window.open('about:blank', '_blank');
+    if (!ventana) {
+      return { ok: false, error: 'El navegador bloqueó WhatsApp. Permite ventanas emergentes para este ERP y vuelve a abrirlo.' };
+    }
+    // Cortar acceso al ERP antes de navegar a un sitio externo.
+    ventana.opener = null;
+    const link = ventana.document.createElement('a');
     link.href = url;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    // Necesario para que Firefox lo trate como apertura de usuario
-    link.style.display = 'none';
-    document.body.appendChild(link);
+    link.rel = 'noreferrer';
+    ventana.document.body.appendChild(link);
     link.click();
-    // Limpia el DOM
-    setTimeout(() => {
-      if (link.parentNode) document.body.removeChild(link);
-    }, 100);
     return { ok: true, error: null };
   } catch (err) {
     console.error('Error abriendo WhatsApp:', err);

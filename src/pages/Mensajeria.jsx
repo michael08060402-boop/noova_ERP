@@ -10,6 +10,7 @@ import { addLog } from '../services/logService';
 import {
   registrarEnvioMensaje,
   getHistorialMensajes,
+  marcarComoEnviado,
   cancelarEnvioProgramado
 } from '../services/mensajeriaService';
 import { useEnviosProgramados } from '../hooks/useEnviosProgramados';
@@ -33,11 +34,16 @@ const MAX_CARACTERES = 4000;
 
 function obtenerContactosDeCliente(cliente) {
   if (!cliente) return [];
-  if (cliente.contactos && cliente.contactos.length > 0) return cliente.contactos;
-  if (cliente.contacto || cliente.email) {
+  if (Array.isArray(cliente.contactos) && cliente.contactos.length > 0) {
+    return cliente.contactos.filter(Boolean).map(contacto => ({
+      ...contacto,
+      celular: String(contacto.celular || contacto.telefono || '').trim()
+    }));
+  }
+  if (cliente.contacto || cliente.email || cliente.telefono || cliente.celular) {
     return [{
       nombre: cliente.contacto || '',
-      celular: cliente.telefono || cliente.celular || '',
+      celular: String(cliente.telefono || cliente.celular || '').trim(),
       email: cliente.email || ''
     }];
   }
@@ -54,7 +60,7 @@ function formatearFechaHora(iso) {
 }
 
 export default function Mensajeria() {
-  const { clientes, loading } = useClientes();
+  const { clientes, loading, error: errorClientes } = useClientes();
   const { currentUser, userProfile } = useAuth();
 
   const [tabActiva, setTabActiva] = useState('composer'); // 'composer' | 'programados'
@@ -87,7 +93,7 @@ export default function Mensajeria() {
   const handleEnvioDisparado = useCallback((envio) => {
     setInfoEnvio({
       tipo: 'success',
-      texto: `Envío programado ejecutado: ${envio.clienteNombre} → ${envio.numeroDestino}`
+      texto: `WhatsApp abierto: ${envio.clienteNombre} → ${envio.numeroDestino}. Confirma el envío en WhatsApp.`
     });
     setTimeout(() => setInfoEnvio(null), 6000);
   }, []);
@@ -127,7 +133,7 @@ export default function Mensajeria() {
       c.ruc?.toLowerCase().includes(term) ||
       (c.contactos || []).some(ct =>
         ct.nombre?.toLowerCase().includes(term) ||
-        ct.celular?.toLowerCase().includes(term)
+        String(ct.celular || ct.telefono || '').toLowerCase().includes(term)
       )
     );
   }, [clientes, terminoBusqueda]);
@@ -139,7 +145,10 @@ export default function Mensajeria() {
 
   function seleccionarCliente(cliente) {
     setClienteSeleccionado(cliente);
-    setContactoSeleccionado(null);
+    const contactosValidos = obtenerContactosDeCliente(cliente)
+      .filter(contacto => contacto.celular && !validarCelular(contacto.celular));
+    // Solo elegir automáticamente si no hay ambigüedad de destinatario.
+    setContactoSeleccionado(contactosValidos.length === 1 ? contactosValidos[0] : null);
     setMostrarListaClientes(false);
     setErrorForm(null);
     setInfoEnvio(null);
@@ -187,6 +196,7 @@ export default function Mensajeria() {
   }
 
   async function handleEnviar() {
+    if (enviando) return;
     setErrorForm(null);
     setInfoEnvio(null);
 
@@ -224,6 +234,11 @@ export default function Mensajeria() {
           plantillaId: plantillaSeleccionada || null,
           programadoPara: fechaProg ? fechaProg.toISOString() : null
         });
+      } catch (errRegistro) {
+        if (programar) throw errRegistro;
+        setErrorForm('WhatsApp se abrió, pero no se pudo guardar el historial. No repitas el envío por este aviso.');
+      }
+      try {
         await addLog({
           usuario: responsable,
           accion: programar ? 'programar_whatsapp' : 'envio_whatsapp',
@@ -236,7 +251,7 @@ export default function Mensajeria() {
       if (programar) {
         setInfoEnvio({
           tipo: 'success',
-          texto: `Mensaje programado para ${formatearFechaHora(fechaProg.toISOString())}. Se enviará automáticamente cuando la app esté abierta.`
+          texto: `Mensaje programado para ${formatearFechaHora(fechaProg.toISOString())}. Mantén Mensajería abierta y confirma el envío en WhatsApp. Si el navegador bloquea la ventana, usa «Abrir WhatsApp» en Programados.`
         });
         refrescarProgramados();
       } else {
@@ -273,6 +288,21 @@ export default function Mensajeria() {
     } catch (err) {
       console.error('Error cancelando envío programado:', err);
       setErrorForm('Error al cancelar envío: ' + err.message);
+    }
+  }
+
+  async function abrirProgramado(envio) {
+    const resultado = abrirWhatsApp(envio.numeroDestino, envio.mensajeCompleto || envio.mensajePreview);
+    if (!resultado.ok) {
+      setErrorForm(resultado.error);
+      return;
+    }
+    try {
+      await marcarComoEnviado(envio.id);
+      await refrescarProgramados();
+      await cargarHistorial();
+    } catch {
+      setErrorForm('WhatsApp se abrió, pero no se pudo actualizar el registro. Verifica el envío antes de volver a abrirlo.');
     }
   }
 
@@ -322,6 +352,14 @@ export default function Mensajeria() {
       </div>
 
       {/* Tabs */}
+      {errorClientes && (
+        <div className="mensaje-flash mensaje-error" role="alert">
+          No se pudieron cargar los clientes: {errorClientes}
+        </div>
+      )}
+      {tabActiva === 'programados' && errorForm && (
+        <div className="mensaje-flash mensaje-error" role="alert">{errorForm}</div>
+      )}
       <div className="mensajeria-tabs">
         <button
           className={`tab-btn ${tabActiva === 'composer' ? 'activa' : ''}`}
@@ -422,18 +460,20 @@ export default function Mensajeria() {
                     <div className="lista-contactos-composer">
                       {contactosActuales.map((ct, idx) => {
                         const errCel = ct.celular ? validarCelular(ct.celular) : 'Sin celular';
-                        const seleccionado = contactoSeleccionado === ct;
+                        const seleccionado = contactoSeleccionado?.celular === ct.celular
+                          && contactoSeleccionado?.nombre === ct.nombre;
                         return (
                           <button
                             key={idx}
                             className={`contacto-chip ${seleccionado ? 'seleccionado' : ''} ${errCel ? 'invalido' : ''}`}
                             onClick={() => seleccionarContacto(ct)}
-                            disabled={!!errCel}
+                            aria-pressed={seleccionado}
                             title={errCel ? `Inválido: ${errCel}` : 'Seleccionar contacto'}
                           >
                             <div className="contacto-chip-info">
                               <span className="contacto-chip-nombre">{ct.nombre || 'Sin nombre'}</span>
                               <span className="contacto-chip-celular">{ct.celular || 'Sin celular'}</span>
+                              {errCel && <span>{errCel}. Actualiza el contacto en Clientes.</span>}
                             </div>
                             {ct.email && <span className="contacto-chip-email">{ct.email}</span>}
                           </button>
@@ -497,7 +537,7 @@ export default function Mensajeria() {
                       }}
                     />
                     <FiCalendar size={14} />
-                    <span>Programar envío automático</span>
+                    <span>Programar apertura de WhatsApp</span>
                   </label>
                   {programar && (
                     <div className="programar-config">
@@ -510,15 +550,15 @@ export default function Mensajeria() {
                         onChange={(e) => setFechaProgramada(e.target.value)}
                       />
                       <span className="pista-form">
-                        El mensaje se abrirá automáticamente en WhatsApp a la hora indicada.
-                        Debes tener esta pestaña abierta.
+                        Mantén Mensajería abierta y permite ventanas emergentes.
+                        Confirma el envío en WhatsApp; si no se abre, usa «Abrir WhatsApp» en Programados.
                       </span>
                     </div>
                   )}
                 </div>
 
                 {errorForm && (
-                  <div className="mensaje-flash mensaje-error mensaje-flash-mejorado">
+                  <div className="mensaje-flash mensaje-error mensaje-flash-mejorado" role="alert">
                     <span className="mensaje-flash-icono"><FiAlertCircle /></span>
                     <span className="mensaje-flash-texto">{errorForm}</span>
                     <button className="mensaje-flash-cerrar" onClick={() => setErrorForm(null)}>
@@ -541,7 +581,7 @@ export default function Mensajeria() {
                   <button
                     className="btn-principal btn-enviar-whatsapp"
                     onClick={handleEnviar}
-                    disabled={enviando || !contactoSeleccionado || !mensaje.trim()}
+                    disabled={enviando}
                   >
                     <FiSend size={16} />
                     {enviando
@@ -613,7 +653,7 @@ export default function Mensajeria() {
         <div className="programados-tabla">
           <div className="programados-header-info">
             <h2>Envíos programados pendientes</h2>
-            <p>Estos mensajes se enviarán automáticamente a la hora indicada mientras tengas el ERP abierto.</p>
+            <p>Se intentará abrir WhatsApp a la hora indicada mientras Mensajería esté abierta. Confirma el envío allí. Si la ventana se bloquea, ábrela con el botón de la fila.</p>
           </div>
 
           {enviosPendientes.length === 0 ? (
@@ -649,11 +689,18 @@ export default function Mensajeria() {
                             <div className="programado-fecha">
                               <FiClock size={12} />
                               <span>{formatearFechaHora(e.programadoPara)}</span>
-                              {vencido && <span className="programado-vencido">(procesando...)</span>}
+                              {vencido && <span className="programado-vencido">(listo para abrir)</span>}
                             </div>
                           </td>
                           <td className="texto-truncado">{e.mensajePreview}</td>
                           <td className="texto-centro">
+                            <button
+                              className="btn-secundario btn-pequeno"
+                              onClick={() => abrirProgramado(e)}
+                              title="Abrir WhatsApp y confirmar el envío allí"
+                            >
+                              <FiSend size={14} /> Abrir WhatsApp
+                            </button>
                             <button
                               className="btn-accion btn-eliminar"
                               onClick={() => {

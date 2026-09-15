@@ -46,6 +46,24 @@
   //     ]
   //   },
   // ]
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "mensajeria",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "usuarioId", "order": "ASCENDING" },
+        { "fieldPath": "programadoPara", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "mensajeria",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "programadoPara", "order": "ASCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

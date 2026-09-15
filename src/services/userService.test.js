@@ -129,14 +129,14 @@ test('Marketing tiene lectura en Dashboard, Clientes y Perfil', () => {
   assert.equal(getRutaInicial(user), '/dashboard');
 });
 
-test('Jefe de Proyecto de Mina solo tiene Nube restringida a Técnica', () => {
+test('Jefe de Proyecto de Mina tiene Nube restringida a Proyectos y su Perfil', () => {
   const user = perfil('jefe_proyecto_mina');
 
   assert.equal(tienePermiso(user, 'nube'), true);
   assert.equal(tienePermiso(user, 'dashboard'), false);
-  assert.equal(tienePermiso(user, 'perfil'), false);
+  assert.equal(tienePermiso(user, 'perfil'), true);
   assert.equal(tienePermiso(user, 'mensajeria'), false);
-  assert.equal(getCarpetaNube(user), 'NOOVA SAC/03. TÉCNICA');
+  assert.equal(getCarpetaNube(user), 'NOOVA SAC/13. PROYECTOS');
   assert.equal(getRutaInicial(user), '/nube');
 });
 
@@ -171,7 +171,7 @@ test('cada rol usa su área y raíz lógica canónicas', () => {
       administrador: { area: 'administracion', nube: 'NOOVA SAC' },
       soporte_ti: { area: 'sistemas', nube: 'NOOVA SAC/10. SISTEMAS' },
       responsable_marketing: { area: 'marketing', nube: 'NOOVA SAC/04. MARKETING' },
-      jefe_proyecto_mina: { area: 'minas', nube: 'NOOVA SAC/03. TÉCNICA' }
+      jefe_proyecto_mina: { area: 'minas', nube: 'NOOVA SAC/13. PROYECTOS' }
     }
   );
 });

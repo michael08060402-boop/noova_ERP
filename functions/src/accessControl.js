@@ -75,10 +75,11 @@ const ROLES = {
     label: 'Jefe de Proyecto de Mina',
     areaPredeterminada: 'minas',
     permissions: {
-      nube: TODO
+      nube: TODO,
+      perfil: ['read', 'update']
     },
     configuracion: [],
-    nubeCarpeta: 'NOOVA SAC/03. TÉCNICA'
+    nubeCarpeta: 'NOOVA SAC/13. PROYECTOS'
   }
 };
 
