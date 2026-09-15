@@ -1,16 +1,14 @@
 import { db } from '../firebase/config';
 import {
   collection, addDoc, query, orderBy, limit, getDocs, where,
-  doc, updateDoc, deleteDoc
+  writeBatch
 } from 'firebase/firestore';
-import { sanitizarParaLog } from '../utils/validation';
+import { sanitizarParaLog, sanitizarTexto } from '../utils/validation';
 
 const COLLECTION = 'mensajeria';
 
 /**
- * Registra un envío de WhatsApp en el historial.
- * Si `programadoPara` es una fecha futura, se marca como 'pendiente'
- * y el worker local lo abrirá automáticamente cuando llegue la hora.
+ * Registra la apertura solicitada de WhatsApp o correo, no la entrega del mensaje.
  */
 export async function registrarEnvioMensaje({
   usuarioId,
@@ -19,14 +17,14 @@ export async function registrarEnvioMensaje({
   clienteNombre,
   contactoNombre,
   numeroDestino,
+  correoDestino = '',
+  canal = 'whatsapp',
+  asunto = '',
   mensajeCompleto,
   mensajePreview,
-  plantillaId = null,
-  programadoPara = null
+  plantillaId = null
 }) {
   const now = new Date();
-  const fechaProgramada = programadoPara ? new Date(programadoPara) : null;
-  const esProgramado = fechaProgramada && fechaProgramada > now;
 
   await addDoc(collection(db, COLLECTION), {
     usuarioId: sanitizarParaLog(usuarioId),
@@ -35,19 +33,17 @@ export async function registrarEnvioMensaje({
     clienteNombre: sanitizarParaLog(clienteNombre),
     contactoNombre: sanitizarParaLog(contactoNombre),
     numeroDestino: sanitizarParaLog(numeroDestino),
-    // Mensaje completo (necesario para reproducir envíos programados)
-    mensajeCompleto: sanitizarParaLog(mensajeCompleto).slice(0, 4000),
+    canal: canal === 'correo' ? 'correo' : 'whatsapp',
+    correoDestino: sanitizarParaLog(correoDestino),
+    asunto: sanitizarTexto(asunto, 160).replace(/[\r\n]/g, ' '),
+    mensajeCompleto: sanitizarTexto(mensajeCompleto, 4000),
     // Preview corto para listados
     mensajePreview: sanitizarParaLog(mensajePreview || mensajeCompleto).slice(0, 120),
     plantillaId: plantillaId ? sanitizarParaLog(plantillaId) : null,
     fecha: now.toISOString().split('T')[0],
     hora: now.toLocaleTimeString('es-PE', { hour12: false }),
     createdAt: now.toISOString(),
-    // Campos de programación
-    programado: !!esProgramado,
-    programadoPara: esProgramado ? fechaProgramada.toISOString() : null,
-    estado: esProgramado ? 'pendiente' : 'enviado',
-    enviadoEn: esProgramado ? null : now.toISOString()
+    estado: 'apertura_solicitada'
   });
 }
 
@@ -65,47 +61,26 @@ export async function getHistorialMensajes(limitCount = 50) {
 }
 
 /**
- * Obtiene los envíos programados pendientes (estado = 'pendiente').
- * Opcionalmente filtra por usuario.
+ * Elimina exactamente los documentos presentes al confirmar la limpieza.
+ * El historial es compartido; las reglas existentes verifican el permiso.
+ * Los mensajes creados después de esta lectura no se eliminan.
  */
-export async function getEnviosProgramados(usuarioId = null, limitCount = 50) {
-  let q;
-  if (usuarioId) {
-    q = query(
-      collection(db, COLLECTION),
-      where('estado', '==', 'pendiente'),
-      where('usuarioId', '==', usuarioId),
-      orderBy('programadoPara', 'asc'),
-      limit(limitCount)
-    );
-  } else {
-    q = query(
-      collection(db, COLLECTION),
-      where('estado', '==', 'pendiente'),
-      orderBy('programadoPara', 'asc'),
-      limit(limitCount)
-    );
+export async function limpiarHistorialMensajes() {
+  const snapshot = await getDocs(collection(db, COLLECTION));
+  let eliminados = 0;
+  try {
+    for (let inicio = 0; inicio < snapshot.docs.length; inicio += 400) {
+      const lote = snapshot.docs.slice(inicio, inicio + 400);
+      const batch = writeBatch(db);
+      lote.forEach(registro => batch.delete(registro.ref));
+      await batch.commit();
+      eliminados += lote.length;
+    }
+    return eliminados;
+  } catch (error) {
+    error.eliminados = eliminados;
+    throw error;
   }
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-}
-
-/**
- * Marca un envío programado como enviado.
- */
-export async function marcarComoEnviado(envioId) {
-  const now = new Date();
-  await updateDoc(doc(db, COLLECTION, envioId), {
-    estado: 'enviado',
-    enviadoEn: now.toISOString()
-  });
-}
-
-/**
- * Cancela (elimina) un envío programado pendiente.
- */
-export async function cancelarEnvioProgramado(envioId) {
-  await deleteDoc(doc(db, COLLECTION, envioId));
 }
 
 /**

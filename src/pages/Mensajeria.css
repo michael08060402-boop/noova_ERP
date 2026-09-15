@@ -27,179 +27,6 @@
   color: #d97706;
 }
 
-/* ── BADGE DE PROGRAMADOS ── */
-.badge-programados {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-left: 0.5rem;
-  padding: 0.15rem 0.5rem;
-  background: #fef3c7;
-  color: #92400e;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  border: 1px solid #fde68a;
-}
-
-/* ── TABS ── */
-.mensajeria-tabs {
-  display: flex;
-  gap: 0.25rem;
-  margin-bottom: 1rem;
-  border-bottom: 2px solid var(--gris-borde);
-  padding-bottom: 0;
-}
-
-.tab-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.625rem 1rem;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--texto-suave);
-  cursor: pointer;
-  transition: all 0.15s;
-  position: relative;
-}
-
-.tab-btn:hover {
-  color: var(--texto-medio);
-  background: var(--gris-fondo);
-}
-
-.tab-btn.activa {
-  color: var(--azul-primario);
-  border-bottom-color: var(--azul-primario);
-  font-weight: 600;
-}
-
-.tab-badge {
-  background: var(--azul-primario);
-  color: #fff;
-  font-size: 0.7rem;
-  padding: 0.1rem 0.4rem;
-  border-radius: 999px;
-  font-weight: 600;
-  min-width: 18px;
-  text-align: center;
-}
-
-/* ── PROGRAMAR ENVÍO ── */
-.composer-programar {
-  background: var(--gris-fondo);
-  border: 1px solid var(--gris-borde);
-  border-radius: 8px;
-  padding: 0.75rem;
-}
-
-.programar-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--texto-medio);
-}
-
-.programar-toggle input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--azul-primario);
-  cursor: pointer;
-}
-
-.programar-config {
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px dashed var(--gris-borde);
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.programar-datetime {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--gris-borde);
-  border-radius: 6px;
-  font-size: 0.875rem;
-  background: #fff;
-  color: var(--texto-oscuro);
-  box-sizing: border-box;
-  height: 38px;
-}
-
-.programar-datetime:focus {
-  outline: none;
-  border-color: var(--azul-primario);
-  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
-}
-
-/* ── TABLA DE PROGRAMADOS ── */
-.programados-header-info {
-  margin-bottom: 1rem;
-}
-
-.programados-header-info h2 {
-  margin: 0 0 0.25rem 0;
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--texto-oscuro);
-}
-
-.programados-header-info p {
-  margin: 0;
-  font-size: 0.82rem;
-  color: var(--texto-suave);
-}
-
-.programados-tabla .estado-vacio {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 3rem 1rem;
-}
-
-.programados-tabla .estado-vacio svg {
-  color: var(--texto-muy-suave);
-  opacity: 0.4;
-}
-
-.programado-fecha {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.8rem;
-  color: var(--texto-medio);
-  flex-wrap: wrap;
-}
-
-.programado-fecha svg {
-  color: var(--azul-primario);
-}
-
-.programado-vencido {
-  color: #d97706;
-  font-style: italic;
-  font-size: 0.72rem;
-}
-
-.fila-vencida {
-  background: #fffbeb !important;
-}
-
-.fila-vencida:hover {
-  background: #fef3c7 !important;
-}
-
 /* ── ESTADO EN HISTORIAL ── */
 .historial-item-footer {
   display: flex;
@@ -551,6 +378,7 @@
 
 .composer-acciones {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.875rem;
   padding-top: 0.5rem;
@@ -584,6 +412,7 @@
 
 .historial-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
   padding: 0.75rem 0.875rem;
@@ -666,6 +495,8 @@
 }
 
 .historial-numero {
+  overflow-wrap: anywhere;
+  min-width: 0;
   margin-left: auto;
   color: var(--azul-primario);
   font-family: 'Courier New', monospace;
@@ -688,6 +519,39 @@
 }
 
 /* ── RESPONSIVE ── */
+.composer-asunto {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--gris-borde);
+  border-radius: 8px;
+  font: inherit;
+  color: var(--texto-oscuro);
+  background: #fff;
+}
+
+.historial-limpiar {
+  margin-left: auto;
+}
+
+.historial-aviso {
+  margin: 0.75rem;
+  padding: 0.65rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.historial-aviso-success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.historial-aviso-error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
 @media (max-width: 1200px) {
   .mensajeria-layout {
     grid-template-columns: 240px 1fr;
