@@ -2,14 +2,15 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   FiBarChart2, FiUsers, FiFileText, FiSettings,
-  FiMenu, FiLogOut, FiUser, FiX, FiDollarSign, FiBell, FiTool,
+  FiMenu, FiLogOut, FiUser, FiX, FiChevronDown, FiDollarSign, FiBell, FiTool,
   FiWind, FiMessageCircle, FiCloud, FiShoppingCart, FiTruck, FiTrendingUp
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useCotizaciones } from '../hooks/useCotizaciones';
-import { puede } from '../services/userService';
+import { puede, ROLES, normalizarRol } from '../services/userService';
 import { obtenerCalibracionesProximas } from '../utils/calibracion';
-import logo from '../assets/logo-blanco.png';
+import ConfirmDialog from '../components/ConfirmDialog';
+import logo from '../assets/noova-logo.png';
 import '../styles/shared.css';
 import './DashboardLayout.css';
 import '../styles/paleta-preview.css';
@@ -49,10 +50,10 @@ export default function DashboardLayout() {
   const navigate = useNavigate();
   const esMobile = useEsMobile();
 
-  const [sidebarColapsado, setSidebarColapsado] = useState(false);
   const [sidebarMobileAbierto, setSidebarMobileAbierto] = useState(false);
 
   const [menuUsuarioAbierto, setMenuUsuarioAbierto] = useState(false);
+  const [confirmarCierreSesion, setConfirmarCierreSesion] = useState(false);
   const [notificacionesAbiertas, setNotificacionesAbiertas] = useState(false);
   const menuUsuarioRef = useRef(null);
   const notificacionesRef = useRef(null);
@@ -92,6 +93,8 @@ export default function DashboardLayout() {
     userProfile?.nombre ||
     currentUser?.email?.split('@')[0] ||
     'Usuario';
+  const rolUsuario = ROLES[normalizarRol(userProfile?.role)]?.label
+    || 'Sin rol asignado';
 
   const cotizacionesPendientes = puedeVerCotizaciones
     ? cotizaciones.filter((c) => c.estado === 'Borrador' || c.estado === 'Enviada')
@@ -121,14 +124,12 @@ export default function DashboardLayout() {
   const sidebarClase = [
     'sidebar',
     esMobile ? 'sidebar-mobile' : '',
-    esMobile && sidebarMobileAbierto ? 'sidebar-open' : '',
-    !esMobile && sidebarColapsado ? 'sidebar-collapsed' : ''
+    esMobile && sidebarMobileAbierto ? 'sidebar-open' : ''
   ].filter(Boolean).join(' ');
 
   const mainWrapperClase = [
     'main-wrapper',
-    !esMobile && sidebarColapsado ? 'main-wrapper-collapsed' : '',
-    !esMobile && !sidebarColapsado ? 'main-wrapper-expanded' : ''
+    !esMobile ? 'main-wrapper-expanded' : ''
   ].filter(Boolean).join(' ');
 
   return (
@@ -142,22 +143,16 @@ export default function DashboardLayout() {
 
       <aside className={sidebarClase}>
         <div className="sidebar-header">
-          <button
-            className="sidebar-collapse-btn"
-            onClick={() => {
-              if (esMobile) {
-                setSidebarMobileAbierto(false);
-              } else {
-                setSidebarColapsado((p) => !p);
-                requestAnimationFrame(() => {
-                  window.dispatchEvent(new Event('resize'));
-                });
-              }
-            }}
-            aria-label={sidebarColapsado ? 'Expandir' : 'Minimizar'}
-          >
-            {esMobile ? <FiX size={18} /> : <FiMenu size={16} />}
-          </button>
+          {esMobile && (
+            <button
+              type="button"
+              className="sidebar-close"
+              onClick={() => setSidebarMobileAbierto(false)}
+              aria-label="Cerrar menú"
+            >
+              <FiX size={18} />
+            </button>
+          )}
 
           <div className="sidebar-logo">
             <img className="sidebar-logo-img" src={logo} alt="Logo de Noova" />
@@ -173,7 +168,6 @@ export default function DashboardLayout() {
                 `nav-item ${isActive ? 'nav-item-active' : ''}`
               }
               onClick={() => esMobile && setSidebarMobileAbierto(false)}
-              title={sidebarColapsado ? item.label : undefined}
             >
               <span className="nav-icon">{item.icon}</span>
               <span className="nav-label">{item.label}</span>
@@ -182,68 +176,31 @@ export default function DashboardLayout() {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="sidebar-user-wrapper" ref={menuUsuarioRef}>
-            <button
-              className="sidebar-user-trigger"
-              onClick={() => setMenuUsuarioAbierto((p) => !p)}
-              title={nombreUsuario}
-            >
-              <div className="user-icono">
-                <FiUser size={18} />
-              </div>
-
-              <div className="user-info">
-                <span className="user-name">{nombreUsuario}</span>
-                <span className="user-email-text">{currentUser?.email}</span>
-              </div>
-            </button>
-
-            {menuUsuarioAbierto && (
-              <div className="user-dropdown">
-                <div className="dropdown-header">
-                  <span className="dropdown-name">{nombreUsuario}</span>
-                  <span className="dropdown-email">{currentUser?.email}</span>
-                </div>
-
-                {puedeVerPerfil && (
-                  <>
-                    <div className="dropdown-divider" />
-                    <button
-                      className="dropdown-item"
-                      onClick={() => {
-                        setMenuUsuarioAbierto(false);
-                        navigate('/perfil');
-                      }}
-                    >
-                      <FiUser size={16} />
-                      <span>Mi Perfil</span>
-                    </button>
-                  </>
-                )}
-
-                <div className="dropdown-divider" />
-
-                <button
-                  className="dropdown-item dropdown-item-danger"
-                  onClick={() => {
-                    setMenuUsuarioAbierto(false);
-                    cerrarSesion();
-                  }}
-                >
-                  <FiLogOut size={16} />
-                  <span>Cerrar Sesión</span>
-                </button>
-              </div>
-            )}
-          </div>
+          <button
+            type="button"
+            className="sidebar-logout"
+            onClick={() => setConfirmarCierreSesion(true)}
+          >
+            <FiLogOut size={15} />
+            <span>Cerrar Sesión</span>
+          </button>
 
           <div className="sidebar-copyright">
-            {sidebarColapsado
-              ? new Date().getFullYear()
-              : `© ${new Date().getFullYear()} NOOVA S.A.C.`}
+            {`© ${new Date().getFullYear()} NOOVA S.A.C.`}
           </div>
         </div>
       </aside>
+
+      <ConfirmDialog
+        isOpen={confirmarCierreSesion}
+        onClose={() => setConfirmarCierreSesion(false)}
+        onConfirm={cerrarSesion}
+        title="¿Cerrar sesión?"
+        message="Se cerrará tu sesión actual y tendrás que volver a iniciar sesión para acceder al sistema."
+        confirmLabel="Cerrar Sesión"
+        busyLabel="Cerrando sesión…"
+        icon={<FiLogOut size={42} strokeWidth={1.8} />}
+      />
 
       <div className={mainWrapperClase}>
         <header className="topbar">
@@ -308,6 +265,58 @@ export default function DashboardLayout() {
                 )}
               </div>
             )}
+
+            <div className="topbar-user-wrapper" ref={menuUsuarioRef}>
+              <button
+                className="topbar-user-trigger"
+                onClick={() => setMenuUsuarioAbierto((p) => !p)}
+                title={nombreUsuario}
+                aria-label="Menú de usuario"
+              >
+                <span className="topbar-user-icon">
+                  <FiUser size={17} />
+                </span>
+                <span className="topbar-user-data">
+                  <span className="topbar-user-name">{nombreUsuario}</span>
+                  <span className="topbar-user-role">{rolUsuario}</span>
+                </span>
+                <FiChevronDown
+                  className={`topbar-user-chevron ${menuUsuarioAbierto ? 'topbar-user-chevron-open' : ''}`}
+                  size={15}
+                  aria-hidden="true"
+                />
+              </button>
+
+              {menuUsuarioAbierto && (
+                <div className="user-dropdown topbar-user-dropdown">
+                  <div className="dropdown-header">
+                    <div className="dropdown-profile">
+                      <div className="dropdown-profile-data">
+                        <span className="dropdown-name">{nombreUsuario}</span>
+                        <span className="dropdown-email">{currentUser?.email}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {puedeVerPerfil && (
+                    <>
+                      <div className="dropdown-divider" />
+                      <button
+                        className="dropdown-item"
+                        onClick={() => {
+                          setMenuUsuarioAbierto(false);
+                          navigate('/perfil');
+                        }}
+                      >
+                        <FiUser size={16} />
+                        <span>Mi Perfil</span>
+                      </button>
+                    </>
+                  )}
+
+                </div>
+              )}
+            </div>
           </div>
         </header>
 

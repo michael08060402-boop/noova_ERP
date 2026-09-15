@@ -86,6 +86,7 @@ export default function Configuracion() {
       setLogs(data);
     } catch (err) {
       console.error('Error cargando logs:', err);
+      setMensaje({ tipo: 'error', texto: 'No se pudo actualizar el historial de auditoría. Intenta actualizar nuevamente.' });
     } finally {
       setCargandoLogs(false);
     }
@@ -781,17 +782,21 @@ export default function Configuracion() {
 
           {pestanaActiva === 'logs' && puedeLogs && (
             <div className="config-seccion">
-              <div className="seccion-header">
+              <div className="seccion-header auditoria-header">
                 <h2 className="seccion-titulo">
                   Registro de Auditoría
                 </h2>
 
+                <div className="auditoria-acciones">
                 <button
-                  className="btn-secundario btn-pequeno"
+                  type="button"
+                  className="btn-secundario auditoria-boton"
                   onClick={cargarLogs}
+                  disabled={cargandoLogs}
                 >
                   Actualizar
                 </button>
+                </div>
               </div>
 
               {cargandoLogs ? (

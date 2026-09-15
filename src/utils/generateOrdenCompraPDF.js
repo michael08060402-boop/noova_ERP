@@ -70,7 +70,10 @@ function dibujarMarca(doc, empresa, logo) {
   doc.rect(112, 10, 90, 30, 'F');
   doc.triangle(112, 10, 94, 40, 112, 40, 'F');
 
-  doc.addImage(logo, 'PNG', 9, 21, 46, 24, undefined, 'FAST');
+  const logoProps = doc.getImageProperties(logo);
+  const logoHeight = 24;
+  const logoWidth = logoHeight * logoProps.width / logoProps.height;
+  doc.addImage(logo, 'PNG', 9 + (46 - logoWidth) / 2, 21, logoWidth, logoHeight, undefined, 'FAST');
 
   const empresaX = 118;
   texto(doc, (empresa.razonSocial || 'CONTRATISTA GENERALES NOOVA S.A.C.').toUpperCase(), empresaX, 17, { bold: true, size: 8.5, color: [255, 255, 255] });

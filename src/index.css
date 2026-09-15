@@ -7,12 +7,12 @@
 }
 
 :root {
-  --color-primary: #1d4ed8;
-  --color-primary-light: #3b82f6;
-  --color-primary-lighter: #60a5fa;
-  --color-primary-dark: #1e3a8a;
+  --color-primary: #064C70;
+  --color-primary-light: #079BB5;
+  --color-primary-lighter: #79c6d4;
+  --color-primary-dark: #053c59;
 
-  --color-accent: #ece63e;
+  --color-accent: #C8D91E;
 
   --color-white: #ffffff;
   --color-gray-50: #f9fafb;
