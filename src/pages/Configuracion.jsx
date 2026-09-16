@@ -871,7 +871,7 @@ export default function Configuracion() {
           )}
 
           {pestanaActiva === 'perfil' && puedePerfil && (
-            <div className="config-seccion config-seccion-perfil">
+            <div className="config-seccion-perfil">
               <Perfil embebido />
             </div>
           )}

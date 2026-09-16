@@ -10,10 +10,11 @@ import { calcularTotalesOrden, validarOrdenCompra } from '../utils/ordenCompra';
 import { downloadOrdenCompraPDF } from '../utils/generateOrdenCompraPDF';
 import { formatDate, formatDateISO } from '../utils/formatDate';
 import { addLog } from '../services/logService';
-import { LISTA_PRECIOS_PARTNER_2026, buscarProductoPartner } from '../data/preciosPartner2026';
+import { buscarProductoPartner } from '../data/preciosPartner2026';
 import { FIRMANTES } from '../data/firmantes';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Loading from '../components/Loading';
+import CompraProductoSelector from '../components/CompraProductoSelector';
 import '../styles/shared.css';
 import './Compras.css';
 
@@ -451,21 +452,14 @@ export default function Compras() {
           <div className="form-card-body">
           <div className="compras-items-header"><span className="texto-suave">Productos y servicios a comprar</span><button type="button" className="btn-secundario btn-pequeno" onClick={agregarItem}><FiPlus size={14} /> Agregar ítem</button></div>
           {errores.items && <span className="mensaje-error">{errores.items}</span>}
-          <datalist id="catalogo-partner-2026">
-            {LISTA_PRECIOS_PARTNER_2026.map((producto) => (
-              <option key={producto.codigo} value={producto.codigo}>{producto.descripcion}</option>
-            ))}
-          </datalist>
           <div className="tabla-contenedor compras-items-wrap">
             <table className="compras-items"><thead><tr><th>Código</th><th>Descripción *</th><th>U.M.</th><th>Cant.</th><th>Precio Partner / compra</th><th>Total</th><th></th></tr></thead><tbody>
               {form.items.map((item, index) => (
-                <tr key={`${index}-${item.codigo}`}>
+                <tr key={index}>
                   <td>
-                    <input
-                      list="catalogo-partner-2026"
+                    <CompraProductoSelector
                       value={item.codigo}
-                      onChange={(event) => actualizarCodigoItem(index, event.target.value)}
-                      placeholder="Código Testo o manual"
+                      onChange={(codigo) => actualizarCodigoItem(index, codigo)}
                     />
                   </td>
                   <td><textarea rows="2" value={item.descripcion} onChange={(event) => actualizarItem(index, 'descripcion', event.target.value)} /></td>

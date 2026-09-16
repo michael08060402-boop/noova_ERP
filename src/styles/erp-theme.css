@@ -39,6 +39,10 @@
   border-color: #134b6b;
 }
 .dashboard-layout.paleta-preview .form-card-header h3 { color: #fff; }
+.dashboard-layout.paleta-preview .form-card-header .form-card-icon {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
 .dashboard-layout.paleta-preview .tabla-datos thead tr { border-color: #134b6b; }
 .dashboard-layout.paleta-preview :is(.tabla-datos td, .nube-item) { border-color: var(--dashboard-line); }
 .dashboard-layout.paleta-preview :is(.tabla-datos tbody tr:hover, .nube-item:hover) { background: #edf6fb; }

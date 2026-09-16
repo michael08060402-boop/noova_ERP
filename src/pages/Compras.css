@@ -152,13 +152,38 @@
 .compras-items { min-width: 870px; width: 100%; border-collapse: collapse; }
 .compras-items th { background: #eef0f3; padding: .65rem .55rem; text-align: left; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; color: var(--texto-medio); border-bottom: 1px solid var(--gris-borde); }
 .compras-items td { padding: .55rem .45rem; border-top: 1px solid var(--gris-borde-claro); vertical-align: middle; }
-.compras-items th:nth-child(1), .compras-items td:nth-child(1) { width: 110px; }
+.compras-items th:nth-child(1), .compras-items td:nth-child(1) { width: 200px; min-width: 180px; }
 .compras-items th:nth-child(3), .compras-items td:nth-child(3) { width: 80px; }
 .compras-items th:nth-child(4), .compras-items td:nth-child(4) { width: 85px; }
 .compras-items th:nth-child(5), .compras-items td:nth-child(5) { width: 120px; }
 .compras-items input, .compras-items textarea { width: 100%; padding: .45rem .5rem; border: 1px solid var(--gris-borde); border-radius: 6px; font-size: .82rem; resize: vertical; }
 .compras-check { display: flex; align-items: center; gap: .5rem; font-size: .84rem; color: var(--texto-medio); margin: .65rem 0; }
 .compras-btn-observaciones { align-self: flex-start; }
+
+.compra-productos-lista {
+  position: fixed;
+  z-index: 1200;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: #fff;
+  border: 1px solid #d5e3ed;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px #08264d26;
+  font-size: 14px;
+}
+.compra-producto-opcion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f3f7;
+  cursor: pointer;
+}
+.compra-producto-opcion:hover,
+.compra-producto-opcion[aria-selected="true"] { background: #eef5ff; }
+.compra-producto-codigo { flex-shrink: 0; color: #0755ff; }
+.compra-producto-descripcion { color: #064c70; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compra-productos-vacio { padding: 12px; color: #506584; }
 
 /* ── SELECTOR DE COTIZACIÓN DE ORIGEN (combobox propio) ── */
 .combo-selector { position: relative; }

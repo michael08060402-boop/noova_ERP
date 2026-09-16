@@ -93,6 +93,10 @@ body {
   border-radius: var(--radius-md);
 }
 
+#root .sidebar .nav-item-active {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
 #root :is(.form-card, .tarjeta-tabla, .chart-card, .dashboard-kpi,
   .actividad-reciente, .config-seccion, .perfil-card, .venta-card,
   .modal, .modal-container, .confirm-dialog, .login-form-container,

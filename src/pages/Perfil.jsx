@@ -331,7 +331,7 @@ export default function Perfil({ embebido = false }) {
   }
 
   return (
-    <div className="pagina">
+    <div className="pagina perfil-pagina">
       {!embebido && (
         <div className="pagina-header">
           <div>
@@ -351,7 +351,8 @@ export default function Perfil({ embebido = false }) {
         </div>
       )}
 
-      <div className="perfil-card">
+      <div className={`perfil-grid ${!puedeEditarPerfil ? 'perfil-grid-solo-datos' : ''}`}>
+      <div className="perfil-card perfil-datos">
         <div className="perfil-avatar-section">
           <img className="perfil-logo" src={logo} alt="Noova" />
           <div className="perfil-avatar-info">
@@ -524,7 +525,7 @@ export default function Perfil({ embebido = false }) {
       </div>
 
       {puedeEditarPerfil && (
-        <div className="perfil-card">
+        <div className="perfil-card perfil-seguridad">
           <h2 className="perfil-seccion-titulo">Seguridad</h2>
 
           {editandoPassword ? (
@@ -608,6 +609,7 @@ export default function Perfil({ embebido = false }) {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

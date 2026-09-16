@@ -2,11 +2,23 @@
    PERFIL - Tarjeta de perfil de usuario
    ==================================================== */
 
+.perfil-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.perfil-grid-solo-datos {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .perfil-card {
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  padding: 1.75rem;
+  padding: 1.25rem;
+  min-width: 0;
   width: 100%;
   max-width: none;
   box-sizing: border-box;
@@ -17,15 +29,15 @@
   display: flex;
   align-items: center;
   gap: 1rem;
-  min-height: 92px;
-  padding-bottom: 1.4rem;
-  margin-bottom: 1.4rem;
+  min-height: 72px;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
   border-bottom: 1px solid #e5e7eb;
 }
 
 .perfil-logo {
-  width: 104px;
-  height: 90px;
+  width: 84px;
+  height: 72px;
   object-fit: contain;
   border-radius: 8px;
   flex-shrink: 0;
@@ -35,6 +47,8 @@
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .perfil-name {
@@ -82,9 +96,11 @@
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  flex-wrap: wrap;
 }
 .email-solo-lectura-wrap input {
-  flex: 1;
+  flex: 1 1 160px;
+  min-width: 0;
 }
 .email-edicion {
   display: flex;
@@ -94,8 +110,18 @@
   width: 100%;
 }
 
-.perfil-card + .perfil-card {
-  margin-top: 1.75rem;
+.perfil-seguridad .fila-form {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.perfil-grid .acciones-form {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 1100px) {
+  .perfil-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* ── SEGURIDAD / CONTRASEÑA ── */
