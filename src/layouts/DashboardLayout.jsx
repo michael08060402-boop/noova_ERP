@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   FiBarChart2, FiUsers, FiFileText, FiSettings,
   FiMenu, FiLogOut, FiUser, FiX, FiChevronDown, FiDollarSign, FiBell, FiTool,
-  FiWind, FiMessageCircle, FiCloud, FiShoppingCart, FiTruck, FiTrendingUp
+  FiWind, FiMessageCircle, FiCloud, FiShoppingCart, FiTruck, FiTrendingUp, FiSearch, FiCalendar
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useCotizaciones } from '../hooks/useCotizaciones';
@@ -11,6 +11,7 @@ import { puede, ROLES, normalizarRol } from '../services/userService';
 import { obtenerCalibracionesProximas } from '../utils/calibracion';
 import ConfirmDialog from '../components/ConfirmDialog';
 import logo from '../assets/noova-logo.png';
+import logoBlanco from '../assets/logo-blanco.png';
 import '../styles/shared.css';
 import './DashboardLayout.css';
 import '../styles/paleta-preview.css';
@@ -30,6 +31,13 @@ const ITEMS_MENU = [
   { path: '/configuracion', label: 'Configuración', icon: <FiSettings />, key: 'configuracion' }
 ];
 
+const GRUPOS_MENU = [
+  { id: 'comercial', label: 'Comercial y clientes', keys: ['dashboard', 'clientes', 'cotizaciones', 'ventas'] },
+  { id: 'operaciones', label: 'Operaciones y servicios', keys: ['equipos', 'mangas'] },
+  { id: 'logistica', label: 'Logística y facturación', keys: ['proveedores', 'compras', 'facturacion'] },
+  { id: 'sistema', label: 'Comunicación y archivos', keys: ['mensajeria', 'nube'] }
+];
+
 function useEsMobile() {
   const [esMobile, setEsMobile] = useState(() => window.innerWidth < 1024);
 
@@ -46,8 +54,13 @@ export default function DashboardLayout() {
   const { currentUser, userProfile, logout } = useAuth();
   const puedeVerCotizaciones = puede(userProfile, 'cotizaciones', 'read');
   const puedeVerPerfil = puede(userProfile, 'perfil', 'read');
+  const puedeVerConfiguracion = puede(userProfile, 'configuracion', 'read');
   const { cotizaciones, fetchCotizaciones } = useCotizaciones(puedeVerCotizaciones);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const esDashboard = pathname === '/dashboard' || pathname === '/dashboard/';
+  const [busquedaModulo, setBusquedaModulo] = useState('');
+  const [gruposCerrados, setGruposCerrados] = useState({});
   const esMobile = useEsMobile();
 
   const [sidebarMobileAbierto, setSidebarMobileAbierto] = useState(false);
@@ -132,8 +145,24 @@ export default function DashboardLayout() {
     !esMobile ? 'main-wrapper-expanded' : ''
   ].filter(Boolean).join(' ');
 
+  const renderItemMenu = (item) => (
+    <NavLink
+      key={item.path}
+      to={item.path}
+      className={({ isActive }) => `nav-item ${isActive ? 'nav-item-active' : ''}`}
+      onClick={() => esMobile && setSidebarMobileAbierto(false)}
+    >
+      <span className="nav-icon">{item.icon}</span>
+      <span className="nav-label">{item.label}</span>
+    </NavLink>
+  );
+  const normalizarBusqueda = (texto) => texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const resultadosModulos = itemsMenu.filter((item) =>
+    normalizarBusqueda(item.label).includes(normalizarBusqueda(busquedaModulo.trim()))
+  );
+
   return (
-    <div className="dashboard-layout paleta-preview">
+    <div className={`dashboard-layout paleta-preview ${esDashboard ? 'dashboard-reference' : ''}`}>
       {esMobile && sidebarMobileAbierto && (
         <div
           className="sidebar-overlay"
@@ -155,24 +184,33 @@ export default function DashboardLayout() {
           )}
 
           <div className="sidebar-logo">
-            <img className="sidebar-logo-img" src={logo} alt="Logo de Noova" />
+            <img className="sidebar-logo-img" src={esDashboard ? logoBlanco : logo} alt="NOOVA Consulting" />
           </div>
         </div>
 
-        <nav className="sidebar-nav">
-          {itemsMenu.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) =>
-                `nav-item ${isActive ? 'nav-item-active' : ''}`
-              }
-              onClick={() => esMobile && setSidebarMobileAbierto(false)}
-            >
-              <span className="nav-icon">{item.icon}</span>
-              <span className="nav-label">{item.label}</span>
-            </NavLink>
-          ))}
+        <nav className="sidebar-nav" aria-label="Navegación principal">
+          {GRUPOS_MENU.map((grupo) => {
+            const items = grupo.keys.map((key) => itemsMenu.find((item) => item.key === key)).filter(Boolean);
+            const abierto = !gruposCerrados[grupo.id];
+            const activo = items.some((item) => pathname === item.path || pathname.startsWith(`${item.path}/`));
+            return items.length > 0 && (
+              <div className="sidebar-nav-group" key={grupo.id}>
+                <button
+                  type="button"
+                  className={`sidebar-group-toggle ${activo ? 'sidebar-group-active' : ''}`}
+                  aria-expanded={abierto}
+                  aria-controls={`sidebar-group-${grupo.id}`}
+                  onClick={() => setGruposCerrados((actual) => ({ ...actual, [grupo.id]: abierto }))}
+                >
+                  <span>{grupo.label}</span>
+                  <FiChevronDown aria-hidden="true" />
+                </button>
+                <div id={`sidebar-group-${grupo.id}`} hidden={!abierto}>
+                  {items.map(renderItemMenu)}
+                </div>
+              </div>
+            );
+          })}
         </nav>
 
         <div className="sidebar-footer">
@@ -214,10 +252,56 @@ export default function DashboardLayout() {
                 <FiMenu size={20} />
               </button>
             )}
-            <span className="topbar-title">ERP NOOVA S.A.C.</span>
+            <div className="topbar-brand">
+              <span className="topbar-title">ERP NOOVA S.A.C.</span>
+            </div>
           </div>
 
+          {esDashboard && (
+            <div className="dashboard-module-search" role="search">
+              <FiSearch aria-hidden="true" />
+              <input
+                type="search"
+                aria-label="Buscar módulo del ERP"
+                placeholder="Buscar módulo del ERP…"
+                value={busquedaModulo}
+                onChange={(event) => setBusquedaModulo(event.target.value)}
+                onKeyDown={(event) => { if (event.key === 'Escape') setBusquedaModulo(''); }}
+              />
+              {busquedaModulo.trim() && (
+                <div className="dashboard-search-results">
+                  {resultadosModulos.length ? resultadosModulos.map((item) => (
+                    <NavLink key={item.path} to={item.path} onClick={() => setBusquedaModulo('')}>
+                      {item.icon}<span>{item.label}</span>
+                    </NavLink>
+                  )) : <p role="status">No se encontraron módulos.</p>}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="topbar-actions">
+            {esDashboard && (
+              <time className="dashboard-current-month" dateTime={new Date().toISOString().slice(0, 7)}>
+                <FiCalendar aria-hidden="true" />
+                {new Date().toLocaleDateString('es-PE', { month: 'long', year: 'numeric' })}
+              </time>
+            )}
+            {puedeVerConfiguracion && (
+              <NavLink
+                to="/configuracion"
+                className={({ isActive }) => `topbar-settings ${isActive ? 'topbar-settings-active' : ''}`}
+                aria-label="Configuración"
+                title="Configuración"
+                onClick={() => {
+                  setSidebarMobileAbierto(false);
+                  setMenuUsuarioAbierto(false);
+                  setNotificacionesAbiertas(false);
+                }}
+              >
+                <FiSettings size={19} aria-hidden="true" />
+              </NavLink>
+            )}
             {puedeVerCotizaciones && (
               <div className="notification-wrapper" ref={notificacionesRef}>
                 <button
@@ -227,6 +311,7 @@ export default function DashboardLayout() {
                     fetchCotizaciones();
                   }}
                   aria-label="Notificaciones"
+                  aria-expanded={notificacionesAbiertas}
                 >
                   <FiBell size={18} />
                   {notificacionesPendientes.length > 0 && (
@@ -272,9 +357,12 @@ export default function DashboardLayout() {
                 onClick={() => setMenuUsuarioAbierto((p) => !p)}
                 title={nombreUsuario}
                 aria-label="Menú de usuario"
+                aria-expanded={menuUsuarioAbierto}
               >
                 <span className="topbar-user-icon">
-                  <FiUser size={17} />
+                  {esDashboard
+                    ? nombreUsuario.trim().split(/\s+/).slice(0, 2).map((nombre) => nombre[0]).join('').toUpperCase()
+                    : <FiUser size={17} />}
                 </span>
                 <span className="topbar-user-data">
                   <span className="topbar-user-name">{nombreUsuario}</span>

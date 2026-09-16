@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiArrowRight, FiFileText, FiCheckCircle, FiTrendingUp, FiTool } from 'react-icons/fi';
+import { FiArrowRight, FiFileText, FiCheckCircle, FiTrendingUp, FiTool, FiBarChart2, FiPieChart, FiShoppingCart, FiUsers } from 'react-icons/fi';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, ArcElement, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { useClientes } from '../hooks/useClientes';
@@ -21,10 +21,10 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, PointElemen
 const COLORES = {
   azulPrimario: '#064C70',
   azulOscuro: '#079BB5',
-  verde: '#62977b',
-  rojo: '#bb5b53',
+  verde: '#00a66c',
+  rojo: '#ef5777',
   amarillo: '#C8D91E',
-  gris: '#7893a0'
+  gris: '#9aadc4'
 };
 
 const ESTADOS = ['Generada', 'Aceptada', 'Error', 'Cancelada'];
@@ -48,29 +48,32 @@ const COLORES_CATEGORIAS = [COLORES.azulPrimario, COLORES.azulOscuro, COLORES.am
 const opcionesGrafico = {
   responsive: true,
   maintainAspectRatio: false,
+  animation: false,
   plugins: { legend: { display: false } },
   scales: {
-    x: { grid: { display: false }, ticks: { color: '#61736a', font: { size: 11 } } },
-    y: { grid: { color: 'rgba(54,94,76,0.07)' }, ticks: { color: '#61736a', font: { size: 11 }, stepSize: 1 }, beginAtZero: true }
+    x: { grid: { display: false }, ticks: { color: '#506584', font: { size: 11 } } },
+    y: { grid: { color: '#eaf0f7' }, ticks: { color: '#506584', font: { size: 11 }, stepSize: 1 }, beginAtZero: true }
   }
 };
 
 const opcionesDoughnut = {
   responsive: true,
   maintainAspectRatio: false,
-  cutout: '65%',
+  animation: false,
+  cutout: '70%',
   plugins: { legend: { display: false } }
 };
 
 const opcionesLine = {
   responsive: true,
   maintainAspectRatio: false,
+  animation: false,
   plugins: {
-    legend: { position: 'top', align: 'end', labels: { usePointStyle: true, pointStyleWidth: 10, font: { size: 11 }, padding: 16 } }
+    legend: { display: false }
   },
   scales: {
-    x: { grid: { display: false }, ticks: { color: '#61736a', font: { size: 10 } } },
-    y: { grid: { color: 'rgba(54,94,76,0.07)' }, ticks: { color: '#61736a', font: { size: 11 }, stepSize: 1 }, beginAtZero: true }
+    x: { grid: { display: false }, ticks: { color: '#506584', font: { size: 10 } } },
+    y: { grid: { color: '#eaf0f7' }, ticks: { color: '#506584', font: { size: 11 }, stepSize: 1 }, beginAtZero: true }
   }
 };
 
@@ -155,7 +158,7 @@ export default function Dashboard() {
         Generada: 'Pendientes',
         Aceptada: 'Aprobadas',
         Error: 'Rechazadas',
-        Cancelada: 'Vencidas'
+        Cancelada: 'Canceladas'
       }[estado],
       cantidad: conteoEstados[estado],
       porcentaje: total ? Math.round((conteoEstados[estado] / total) * 100) : 0,
@@ -163,7 +166,7 @@ export default function Dashboard() {
     }));
   }, [conteoEstados]);
 
-  const ultimos6Meses = useMemo(() => {
+  const ultimos12Meses = useMemo(() => {
     const meses = [];
     for (let i = 11; i >= 0; i--) {
       const d = new Date(anioActual, mesActual - i, 1);
@@ -177,32 +180,32 @@ export default function Dashboard() {
   }, [anioActual, mesActual]);
 
   const datosMensuales = useMemo(() => ({
-    labels: ultimos6Meses.map(m => m.label),
+    labels: ultimos12Meses.map(m => m.label),
     datasets: [
       {
         label: 'Cotizaciones',
-        data: ultimos6Meses.map(m => cotizaciones.filter(c => {
+        data: ultimos12Meses.map(m => cotizaciones.filter(c => {
           const d = parseFechaLocal(c.fechaEmision || c.fecha || c.createdAt);
           return d.getMonth() === m.month && d.getFullYear() === m.year;
         }).length),
-        backgroundColor: '#2187e8',
+        backgroundColor: '#064770',
         borderRadius: 4,
-        barThickness: 13
+        maxBarThickness: 17
       },
       {
         label: 'Aprobadas',
-        data: ultimos6Meses.map(m => cotizaciones.filter(c => {
+        data: ultimos12Meses.map(m => cotizaciones.filter(c => {
           const d = parseFechaLocal(c.fechaEmision || c.fecha || c.createdAt);
           return ['Aceptada', 'Aprobada'].includes(c.estado)
             && d.getMonth() === m.month
             && d.getFullYear() === m.year;
         }).length),
-        backgroundColor: '#17b77a',
+        backgroundColor: '#00a66c',
         borderRadius: 4,
-        barThickness: 13
+        maxBarThickness: 17
       }
     ]
-  }), [ultimos6Meses, cotizaciones]);
+  }), [ultimos12Meses, cotizaciones]);
 
   const conteoCategorias = useMemo(() => {
     return equipos.reduce((acc, equipo) => {
@@ -240,12 +243,12 @@ export default function Dashboard() {
   );
 
   const datosVentasMensuales = useMemo(() => ({
-    labels: ultimos6Meses.map((m) => m.label),
+    labels: ultimos12Meses.map((m) => m.label),
     datasets: [{
       label: 'Ventas confirmadas',
-      data: ultimos6Meses.map((m) => cotizaciones.filter((cot) => {
-        const fecha = parseFechaLocal(cot.fechaEmision || cot.fecha || cot.createdAt);
-        return cot.estado === 'Aprobada'
+      data: ultimos12Meses.map((m) => cotizaciones.filter((cot) => {
+        const fecha = parseFechaLocal(cot.fechaAceptacion || cot.fechaEmision || cot.fecha || cot.createdAt);
+        return ['Aceptada', 'Aprobada'].includes(cot.estado)
           && fecha.getMonth() === m.month
           && fecha.getFullYear() === m.year;
       }).length),
@@ -256,21 +259,21 @@ export default function Dashboard() {
       pointRadius: 3,
       borderWidth: 2
     }]
-  }), [ultimos6Meses, cotizaciones]);
+  }), [ultimos12Meses, cotizaciones]);
 
   const datosComprasMensuales = useMemo(() => ({
-    labels: ultimos6Meses.map((m) => m.label),
+    labels: ultimos12Meses.map((m) => m.label),
     datasets: [{
       label: 'Órdenes de compra',
-      data: ultimos6Meses.map((m) => ordenes.filter((orden) => {
+      data: ultimos12Meses.map((m) => ordenes.filter((orden) => {
         const fecha = parseFechaLocal(orden.fecha || orden.createdAt);
         return fecha.getMonth() === m.month && fecha.getFullYear() === m.year;
       }).length),
-      backgroundColor: '#ff873d',
+      backgroundColor: '#f58b14',
       borderRadius: 4,
-      barThickness: 22
+      maxBarThickness: 28
     }]
-  }), [ultimos6Meses, ordenes]);
+  }), [ultimos12Meses, ordenes]);
 
   const clientesDestacados = useMemo(() => {
     const conteo = cotizaciones.reduce((acumulado, cotizacion) => {
@@ -292,6 +295,20 @@ export default function Dashboard() {
       .slice(0, 5);
   }, [cotizaciones, rankingClientes]);
 
+  const cotizacionesMesAnterior = useMemo(() => {
+    const anterior = new Date(anioActual, mesActual - 1, 1);
+    return cotizaciones.filter((cotizacion) => {
+      const fecha = parseFechaLocal(cotizacion.fechaEmision || cotizacion.fecha || cotizacion.createdAt);
+      return fecha.getMonth() === anterior.getMonth() && fecha.getFullYear() === anterior.getFullYear();
+    }).length;
+  }, [cotizaciones, mesActual, anioActual]);
+  const variacionCotizaciones = cotizacionesMesAnterior
+    ? Math.round(((cotizacionesMes.length - cotizacionesMesAnterior) / cotizacionesMesAnterior) * 100)
+    : null;
+  const totalCotizacionesMes = cotizacionesMes.reduce((total, cotizacion) => total + (Number(cotizacion.total) || 0), 0);
+  const totalVentasMes = ventasMes.reduce((total, cotizacion) => total + (Number(cotizacion.total) || 0), 0);
+  const rangoGraficos = `${NOMBRES_MESES[ultimos12Meses[0].month]} ${ultimos12Meses[0].year} – ${NOMBRES_MESES[mesActual]} ${anioActual}`;
+
   // --- Render ---
   if (cargandoClientes || cargandoCotizaciones || cargandoEquipos || cargandoOrdenes) {
     return <Loading message="Cargando dashboard..." />;
@@ -305,67 +322,93 @@ export default function Dashboard() {
 
   return (
     <div className="pagina dashboard">
+      <header className="dashboard-heading">
+        <div>
+          <h1>Dashboard Principal</h1>
+        </div>
+      </header>
+
       <div className="dashboard-kpis" aria-label="Indicadores principales">
-        {puedeVerCotizaciones && (
-          <div className="dashboard-kpi">
-            <div className="dashboard-kpi-icon dashboard-kpi-icon-blue"><FiFileText /></div>
-            <div className="dashboard-kpi-content">
-              <span>Cotizaciones del mes</span>
-              <strong>{cotizacionesMes.length}</strong>
-              <small className="dashboard-kpi-amount">{formatCurrency(cotizacionesMes.reduce((sum, cotizacion) => sum + (cotizacion.total || 0), 0))}</small>
-            </div>
-          </div>
-        )}
-        {puedeVerCotizaciones && (
-          <div className="dashboard-kpi">
-            <div className="dashboard-kpi-icon dashboard-kpi-icon-green"><FiCheckCircle /></div>
-            <div className="dashboard-kpi-content">
-              <span>Tasa de aceptación</span>
-              <strong>{tasaAceptacion}%</strong>
-              <small>{ventasAprobadas.length} aprobadas</small>
-            </div>
-          </div>
-        )}
-        {puedeVerCotizaciones && (
-          <div className="dashboard-kpi">
-            <div className="dashboard-kpi-icon dashboard-kpi-icon-orange"><FiTrendingUp /></div>
-            <div className="dashboard-kpi-content">
-              <span>Ventas del mes</span>
-              <strong>{ventasMes.length}</strong>
-              <small className="dashboard-kpi-amount">{formatCurrency(ventasMes.reduce((sum, cotizacion) => sum + (cotizacion.total || 0), 0))}</small>
-            </div>
-          </div>
-        )}
-        {puedeVerCotizaciones && (
-          <div className="dashboard-kpi">
-            <div className="dashboard-kpi-icon dashboard-kpi-icon-purple"><FiTool /></div>
-            <div className="dashboard-kpi-content">
-              <span>Calibraciones próximas</span>
-              <strong>{calibracionesProximas.length}</strong>
-              <small>en los próximos 30 días</small>
-            </div>
-          </div>
+        {puedeVerCotizaciones ? (
+          <>
+            <article className="dashboard-kpi dashboard-kpi-featured">
+              <div className="dashboard-kpi-heading">
+                <div className="dashboard-kpi-icon dashboard-kpi-icon-blue"><FiFileText /></div>
+                <h2>Cotizaciones del mes</h2>
+              </div>
+              <div className="dashboard-kpi-value">
+                <strong>{cotizacionesMes.length}</strong>
+                {variacionCotizaciones !== null && <span className="dashboard-trend" title="Variación frente al mes anterior" aria-label={`${variacionCotizaciones}% frente al mes anterior`}>{variacionCotizaciones > 0 ? '+' : ''}{variacionCotizaciones}%</span>}
+              </div>
+              <p className="dashboard-kpi-description"><b>{formatCurrency(totalCotizacionesMes)}</b> en total</p>
+              <div className="dashboard-kpi-footnote">
+                <span>Mes anterior</span>
+                <b>{cotizacionesMesAnterior} cotizaciones</b>
+              </div>
+            </article>
+            <article className="dashboard-kpi">
+              <div className="dashboard-kpi-heading">
+                <div className="dashboard-kpi-icon dashboard-kpi-icon-green"><FiUsers /></div>
+                <h2>Tasa de aceptación</h2>
+              </div>
+              <div className="dashboard-kpi-value"><strong>{tasaAceptacion}%</strong><span className="dashboard-value-caption">de conversión</span></div>
+              <p className="dashboard-kpi-description"><b className="dashboard-positive">{ventasAprobadas.length} aprobadas</b> de {cotizaciones.length} en total</p>
+              <div className="dashboard-acceptance">
+                <div><span>Conversión histórica</span><b>{tasaAceptacion}%</b></div>
+                <meter min="0" max="100" value={tasaAceptacion} aria-label="Tasa de aceptación" />
+              </div>
+            </article>
+            <article className="dashboard-kpi">
+              <div className="dashboard-kpi-heading">
+                <div className="dashboard-kpi-icon dashboard-kpi-icon-sales"><FiShoppingCart /></div>
+                <h2>Ventas del mes</h2>
+              </div>
+              <div className="dashboard-kpi-value"><strong>{ventasMes.length}</strong><FiTrendingUp className="dashboard-sales-icon" aria-hidden="true" /></div>
+              <p className="dashboard-kpi-description"><b>{formatCurrency(totalVentasMes)}</b> en aprobadas</p>
+              <div className="dashboard-kpi-footnote">
+                <span>Importe promedio</span><b>{formatCurrency(ventasMes.length ? totalVentasMes / ventasMes.length : 0)}</b>
+              </div>
+            </article>
+            <article className="dashboard-kpi">
+              <div className="dashboard-kpi-heading">
+                <div className="dashboard-kpi-icon dashboard-kpi-icon-amber"><FiTool /></div>
+                <h2>Calibraciones próximas</h2>
+              </div>
+              <div className="dashboard-kpi-value"><strong>{calibracionesProximas.length}</strong><span className="dashboard-status-chip">{calibracionesProximas.length ? 'Por revisar' : 'Sin alertas'}</span></div>
+              <p className="dashboard-kpi-description">Hasta 30 días, incluidas vencidas</p>
+              <div className="dashboard-calibration-note"><FiCheckCircle aria-hidden="true" /><span>Seguimiento de calibraciones registradas</span></div>
+            </article>
+          </>
+        ) : puedeVerClientes && (
+          <article className="dashboard-kpi dashboard-kpi-featured">
+            <div className="dashboard-kpi-heading"><div className="dashboard-kpi-icon dashboard-kpi-icon-blue"><FiUsers /></div><h2>Clientes registrados</h2></div>
+            <div className="dashboard-kpi-value"><strong>{clientes.length}</strong></div>
+            <p className="dashboard-kpi-description">Directorio comercial</p>
+            <button className="dashboard-client-link" onClick={() => navigate('/clientes')}>Consultar clientes <FiArrowRight /></button>
+          </article>
         )}
       </div>
 
+      {puedeVerCotizaciones && <>
       <div className="dashboard-chart-grid">
         <div className="chart-card">
           <div className="chart-card-header">
-            <h2>Cotizaciones mensuales</h2>
-            <span className="chart-legend"><i className="legend-blue" />Cotizaciones <i className="legend-green" />Aprobadas</span>
+            <div className="dashboard-chart-title"><FiBarChart2 /><div><h2>Cotizaciones mensuales</h2><p>Emitidas y aprobadas · {rangoGraficos}</p></div></div>
+            <div className="chart-legend"><span><i className="legend-blue" />Cotizaciones</span><span><i className="legend-green" />Aprobadas</span></div>
           </div>
           <div className="chart-container">
-            <Bar data={datosMensuales} options={opcionesGrafico} />
+            <Bar data={datosMensuales} options={opcionesGrafico} role="img" aria-label={`Cotizaciones y aprobadas por mes. ${rangoGraficos}`} />
           </div>
         </div>
 
         <div className="chart-card status-chart-card">
           <div className="chart-card-header">
-            <h2>Cotizaciones por estado</h2>
-            <span className="chart-subtitle">Distribución de cotizaciones</span>
+            <div className="dashboard-chart-title"><FiPieChart /><div><h2>Cotizaciones por estado</h2><p>Distribución de cotizaciones registradas</p></div></div>
           </div>
           <div className="chart-container chart-container-sm">
-            <Doughnut data={datosEstados} options={opcionesDoughnut} />
+            {cotizaciones.length > 0
+              ? <Doughnut data={datosEstados} options={opcionesDoughnut} role="img" aria-label={resumenEstados.map((estado) => `${estado.nombre}: ${estado.cantidad}`).join(', ')} />
+              : <div className="dashboard-empty-ring" />}
             <div className="doughnut-total status-doughnut-total">
               <strong>{cotizaciones.length}</strong>
               <span>Total</span>
@@ -386,19 +429,21 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="dashboard-chart-grid">
-        <div className="chart-card">
-          <div className="chart-card-header"><h2>Ventas mensuales</h2><span className="chart-subtitle">Ventas confirmadas</span></div>
-          <div className="chart-container"><Line data={datosVentasMensuales} options={opcionesLine} /></div>
-        </div>
-        <div className="chart-card">
-          <div className="chart-card-header"><h2>Compras mensuales</h2><span className="chart-subtitle">Órdenes de compra</span></div>
-          <div className="chart-container"><Bar data={datosComprasMensuales} options={opcionesGrafico} /></div>
-        </div>
-      </div>
+      </>}
 
-      <div className="dashboard-chart-grid dashboard-feature-grid">
-        <div className="chart-card category-chart-card">
+      {(puedeVerCotizaciones || puedeVerCompras) && <div className="dashboard-chart-grid dashboard-secondary-grid">
+        {puedeVerCotizaciones && <div className="chart-card">
+          <div className="chart-card-header"><div className="dashboard-chart-title dashboard-chart-title-green"><FiTrendingUp /><div><h2>Ventas mensuales</h2><p>Cotizaciones aprobadas · {rangoGraficos}</p></div></div><span className="dashboard-chart-badge dashboard-chart-badge-green">{ventasMes.length} este mes</span></div>
+          <div className="chart-container"><Line data={datosVentasMensuales} options={opcionesLine} role="img" aria-label={`Ventas confirmadas por mes. ${rangoGraficos}`} /></div>
+        </div>}
+        {puedeVerCompras && <div className="chart-card">
+          <div className="chart-card-header"><div className="dashboard-chart-title dashboard-chart-title-orange"><FiShoppingCart /><div><h2>Compras mensuales</h2><p>Órdenes de compra · {rangoGraficos}</p></div></div><span className="dashboard-chart-badge dashboard-chart-badge-orange">{datosComprasMensuales.datasets[0].data.at(-1)} este mes</span></div>
+          <div className="chart-container"><Bar data={datosComprasMensuales} options={opcionesGrafico} role="img" aria-label={`Órdenes de compra por mes. ${rangoGraficos}`} /></div>
+        </div>}
+      </div>}
+
+      {(puedeVerEquipos || puedeVerCotizaciones) && <div className="dashboard-chart-grid dashboard-feature-grid">
+        {puedeVerEquipos && <div className="chart-card category-chart-card">
           <div className="chart-card-header">
             <h2>Equipos por categoría</h2>
             <button
@@ -410,34 +455,38 @@ export default function Dashboard() {
             </button>
           </div>
           <div className="chart-container chart-container-sm chart-doughnut-summary">
-            <Doughnut data={datosCategorias} options={opcionesDoughnut} />
+            {totalEquipos > 0
+              ? <Doughnut data={datosCategorias} options={opcionesDoughnut} role="img" aria-label={categoriasVisibles.map(([nombre, cantidad]) => `${nombre}: ${cantidad}`).join(', ')} />
+              : <div className="dashboard-empty-ring" />}
             <div className="doughnut-total" aria-label={`${totalEquipos} equipos`}>
               <strong>{totalEquipos}</strong>
               <span>Equipos</span>
             </div>
           </div>
           <div className="category-legend">
-            {categoriasVisibles.map(([nombre], index) => (
+            {categoriasVisibles.map(([nombre, cantidad], index) => (
               <span key={nombre}>
                 <i style={{ backgroundColor: COLORES_CATEGORIAS[index % COLORES_CATEGORIAS.length] }} />
-                {nombre}
+                {nombre}<b>{cantidad}</b>
               </span>
             ))}
           </div>
-        </div>
-        <div className="chart-card top-clientes-card">
+        </div>}
+        {puedeVerCotizaciones && <div className="chart-card top-clientes-card">
           <div className="chart-card-header">
             <h2>Top 5 clientes</h2>
             <div className="dashboard-toggle-group">
               <button
                 className={`dashboard-toggle ${rankingClientes === 'cotizaciones' ? 'active' : ''}`}
                 onClick={() => setRankingClientes('cotizaciones')}
+                aria-pressed={rankingClientes === 'cotizaciones'}
               >
                 Por cotizaciones
               </button>
               <button
                 className={`dashboard-toggle ${rankingClientes === 'ventas' ? 'active' : ''}`}
                 onClick={() => setRankingClientes('ventas')}
+                aria-pressed={rankingClientes === 'ventas'}
               >
                 Por ventas
               </button>
@@ -446,8 +495,8 @@ export default function Dashboard() {
           <div className="top-clientes-list">
             {clientesDestacados.map(({ nombre, valor }) => (
               <div className="top-cliente" key={nombre}>
-                <span>{nombre}</span>
-                <div className="top-cliente-bar"><i style={{ width: `${Math.max(18, (valor / (clientesDestacados[0]?.valor || 1)) * 100)}%` }} /></div>
+                <span title={nombre}>{nombre}</span>
+                <div className="top-cliente-bar"><i style={{ width: `${(valor / (clientesDestacados[0]?.valor || 1)) * 100}%` }} /></div>
                 <strong>{rankingClientes === 'ventas' ? formatCurrency(valor) : valor}</strong>
               </div>
             ))}
@@ -459,10 +508,10 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-        </div>
-      </div>
+        </div>}
+      </div>}
 
-      <div className="tarjeta-tabla actividad-reciente">
+      {puedeVerCotizaciones && <div className="tarjeta-tabla actividad-reciente">
         <div className="actividad-header">
           <h2 className="seccion-titulo">Actividad Reciente</h2>
           <button className="btn-enlace" onClick={() => navigate('/cotizaciones')}>
@@ -473,7 +522,7 @@ export default function Dashboard() {
           <div className="estado-vacio">
             <p>No hay cotizaciones registradas</p>
             <button className="btn-principal" onClick={() => navigate('/cotizaciones')} style={{ marginTop: '0.75rem' }}>
-              Crear Primera Cotización
+              Ver cotizaciones
             </button>
           </div>
         ) : (
@@ -493,7 +542,7 @@ export default function Dashboard() {
                 {cotizacionesRecientes.map((cot) => (
                   <tr key={cot.id}>
                     <td className="texto-codigo">{cot.codigo}</td>
-                    <td>{formatDate(cot.fecha || cot.createdAt)}</td>
+                    <td>{formatDate(cot.fechaEmision || cot.fecha || cot.createdAt)}</td>
                     <td>{cot.cliente?.razonSocial || '-'}</td>
                     <td>{cot.responsable || '-'}</td>
                     <td className="texto-derecha">{formatCurrency(cot.total || 0)}</td>
@@ -504,7 +553,7 @@ export default function Dashboard() {
             </table>
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

@@ -22,8 +22,12 @@
   bottom: 0;
   z-index: 100;
   transition: transform 0.2s cubic-bezier(0.4,0,0.2,1);
-  /* Overflow visible para que el dropdown del usuario se vea fuera del sidebar */
-  overflow: visible;
+  /* El desplazamiento pertenece al sidebar completo, no solo al menú. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #90b0bf #f3f7f8;
 }
 
 /* Desktop colapsado */
@@ -708,4 +712,62 @@
   margin-top: 0.5rem;
   width: 100%;
   justify-content: center;
+}
+
+/* Navegación compacta y desplegable, compartida entre rutas. */
+.dashboard-layout .sidebar-header { height: 64px; padding-block: 8px; }
+.dashboard-layout .sidebar-logo-img { width: 96px; height: 48px; }
+.dashboard-layout .sidebar-nav { flex: 1 0 auto; overflow: visible; gap: 0; }
+.dashboard-layout .sidebar-footer { flex-shrink: 0; }
+.dashboard-layout .sidebar-nav-group { flex-shrink: 0; }
+.dashboard-layout .sidebar-nav-group + .sidebar-nav-group { margin-top: 4px; padding-top: 4px; border-top: 1px solid #d5e4ea; }
+.dashboard-layout .sidebar-nav .nav-item { min-height: 32px; padding-block: 5px; margin-block: 0; border-radius: 0; }
+.dashboard-layout .sidebar-group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  min-height: 28px;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #526f80;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: .035em;
+  text-align: left;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.dashboard-layout .sidebar-group-toggle:hover { background: #e5f2f6; color: #064c70; }
+.dashboard-layout .sidebar-group-toggle svg { flex: 0 0 13px; transition: transform .15s ease; }
+.dashboard-layout .sidebar-group-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+.dashboard-layout .sidebar-group-active { color: #064c70; }
+.dashboard-layout .topbar-settings,
+.dashboard-layout .notification-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid #d5e4ea;
+  border-radius: 50%;
+  background: #fff;
+  color: #064c70;
+  text-decoration: none;
+}
+.dashboard-layout .topbar-settings:hover,
+.dashboard-layout .topbar-settings-active { background: #e5f2f6; border-color: #79c6d4; }
+@media (max-width: 1023px) {
+  .dashboard-layout .sidebar-mobile .nav-item { min-height: 40px; padding-block: 9px; }
+  .dashboard-layout .sidebar-mobile .sidebar-group-toggle { min-height: 40px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-layout .sidebar-group-toggle svg { transition: none; }
 }
