@@ -18,6 +18,8 @@ const Cotizaciones = lazy(() => import('./pages/Cotizaciones'));
 const Ventas = lazy(() => import('./pages/Ventas'));
 const Equipos = lazy(() => import('./pages/Equipos'));
 const Mangas = lazy(() => import('./pages/Mangas'));
+const Servicios = lazy(() => import('./pages/Servicios'));
+const EPP = lazy(() => import('./pages/EPP'));
 const Configuracion = lazy(() => import('./pages/Configuracion'));
 const Perfil = lazy(() => import('./pages/Perfil'));
 const Facturacion = lazy(() => import('./pages/Facturacion'));
@@ -233,6 +235,24 @@ function App() {
               element={
                 <RutaConPermiso modulo="mangas">
                   <Mangas />
+                </RutaConPermiso>
+              }
+            />
+
+            <Route
+              path="servicios"
+              element={
+                <RutaConPermiso modulo="servicios">
+                  <Servicios />
+                </RutaConPermiso>
+              }
+            />
+
+            <Route
+              path="epp"
+              element={
+                <RutaConPermiso modulo="epp">
+                  <EPP />
                 </RutaConPermiso>
               }
             />

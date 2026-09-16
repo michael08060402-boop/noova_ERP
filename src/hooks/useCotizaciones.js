@@ -7,7 +7,11 @@ import {
   deleteCotizacion
 } from '../services/cotizacionService';
 
-export function useCotizaciones(enabled = true) {
+// opciones.soloEpp: filtra en servidor las cotizaciones tipoItem == 'epp'
+// (rol Jefe de Proyecto de Mina). Para el resto de roles la llamada sigue
+// siendo useCotizaciones() tal cual, sin romper compatibilidad.
+export function useCotizaciones(enabled = true, opciones = {}) {
+  const { soloEpp = false } = opciones;
   const [cotizaciones, setCotizaciones] = useState([]);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState(null);
@@ -17,7 +21,7 @@ export function useCotizaciones(enabled = true) {
     try {
       setLoading(true);
       setError(null);
-      const data = await getCotizaciones();
+      const data = await getCotizaciones({ soloEpp });
       setCotizaciones(data);
     } catch (err) {
       setError(err.message);
@@ -25,7 +29,7 @@ export function useCotizaciones(enabled = true) {
     } finally {
       setLoading(false);
     }
-  }, [enabled]);
+  }, [enabled, soloEpp]);
 
   useEffect(() => {
     if (enabled) fetchCotizaciones();

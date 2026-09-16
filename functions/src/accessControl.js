@@ -7,6 +7,8 @@ const PERMISOS_TOTALES = {
   clientes: TODO,
   equipos: TODO,
   mangas: TODO,
+  servicios: TODO,
+  epp: TODO,
   cotizaciones: TODO,
   ventas: TODO,
   mensajeria: TODO,
@@ -71,10 +73,14 @@ const ROLES = {
     nubeCarpeta: 'NOOVA SAC/04. MARKETING'
   },
 
+  // Jefe de Proyecto de Mina: interfaz muy limitada. Cotiza únicamente EPP
+  // (sin eliminar) y lee el catálogo EPP. Conserva Nube y Perfil.
   jefe_proyecto_mina: {
     label: 'Jefe de Proyecto de Mina',
     areaPredeterminada: 'minas',
     permissions: {
+      cotizaciones: ['read', 'create', 'update'],
+      epp: ['read'],
       nube: TODO,
       perfil: ['read', 'update']
     },

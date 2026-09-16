@@ -3,11 +3,12 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   FiBarChart2, FiUsers, FiFileText, FiSettings,
   FiMenu, FiLogOut, FiX, FiChevronDown, FiDollarSign, FiBell, FiTool,
-  FiWind, FiMessageCircle, FiCloud, FiShoppingCart, FiTruck, FiTrendingUp, FiSearch
+  FiWind, FiMessageCircle, FiCloud, FiShoppingCart, FiTruck, FiTrendingUp, FiSearch,
+  FiShield, FiBriefcase
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useCotizaciones } from '../hooks/useCotizaciones';
-import { puede, ROLES, normalizarRol } from '../services/userService';
+import { puede, ROLES, normalizarRol, esRolMinas } from '../services/userService';
 import { obtenerCalibracionesProximas } from '../utils/calibracion';
 import ConfirmDialog from '../components/ConfirmDialog';
 import logoBlanco from '../assets/logo-blanco.png';
@@ -19,22 +20,33 @@ import '../styles/erp-theme.css';
 const ITEMS_MENU = [
   { path: '/dashboard', label: 'Dashboard', icon: <FiBarChart2 />, key: 'dashboard' },
   { path: '/clientes', label: 'Clientes', icon: <FiUsers />, key: 'clientes' },
-  { path: '/equipos', label: 'Equipos', icon: <FiTool />, key: 'equipos' },
-  { path: '/mangas', label: 'Mangas', icon: <FiWind />, key: 'mangas' },
   { path: '/cotizaciones', label: 'Cotizaciones', icon: <FiFileText />, key: 'cotizaciones' },
   { path: '/ventas', label: 'Ventas', icon: <FiTrendingUp />, key: 'ventas' },
+  { path: '/facturacion', label: 'Boletas / Facturas', icon: <FiDollarSign />, key: 'facturacion' },
+  { path: '/equipos', label: 'Equipos', icon: <FiTool />, key: 'equipos' },
+  { path: '/mangas', label: 'Mangas', icon: <FiWind />, key: 'mangas' },
+  { path: '/servicios', label: 'Servicios', icon: <FiBriefcase />, key: 'servicios' },
+  { path: '/epp', label: 'EPP', icon: <FiShield />, key: 'epp' },
   { path: '/mensajeria', label: 'Mensajería', icon: <FiMessageCircle />, key: 'mensajeria' },
+  { path: '/nube', label: 'Nube', icon: <FiCloud />, key: 'nube' },
   { path: '/proveedores', label: 'Proveedores', icon: <FiTruck />, key: 'proveedores' },
   { path: '/compras', label: 'Órdenes de compra', icon: <FiShoppingCart />, key: 'compras' },
-  { path: '/facturacion', label: 'Boletas / Facturas', icon: <FiDollarSign />, key: 'facturacion' },
-  { path: '/nube', label: 'Nube', icon: <FiCloud />, key: 'nube' },
   { path: '/configuracion', label: 'Configuración', icon: <FiSettings />, key: 'configuracion' }
 ];
 
+// Grupos del sidebar para gerencia, administración y demás roles generales.
+// Mensajería, Nube y Configuración no pertenecen a ningún grupo: se acceden
+// desde el topbar (atajos y botón de ajustes).
 const GRUPOS_MENU = [
-  { id: 'comercial', label: 'Comercial y clientes', keys: ['dashboard', 'clientes', 'cotizaciones', 'ventas'] },
-  { id: 'operaciones', label: 'Operaciones y servicios', keys: ['equipos', 'mangas'] },
-  { id: 'logistica', label: 'Logística y facturación', keys: ['proveedores', 'compras', 'facturacion'] }
+  { id: 'comercial', label: 'COMERCIAL', keys: ['dashboard', 'clientes', 'cotizaciones', 'ventas', 'facturacion'] },
+  { id: 'catalogo', label: 'CATÁLOGO', keys: ['equipos', 'mangas', 'servicios', 'epp'] },
+  { id: 'abastecimiento', label: 'ABASTECIMIENTO', keys: ['proveedores', 'compras'] }
+];
+
+// Grupo único del sidebar para Jefe de Proyecto de Mina: solo ve Cotizaciones
+// (en modo EPP) y EPP. Nube se conserva en el topbar.
+const GRUPOS_MENU_MINAS = [
+  { id: 'minas', label: 'MINAS', keys: ['cotizaciones', 'epp'] }
 ];
 
 function useEsMobile() {
@@ -51,10 +63,13 @@ function useEsMobile() {
 
 export default function DashboardLayout() {
   const { currentUser, userProfile, logout } = useAuth();
+  const esMinas = esRolMinas(userProfile);
   const puedeVerCotizaciones = puede(userProfile, 'cotizaciones', 'read');
   const puedeVerPerfil = puede(userProfile, 'perfil', 'read');
   const puedeVerConfiguracion = puede(userProfile, 'configuracion', 'read');
-  const { cotizaciones, fetchCotizaciones } = useCotizaciones(puedeVerCotizaciones);
+  // Para Minas las reglas de Firestore solo permiten leer cotizaciones EPP:
+  // la consulta debe incluir where('tipoItem','==','epp') (rules no son filtros).
+  const { cotizaciones, fetchCotizaciones } = useCotizaciones(puedeVerCotizaciones, { soloEpp: esMinas });
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const esDashboard = pathname === '/dashboard' || pathname === '/dashboard/';
@@ -105,10 +120,12 @@ export default function DashboardLayout() {
     || 'Sin rol asignado';
 
   const cotizacionesPendientes = puedeVerCotizaciones
-    ? cotizaciones.filter((c) => c.estado === 'Borrador' || c.estado === 'Enviada')
+    ? cotizaciones.filter((c) => c.estado === 'Borrador' || c.estado === 'Enviada' || c.estado === 'Generada')
     : [];
 
-  const calibracionesProximas = puedeVerCotizaciones
+  // La calibración próxima aplica únicamente a cotizaciones de Equipos;
+  // Minas solo ve EPP, por lo que no se calcula para ese rol.
+  const calibracionesProximas = (puedeVerCotizaciones && !esMinas)
     ? obtenerCalibracionesProximas(cotizaciones)
     : [];
 
@@ -184,7 +201,7 @@ export default function DashboardLayout() {
         </div>
 
         <nav className="sidebar-nav" aria-label="Navegación principal">
-          {GRUPOS_MENU.map((grupo) => {
+          {(esMinas ? GRUPOS_MENU_MINAS : GRUPOS_MENU).map((grupo) => {
             const items = grupo.keys.map((key) => itemsMenu.find((item) => item.key === key)).filter(Boolean);
             const abierto = !gruposCerrados[grupo.id];
             const activo = items.some((item) => pathname === item.path || pathname.startsWith(`${item.path}/`));

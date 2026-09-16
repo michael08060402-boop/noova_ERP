@@ -1,0 +1,54 @@
+/* ====================================================
+   EPP - Estilos específicos
+   Lo general está en styles/shared.css (mismo patrón que
+   Equipos.css / Mangas.css).
+   ==================================================== */
+
+/* ── BADGE DE ESTADO DEL CATÁLOGO (Activo / Inactivo) ── */
+.badge-estado-catalogo {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+/* Activo: verde suave */
+.badge-estado-catalogo.catalogo-activo {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
+
+/* Inactivo: gris */
+.badge-estado-catalogo.catalogo-inactivo {
+  background: #f3f4f6;
+  color: #4b5563;
+  border-color: #e5e7eb;
+}
+
+/* ── FILA DE DOS COLUMNAS EN EL FORMULARIO (Marca/Modelo, Unidad/Precio) ── */
+.fila-form-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.campo-checkbox .checkbox-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #374151;
+  cursor: pointer;
+}
+
+.campo-checkbox .checkbox-inline input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #1d4ed8;
+  cursor: pointer;
+}

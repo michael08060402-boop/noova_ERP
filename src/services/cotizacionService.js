@@ -8,7 +8,8 @@ import {
   orderBy,
   query,
   runTransaction,
-  updateDoc
+  updateDoc,
+  where
 } from 'firebase/firestore';
 
 const COLLECTION_NAME = 'cotizaciones';
@@ -17,8 +18,16 @@ function limpiarPrefijo(valor) {
   return String(valor || 'NV').toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 8) || 'NV';
 }
 
-export async function getCotizaciones() {
-  const q = query(collection(db, COLLECTION_NAME), orderBy('codigo', 'desc'));
+// opciones.soloEpp: usado por el rol Jefe de Proyecto de Mina. Las reglas de
+// Firestore solo le permiten leer cotizaciones con tipoItem == 'epp' y, como
+// las rules NO actúan como filtros, la consulta debe incluir el where
+// explícito para no fallar. Requiere el índice compuesto (tipoItem, codigo).
+export async function getCotizaciones(opciones = {}) {
+  const { soloEpp = false } = opciones;
+  const base = collection(db, COLLECTION_NAME);
+  const q = soloEpp
+    ? query(base, where('tipoItem', '==', 'epp'), orderBy('codigo', 'desc'))
+    : query(base, orderBy('codigo', 'desc'));
   const snapshot = await getDocs(q);
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 }

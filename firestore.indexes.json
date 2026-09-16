@@ -48,6 +48,14 @@
   // ]
   "indexes": [
     {
+      "collectionGroup": "cotizaciones",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tipoItem", "order": "ASCENDING" },
+        { "fieldPath": "codigo", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "mensajeria",
       "queryScope": "COLLECTION",
       "fields": [

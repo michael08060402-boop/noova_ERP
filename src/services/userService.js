@@ -5,6 +5,8 @@ import {
   ROLES,
   MODULOS,
   SECCIONES_CONFIGURACION,
+  FAMILIAS_COTIZACION,
+  FAMILIA_COTIZACION_MINAS,
   normalizarRol,
   normalizarArea,
   esRolValido,
@@ -18,7 +20,9 @@ import {
   getRutaInicial,
   getCarpetaNube,
   getAreaPredeterminada,
-  getNombreArea
+  getNombreArea,
+  esRolMinas,
+  getFamiliasCotizables
 } from './accessControl';
 
 export {
@@ -26,6 +30,8 @@ export {
   ROLES,
   MODULOS,
   SECCIONES_CONFIGURACION,
+  FAMILIAS_COTIZACION,
+  FAMILIA_COTIZACION_MINAS,
   normalizarRol,
   normalizarArea,
   esRolValido,
@@ -39,7 +45,9 @@ export {
   getRutaInicial,
   getCarpetaNube,
   getAreaPredeterminada,
-  getNombreArea
+  getNombreArea,
+  esRolMinas,
+  getFamiliasCotizables
 };
 
 const COLECCION = 'users';

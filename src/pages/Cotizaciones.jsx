@@ -6,10 +6,15 @@ import { useCotizaciones } from '../hooks/useCotizaciones';
 import { useClientes } from '../hooks/useClientes';
 import { useEquipos } from '../hooks/useEquipos';
 import { useMangas } from '../hooks/useMangas';
+import { useEpp } from '../hooks/useEpp';
+import { useServicios } from '../hooks/useServicios';
 import { useAuth } from '../context/AuthContext';
 import { useConfig } from '../context/ConfigContext';
+import { puede, esRolMinas, FAMILIAS_COTIZACION, FAMILIA_COTIZACION_MINAS } from '../services/userService';
 import { searchEquipoByCodigo } from '../services/equipoService';
 import { searchMangaByCodigo } from '../services/mangaService';
+import { searchEppByCodigo } from '../services/eppService';
+import { searchServicioByCodigo } from '../services/servicioService';
 import { addLog } from '../services/logService';
 import { useRucLookup } from '../hooks/useRucLookup';
 import { formatDate, formatDateISO } from '../utils/formatDate';
@@ -45,6 +50,40 @@ const COLOR_FILA_ESTADO = {
   Rechazada: 'fila-error'
 };
 
+// Etiqueta visible del badge de familia en la lista de cotizaciones.
+const ETIQUETA_FAMILIA = {
+  equipo: 'Equipo',
+  manga: 'Manga',
+  servicio: 'Servicio',
+  epp: 'EPP'
+};
+
+// Sección INCLUYE por familia (vista formulario + PDF). Los textos de
+// calibración de fábrica y garantía Testo son EXCLUSIVOS de la familia
+// Equipos: ninguna otra familia debe mostrarlos.
+const INCLUYE_POR_FAMILIA = {
+  equipo: [
+    'Protocolo de calibración de fábrica',
+    'Garantía oficial Testo',
+    'Soporte técnico postventa'
+  ],
+  manga: [
+    'Costuras y bandas de alta resistencia',
+    'Garantía por defectos de fabricación',
+    'Soporte técnico postventa'
+  ],
+  servicio: [
+    'Personal técnico especializado',
+    'Supervisión y reporte de resultados',
+    'Cumplimiento de normativas vigentes'
+  ],
+  epp: [
+    'Producto original con garantía del fabricante',
+    'Certificados y fichas técnicas',
+    'Soporte técnico postventa'
+  ]
+};
+
 function obtenerContactosCliente(cliente) {
   if (!cliente) return [];
   if (cliente.contactos && cliente.contactos.length > 0) return cliente.contactos;
@@ -59,6 +98,60 @@ function obtenerContactosCliente(cliente) {
 }
 
 const ITEM_VACIO = { codigo: '', descripcion: '', cantidad: 1, precioUnitario: 0, equipoId: '', unidadMedida: 'UNIDAD', tiempoEntrega: '', tipo: 'producto' };
+
+// Mapea un producto del catálogo (equipo, manga, servicio o EPP) a la fila
+// de item de la cotización. Cada familia aporta sus campos propios:
+// - EPP: marca y modelo del catálogo.
+// - Servicios: unidad de cobro y precio referencial.
+// - Mangas: diámetro, longitud, material y acople (comportamiento actual).
+function mapearProductoAItem(producto, familia) {
+  const base = {
+    equipoId: producto.id,
+    codigo: producto.codigo || '',
+    descripcion: producto.nombre || '',
+    esAccesorio: producto.tipoProducto === 'accesorio'
+  };
+
+  if (familia === 'epp') {
+    return {
+      ...base,
+      unidadMedida: producto.unidadMedida || 'UNIDAD',
+      precioUnitario: producto.precio || 0,
+      marca: producto.marca || '',
+      modelo: producto.modelo || '',
+      diametro: '',
+      longitud: '',
+      material: '',
+      tipoAcople: ''
+    };
+  }
+
+  if (familia === 'servicio') {
+    return {
+      ...base,
+      unidadMedida: producto.unidadCobro || 'SERVICIO',
+      precioUnitario: producto.precioReferencial || 0,
+      marca: '',
+      modelo: '',
+      diametro: '',
+      longitud: '',
+      material: '',
+      tipoAcople: ''
+    };
+  }
+
+  // Familias equipo y manga (compatibilidad total con el comportamiento
+  // previo, incluidas las specs de manga).
+  return {
+    ...base,
+    unidadMedida: producto.unidadMedida || 'UNIDAD',
+    precioUnitario: producto.precio || 0,
+    diametro: producto.diametro || '',
+    longitud: producto.longitud || '',
+    material: producto.material || '',
+    tipoAcople: producto.tipoAcople || ''
+  };
+}
 const UNIDADES_MEDIDA = ['UNIDAD', 'LT.', 'KG.', 'DOC.', 'PZ.', 'EQ.', 'M.', 'KIT.', '%.', 'MILL.'];
 const UNIDADES_TIEMPO = ['semanas', 'meses', 'días'];
 
@@ -229,11 +322,22 @@ function EquipoCombobox({ equipos, value, onSelect }) {
 export default function Cotizaciones() {
   const navigate = useNavigate();
   const { cotizaciones, loading, addCotizacion, editCotizacion, removeCotizacion } = useCotizaciones();
-  const { clientes, addCliente, editCliente } = useClientes();
-  const { equipos } = useEquipos();
-  const { mangas } = useMangas();
   const { currentUser, userProfile } = useAuth();
   const { config, refreshConfig } = useConfig();
+
+  // Modo especial del rol Jefe de Proyecto de Mina: la familia queda fijada
+  // en EPP. No hay selector de familia y solo ve/crea/edita cotizaciones EPP.
+  const esMinas = esRolMinas(userProfile);
+  const puedeEliminarCotizaciones = puede(userProfile, 'cotizaciones', 'delete');
+  const puedeGenerarCompras = puede(userProfile, 'compras', 'read');
+
+  const { clientes, addCliente, editCliente } = useClientes();
+  // Minas solo cotiza EPP: los catálogos de las demás familias ni siquiera
+  // se consultan (sus reglas Firestore tampoco se lo permitirían).
+  const { equipos } = useEquipos(!esMinas);
+  const { mangas } = useMangas(!esMinas);
+  const { epp } = useEpp(true);
+  const { servicios } = useServicios(!esMinas);
 
   const [vista, setVista] = useState('lista'); // 'lista' | 'form'
   const [mostrarConfirm, setMostrarConfirm] = useState(false);
@@ -249,6 +353,7 @@ export default function Cotizaciones() {
 
   const [terminoBusqueda, setTerminoBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
+  const [filtroFamilia, setFiltroFamilia] = useState('');
   const [paginaActual, setPaginaActual] = useState(1);
   const [porPagina, setPorPagina] = useState(10);
 
@@ -289,24 +394,45 @@ export default function Cotizaciones() {
     );
   }, [contactosCliente, busquedaContacto]);
 
+  // Catálogo de la familia activa del formulario. Cada familia carga sus
+  // productos EXCLUSIVAMENTE de su propio catálogo; EPP y Servicios solo
+  // ofrecen los ítems activos. Las filas libres (tipo 'transporte') no
+  // provienen de ningún catálogo y no deben confundirse con la familia
+  // Servicios (servicios propios de Noova).
+  const catalogoFamilia = useMemo(() => ({
+    equipo: equipos,
+    manga: mangas,
+    servicio: servicios.filter((s) => s.activo !== false),
+    epp: epp.filter((e) => e.activo !== false)
+  }), [equipos, mangas, servicios, epp]);
+
+  // Minas solo debe ver cotizaciones EPP (doble filtro de seguridad sobre lo
+  // que ya limita la consulta en servidor).
+  const cotizacionesVisibles = useMemo(() => (
+    esMinas
+      ? cotizaciones.filter((c) => detectarTipoItem(c) === FAMILIA_COTIZACION_MINAS)
+      : cotizaciones
+  ), [cotizaciones, esMinas]);
+
   const cotizacionesFiltradas = useMemo(() => {
-    return cotizaciones.filter((c) => {
+    return cotizacionesVisibles.filter((c) => {
       const term = terminoBusqueda.toLowerCase();
       const coincideBusqueda =
         c.codigo?.toLowerCase().includes(term) ||
         c.cliente?.razonSocial?.toLowerCase().includes(term) ||
         c.responsable?.toLowerCase().includes(term);
       const coincideEstado = !filtroEstado || c.estado === filtroEstado;
-      return coincideBusqueda && coincideEstado;
+      const coincideFamilia = esMinas || !filtroFamilia || detectarTipoItem(c) === filtroFamilia;
+      return coincideBusqueda && coincideEstado && coincideFamilia;
     });
-  }, [cotizaciones, terminoBusqueda, filtroEstado]);
+  }, [cotizacionesVisibles, esMinas, terminoBusqueda, filtroEstado, filtroFamilia]);
 
   const cotizacionesPaginadas = useMemo(() => {
     const inicio = (paginaActual - 1) * porPagina;
     return cotizacionesFiltradas.slice(inicio, inicio + porPagina);
   }, [cotizacionesFiltradas, paginaActual, porPagina]);
 
-  const pendientesCount = cotizaciones.filter(
+  const pendientesCount = cotizacionesVisibles.filter(
     (c) => c.estado === 'Generada' || c.estado === 'Borrador' || c.estado === 'Enviada'
   ).length;
 
@@ -333,7 +459,13 @@ export default function Cotizaciones() {
 
   function nuevaCotizacion() {
     setEditandoId(null);
-    setForm({ ...FORMULARIO_VACIO, items: [{ ...ITEM_VACIO }] });
+    // Minas cotiza únicamente EPP: la familia nace fijada. El resto de roles
+    // parte de Equipos (igual que antes).
+    setForm({
+      ...FORMULARIO_VACIO,
+      tipoItem: esMinas ? FAMILIA_COTIZACION_MINAS : 'equipo',
+      items: [{ ...ITEM_VACIO }]
+    });
     setErroresForm({});
     setBusquedaCliente('');
     setClienteSeleccionado(null);
@@ -366,7 +498,7 @@ export default function Cotizaciones() {
       moneda: cot.moneda || 'US$',
       tiempoEntregaNumero: cot.tiempoEntregaNumero || (cot.tiempoEntrega ? (String(cot.tiempoEntrega).match(/\d+/) || [3])[0] : 3),
       tiempoEntregaUnidad: cot.tiempoEntregaUnidad || (cot.tiempoEntrega && /mes/i.test(cot.tiempoEntrega) ? 'meses' : cot.tiempoEntrega && /d[ií]a/i.test(cot.tiempoEntrega) ? 'días' : 'semanas'),
-      tipoItem: cot.tipoItem || 'equipo',
+      tipoItem: esMinas ? FAMILIA_COTIZACION_MINAS : (cot.tipoItem || 'equipo'),
       sinIGV: !!cot.sinIGV,
       items: cot.items?.length ? cot.items.map((i) => ({ ...i })) : [{ ...ITEM_VACIO }],
       estado: cot.estado || 'Generada'
@@ -429,26 +561,24 @@ export default function Cotizaciones() {
     });
   }
 
-  async function buscarEquipoPorCodigo(index, codigo) {
+  // Búsqueda de producto por código desde el catálogo de la familia activa.
+  // Cada familia consulta exclusivamente su propia colección.
+  async function buscarProductoPorCodigo(index, codigo) {
     if (!codigo || codigo.trim().length < 2) return;
     setBuscandoCodigo((prev) => ({ ...prev, [index]: true }));
     try {
-      const searcher = form.tipoItem === 'manga' ? searchMangaByCodigo : searchEquipoByCodigo;
+      const searcher =
+        form.tipoItem === 'manga' ? searchMangaByCodigo :
+        form.tipoItem === 'servicio' ? searchServicioByCodigo :
+        form.tipoItem === 'epp' ? searchEppByCodigo :
+        searchEquipoByCodigo;
       const producto = await searcher(codigo.trim());
       if (producto) {
         setForm((prev) => {
           const items = [...prev.items];
           items[index] = {
             ...items[index],
-            codigo: producto.codigo,
-            descripcion: producto.nombre,
-            unidadMedida: producto.unidadMedida || 'UNIDAD',
-            precioUnitario: producto.precio || 0,
-            diametro: producto.diametro || '',
-            longitud: producto.longitud || '',
-            material: producto.material || '',
-            tipoAcople: producto.tipoAcople || '',
-            esAccesorio: producto.tipoProducto === 'accesorio'
+            ...mapearProductoAItem(producto, prev.tipoItem)
           };
           return { ...prev, items };
         });
@@ -463,8 +593,9 @@ export default function Cotizaciones() {
   function agregarItem(tipo = 'producto') {
     const nuevo = { ...ITEM_VACIO, tipo };
     if (tipo === 'transporte') {
-      // Fila de servicio: sin código de catálogo, el usuario escribe la
-      // descripción (transporte, calibración, capacitación, etc.).
+      // Fila libre: sin código de catálogo. Se usa para fletes, transportes
+      // y cargos logísticos (NO forma parte de la familia Servicios, que
+      // cotiza exclusivamente servicios propios de Noova desde su catálogo).
       nuevo.cantidad = 1;
       nuevo.unidadMedida = 'SERVICIO';
       nuevo.esAccesorio = false;
@@ -480,24 +611,15 @@ export default function Cotizaciones() {
     setForm((prev) => ({ ...prev, items: prev.items.filter((_, i) => i !== index) }));
   }
 
-  function seleccionarEquipo(index, equipoId) {
-    const lista = form.tipoItem === 'manga' ? mangas : equipos;
-    const producto = lista.find((e) => e.id === equipoId);
+  function seleccionarProducto(index, productoId) {
+    const lista = catalogoFamilia[form.tipoItem] || [];
+    const producto = lista.find((e) => e.id === productoId);
     if (producto) {
       setForm((prev) => {
         const items = [...prev.items];
         items[index] = {
           ...items[index],
-          equipoId: producto.id,
-          codigo: producto.codigo,
-          descripcion: producto.nombre,
-          unidadMedida: producto.unidadMedida || 'UNIDAD',
-          precioUnitario: producto.precio || 0,
-          diametro: producto.diametro || '',
-          longitud: producto.longitud || '',
-          material: producto.material || '',
-          tipoAcople: producto.tipoAcople || '',
-          esAccesorio: producto.tipoProducto === 'accesorio'
+          ...mapearProductoAItem(producto, prev.tipoItem)
         };
         return { ...prev, items };
       });
@@ -726,6 +848,8 @@ export default function Cotizaciones() {
           longitud: item.longitud || '',
           material: item.material || '',
           tipoAcople: item.tipoAcople || '',
+          marca: item.marca || '',
+          modelo: item.modelo || '',
           tiempoEntrega: item.tiempoEntrega || '',
           tiempoEntregaNumero: item.tiempoEntregaNumero || '',
           tiempoEntregaUnidad: item.tiempoEntregaUnidad || '',
@@ -788,6 +912,16 @@ export default function Cotizaciones() {
         const downloader = modManga.downloadMangaPDF;
         downloader(cot, c);
         mostrarMensaje('success', `Generando PDF de MANGAS para la cotización ${cot.codigo || ''}`);
+      } else if (tipoDetectado === 'epp') {
+        const modEpp = await import('../utils/generateEppPDF');
+        const downloader = modEpp.downloadEppPDF;
+        downloader(cot, c);
+        mostrarMensaje('success', `Generando PDF de EPP para la cotización ${cot.codigo || ''}`);
+      } else if (tipoDetectado === 'servicio') {
+        const modServicio = await import('../utils/generateServicioPDF');
+        const downloader = modServicio.downloadServicioPDF;
+        downloader(cot, c);
+        mostrarMensaje('success', `Generando PDF de SERVICIOS para la cotización ${cot.codigo || ''}`);
       } else {
         const mod = await import('../utils/generatePDF');
         const downloader = mod.downloadCotizacionPDF;
@@ -881,6 +1015,27 @@ export default function Cotizaciones() {
             </button>
           ))}
         </div>
+        {!esMinas && (
+          <div className="pestanas-estado pestanas-familia">
+            <button
+              type="button"
+              className={`pestana-estado${filtroFamilia === '' ? ' activa' : ''}`}
+              onClick={() => { setFiltroFamilia(''); setPaginaActual(1); }}
+            >
+              Todas <span className="pestana-estado-contador">{cotizacionesVisibles.length}</span>
+            </button>
+            {FAMILIAS_COTIZACION.map((f) => (
+              <button
+                type="button"
+                key={f.key}
+                className={`pestana-estado${filtroFamilia === f.key ? ' activa' : ''}`}
+                onClick={() => { setFiltroFamilia(f.key); setPaginaActual(1); }}
+              >
+                {f.label} <span className="pestana-estado-contador">{cotizacionesVisibles.filter((c) => detectarTipoItem(c) === f.key).length}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <div className="barra-busqueda">
           <FiSearch className="icono-busqueda" size={18} />
           <input
@@ -941,7 +1096,7 @@ export default function Cotizaciones() {
                               className={`badge-tipo-cotizacion badge-tipo-${tipoCot}`}
                               title={cot.tipoItem ? 'Tipo guardado al crear' : 'Tipo detectado automáticamente'}
                             >
-                              {tipoCot === 'manga' ? 'Manga' : 'Equipo'}
+                              {ETIQUETA_FAMILIA[tipoCot] || 'Equipo'}
                             </span>
                           </div>
                         </div>
@@ -976,24 +1131,28 @@ export default function Cotizaciones() {
                       </td>
                       <td className="texto-centro">
                         <div className="acciones-tabla">
-                          <button
-                            className="btn-accion"
-                            style={cot.ordenCompraId ? { visibility: 'hidden' } : undefined}
-                            disabled={Boolean(cot.ordenCompraId)}
-                            onClick={() => navigate('/compras', { state: { cotizacionOrigen: cot } })}
-                            title="Generar orden de compra y marcar cotización como aceptada"
-                          >
-                            <FiShoppingCart size={18} />
-                          </button>
-                          <button className="btn-accion" onClick={() => exportarPDF(cot)} title={`Exportar PDF (${tipoCot === 'manga' ? 'Manga' : 'Equipo'})`}>
+                          {puedeGenerarCompras && (
+                            <button
+                              className="btn-accion"
+                              style={cot.ordenCompraId ? { visibility: 'hidden' } : undefined}
+                              disabled={Boolean(cot.ordenCompraId)}
+                              onClick={() => navigate('/compras', { state: { cotizacionOrigen: cot } })}
+                              title="Generar orden de compra y marcar cotización como aceptada"
+                            >
+                              <FiShoppingCart size={18} />
+                            </button>
+                          )}
+                          <button className="btn-accion" onClick={() => exportarPDF(cot)} title={`Exportar PDF (${ETIQUETA_FAMILIA[tipoCot] || 'Equipo'})`}>
                             <FiDownload size={18} />
                           </button>
                           <button className="btn-accion" onClick={() => editarCotizacion(cot)} title="Editar">
                             <FiEdit2 size={18} />
                           </button>
-                          <button className="btn-accion btn-eliminar" onClick={() => solicitarEliminar(cot.id)} title="Eliminar">
-                            <FiTrash2 size={18} />
-                          </button>
+                          {puedeEliminarCotizaciones && (
+                            <button className="btn-accion btn-eliminar" onClick={() => solicitarEliminar(cot.id)} title="Eliminar">
+                              <FiTrash2 size={18} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1291,15 +1450,28 @@ export default function Cotizaciones() {
               </select>
             </div>
             <div className="campo">
-              <label>Tipo de item</label>
-              <select
-                value={form.tipoItem}
-                onChange={(e) => cambiarTipoItem(e.target.value)}
-                className="selector-tipo-item"
-              >
-                <option value="equipo">Equipos</option>
-                <option value="manga">Mangas de ventilación</option>
-              </select>
+              <label>Familia de cotización</label>
+              {esMinas ? (
+                /* Minas: sin selector. La familia queda fijada en EPP y no
+                   puede cambiarla (además de estar protegido en backend). */
+                <input
+                  type="text"
+                  value="EPP"
+                  readOnly
+                  className="input-solo-lectura"
+                  title="Tu rol cotiza únicamente EPP"
+                />
+              ) : (
+                <select
+                  value={form.tipoItem}
+                  onChange={(e) => cambiarTipoItem(e.target.value)}
+                  className="selector-tipo-item"
+                >
+                  {FAMILIAS_COTIZACION.map((f) => (
+                    <option key={f.key} value={f.key}>{f.label}</option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
 
@@ -1337,7 +1509,12 @@ export default function Cotizaciones() {
           <div className="form-card-body">
           <div className="items-seccion">
             <div className="items-header">
-              <h3 className="items-titulo">{form.tipoItem === 'manga' ? 'Mangas / Accesorios' : 'Equipos / Items'}</h3>
+              <h3 className="items-titulo">
+                {form.tipoItem === 'manga' ? 'Mangas / Accesorios'
+                  : form.tipoItem === 'servicio' ? 'Servicios Noova'
+                  : form.tipoItem === 'epp' ? 'EPP'
+                  : 'Equipos / Items'}
+              </h3>
               <div className="items-header-botones">
                 <button type="button" className="btn-secundario btn-pequeno" onClick={() => agregarItem('producto')}>
                   <FiPlus size={14} /> Agregar Item
@@ -1347,8 +1524,8 @@ export default function Cotizaciones() {
                     <FiPlus size={14} /> Agregar Accesorio
                   </button>
                 )}
-                <button type="button" className="btn-secundario btn-pequeno" onClick={() => agregarItem('transporte')}>
-                  <FiPlus size={14} /> Agregar Servicio
+                <button type="button" className="btn-secundario btn-pequeno" onClick={() => agregarItem('transporte')} title="Fila libre sin catálogo: flete, transporte, seguro u otros cargos">
+                  <FiPlus size={14} /> Agregar Item libre
                 </button>
               </div>
             </div>
@@ -1358,7 +1535,7 @@ export default function Cotizaciones() {
                 <thead>
                   <tr>
                     <th className="col-codigo">Código</th>
-                    <th className="col-select">Buscar {form.tipoItem === 'manga' ? 'Manga' : 'Equipo'}</th>
+                    <th className="col-select">Buscar {form.tipoItem === 'manga' ? 'Manga' : form.tipoItem === 'servicio' ? 'Servicio' : form.tipoItem === 'epp' ? 'EPP' : 'Equipo'}</th>
                     <th className="col-desc">Descripción</th>
                     <th className="col-cant">{form.tipoItem === 'manga' ? 'Cantidad (metros)' : 'Cant.'}</th>
                     <th className="col-unidad">Unidad</th>
@@ -1395,7 +1572,7 @@ export default function Cotizaciones() {
                             type="text"
                             value={item.codigo}
                             onChange={(e) => cambiarItem(index, 'codigo', e.target.value)}
-                            onBlur={(e) => e.target.value && buscarEquipoPorCodigo(index, e.target.value)}
+                            onBlur={(e) => e.target.value && buscarProductoPorCodigo(index, e.target.value)}
                             placeholder={item.tipo === 'transporte' ? 'Opcional' : 'Código'}
                             readOnly={item.tipo !== 'transporte'}
                             title={item.codigo}
@@ -1406,14 +1583,14 @@ export default function Cotizaciones() {
                       </td>
                       <td>
                         {item.tipo === 'transporte' ? (
-                          <span className="cliente-ruc">— servicio —</span>
+                          <span className="cliente-ruc">— libre —</span>
                         ) : (
                           <EquipoCombobox
-                            equipos={form.tipoItem === 'manga' ? mangas : equipos}
+                            equipos={catalogoFamilia[form.tipoItem] || []}
                             value={item.equipoId || ''}
-                            onSelect={(equipoId) => {
-                              if (equipoId) {
-                                seleccionarEquipo(index, equipoId);
+                            onSelect={(productoId) => {
+                              if (productoId) {
+                                seleccionarProducto(index, productoId);
                               } else {
                                 cambiarItem(index, 'equipoId', '');
                               }
@@ -1426,7 +1603,7 @@ export default function Cotizaciones() {
                           type="text"
                           value={item.descripcion}
                           onChange={(e) => cambiarItem(index, 'descripcion', e.target.value)}
-                          placeholder={item.tipo === 'transporte' ? 'Ej: Transporte a obra / Calibración en sitio' : (item.tipo === 'accesorio' ? 'Ej: Codo, Conector tipo Y' : 'Descripción')}
+                          placeholder={item.tipo === 'transporte' ? 'Ej: Flete o transporte a obra' : (item.tipo === 'accesorio' ? 'Ej: Codo, Conector tipo Y' : 'Descripción')}
                           className={erroresForm[`item_${index}_descripcion`] ? 'input-error' : ''}
                         />
                         {erroresForm[`item_${index}_descripcion`] && (
@@ -1626,15 +1803,17 @@ export default function Cotizaciones() {
             </div>
           </div>
 
-          {/* Sección INCLUYE (fija, se muestra en el PDF de la cotización) */}
+          {/* Sección INCLUYE (fija, se muestra en el PDF de la cotización).
+              Cada familia usa su propia lista: los textos de calibración de
+              fábrica y garantía Testo SOLO aplican a Equipos. */}
           <div className="form-card">
             <div className="form-card-body">
             <div className="campo">
               <label>Incluye</label>
               <ul className="incluye-lista">
-                <li>Protocolo de calibración de fábrica</li>
-                <li>Garantía oficial Testo</li>
-                <li>Soporte técnico postventa</li>
+                {(INCLUYE_POR_FAMILIA[form.tipoItem] || INCLUYE_POR_FAMILIA.equipo).map((texto) => (
+                  <li key={texto}>{texto}</li>
+                ))}
               </ul>
             </div>
             </div>

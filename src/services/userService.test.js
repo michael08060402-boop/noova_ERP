@@ -40,6 +40,8 @@ test('Gerencia tiene acceso completo a los módulos', () => {
     'clientes',
     'equipos',
     'mangas',
+    'servicios',
+    'epp',
     'cotizaciones',
     'mensajeria',
     'proveedores',
@@ -57,6 +59,8 @@ test('Gerencia tiene acceso completo a los módulos', () => {
   }
 
   assert.equal(puede(user, 'clientes', 'delete'), true);
+  assert.equal(puede(user, 'servicios', 'delete'), true);
+  assert.equal(puede(user, 'epp', 'delete'), true);
   assert.equal(puedeConfiguracion(user, 'usuarios'), true);
   assert.equal(puedeConfiguracion(user, 'logs'), true);
 });
@@ -129,15 +133,44 @@ test('Marketing tiene lectura en Dashboard, Clientes y Perfil', () => {
   assert.equal(getRutaInicial(user), '/dashboard');
 });
 
-test('Jefe de Proyecto de Mina tiene Nube restringida a Proyectos y su Perfil', () => {
+test('Jefe de Proyecto de Mina ve solo Cotizaciones (modo EPP), EPP y Nube', () => {
   const user = perfil('jefe_proyecto_mina');
 
+  // Accesos permitidos: Cotizaciones (sin eliminar), EPP (solo lectura), Nube y Perfil.
   assert.equal(tienePermiso(user, 'nube'), true);
-  assert.equal(tienePermiso(user, 'dashboard'), false);
   assert.equal(tienePermiso(user, 'perfil'), true);
-  assert.equal(tienePermiso(user, 'mensajeria'), false);
+  assert.equal(tienePermiso(user, 'cotizaciones'), true);
+  assert.equal(puede(user, 'cotizaciones', 'create'), true);
+  assert.equal(puede(user, 'cotizaciones', 'update'), true);
+  assert.equal(puede(user, 'cotizaciones', 'delete'), false);
+  assert.equal(tienePermiso(user, 'epp'), true);
+  assert.equal(puede(user, 'epp', 'create'), false);
+  assert.equal(puede(user, 'epp', 'delete'), false);
+
+  // Módulos que NO debe ver en absoluto.
+  for (const modulo of [
+    'dashboard',
+    'clientes',
+    'ventas',
+    'equipos',
+    'mangas',
+    'servicios',
+    'mensajeria',
+    'proveedores',
+    'compras',
+    'facturacion',
+    'configuracion'
+  ]) {
+    assert.equal(
+      tienePermiso(user, modulo),
+      false,
+      `Minas no debe acceder a ${modulo}`
+    );
+  }
+
   assert.equal(getCarpetaNube(user), 'NOOVA SAC/13. PROYECTOS');
-  assert.equal(getRutaInicial(user), '/nube');
+  // Ruta inicial: directo a Cotizaciones (modo EPP).
+  assert.equal(getRutaInicial(user), '/cotizaciones');
 });
 
 test('un usuario inactivo o con rol desconocido no recibe acceso', () => {

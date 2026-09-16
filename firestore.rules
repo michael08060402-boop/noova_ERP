@@ -98,6 +98,36 @@ service cloud.firestore {
         || canUseMensajeria();
     }
 
+    // El rol Jefe de Proyecto de Mina no ve el módulo Clientes, pero desde
+    // el formulario de Cotizaciones (fijado a EPP) debe poder buscar
+    // clientes existentes y mantener la búsqueda/registro por RUC.
+    // Por eso necesita lectura, creación y actualización limitada de clientes.
+    function isJefeProyectoMinaActivo() {
+      return isActiveUser() && isJefeProyectoMina();
+    }
+
+    // Cotizaciones: Minas solo puede operar cotizaciones de la familia EPP.
+    // Las cotizaciones legacy (sin tipoItem) quedan excluidas para Minas:
+    // son de Equipos o Mangas y no debe verlas.
+    function canReadCotizacionEpp() {
+      return isActiveUser()
+        && isJefeProyectoMina()
+        && resource.data.tipoItem == 'epp';
+    }
+
+    function canCreateCotizacionEpp() {
+      return isActiveUser()
+        && isJefeProyectoMina()
+        && request.resource.data.tipoItem == 'epp';
+    }
+
+    function canUpdateCotizacionEpp() {
+      return isActiveUser()
+        && isJefeProyectoMina()
+        && resource.data.tipoItem == 'epp'
+        && request.resource.data.tipoItem == 'epp';
+    }
+
     function validOfficialRole(role) {
       return role in [
         'gerencia',
@@ -274,10 +304,15 @@ service cloud.firestore {
 
       // Marketing: solo lectura.
       // Soporte TI: lectura técnica necesaria para Mensajería.
-      allow read: if canReadClientesData();
+      // Jefe de Proyecto de Mina: lectura y registro desde el formulario de
+      // Cotizaciones (búsqueda y creación por RUC, edición de contactos).
+      allow read: if canReadClientesData() || isJefeProyectoMinaActivo();
 
-      // Solo Gerente/Administrador pueden alterar Clientes.
-      allow create, update, delete: if canBusinessAll();
+      // Gerencia/Administrador pueden alterar Clientes completamente.
+      // Minas puede crear y actualizar (contactos al cotizar) pero NO eliminar.
+      allow create, update: if canBusinessAll() || isJefeProyectoMinaActivo();
+
+      allow delete: if canBusinessAll();
     }
 
     // ============================================================
@@ -285,7 +320,14 @@ service cloud.firestore {
     // ============================================================
 
     match /cotizaciones/{docId} {
-      allow read, create, update, delete: if canBusinessAll();
+      // Gerencia/Administrador: acceso completo a las cuatro familias.
+      // Jefe de Proyecto de Mina: únicamente cotizaciones EPP (leer, crear y
+      // actualizar). No puede ver cotizaciones de Equipos, Mangas o Servicios
+      // ni eliminarlas. Protección real en backend, no solo en el frontend.
+      allow read: if canBusinessAll() || canReadCotizacionEpp();
+      allow create: if canBusinessAll() || canCreateCotizacionEpp();
+      allow update: if canBusinessAll() || canUpdateCotizacionEpp();
+      allow delete: if canBusinessAll();
     }
 
     // ============================================================
@@ -302,6 +344,26 @@ service cloud.firestore {
 
     match /mangas/{docId} {
       allow read, create, update, delete: if canBusinessAll();
+    }
+
+    // ============================================================
+    // SERVICIOS (catálogo de servicios propios de Noova)
+    // ============================================================
+
+    match /servicios/{docId} {
+      allow read, create, update, delete: if canBusinessAll();
+    }
+
+    // ============================================================
+    // EPP (catálogo de equipos de protección personal)
+    // ============================================================
+
+    match /epp/{docId} {
+      // Gerencia/Administrador administran el catálogo completo.
+      // Jefe de Proyecto de Mina solo lo lee (necesario para cotizar EPP
+      // y para el módulo EPP de su grupo MINAS).
+      allow read: if canBusinessAll() || isJefeProyectoMinaActivo();
+      allow create, update, delete: if canBusinessAll();
     }
 
     // ============================================================
@@ -355,10 +417,13 @@ service cloud.firestore {
 
     match /configuracion/{docId} {
 
-      // Solo roles que consumen módulos de negocio o Configuración cargan
-      // este documento; Marketing y Mina no reciben sus datos por Firestore.
+      // Los roles que consumen módulos de negocio o Configuración cargan este
+      // documento: Gerencia, Administrador y Soporte TI para administrarlo, y
+      // Jefe de Proyecto de Mina en solo lectura porque el módulo Cotizaciones
+      // (familia EPP) necesita datos de empresa y condiciones de pago.
+      // Marketing no recibe sus datos por Firestore.
       allow read: if isActiveUser()
-        && (isGerente() || isAdministrador() || isSoporteTI());
+        && (isGerente() || isAdministrador() || isSoporteTI() || isJefeProyectoMina());
 
       // Gerente y Soporte TI: Configuración completa.
       allow create, update: if isActiveUser()

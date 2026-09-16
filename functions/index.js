@@ -164,9 +164,17 @@ exports.cotizacionCrear = onCall(
     campoConfig: 'cotizacion',
     permiso: 'cotizaciones',
     defaults: { prefijo: 'NV', longitud: 7, proximoNumero: 1000001 },
-    prepararDatos: async ({ data }) => {
+    prepararDatos: async ({ data, perfil }) => {
       if (!Array.isArray(data.items) || !data.items.length) {
         throw new HttpsError('invalid-argument', 'La cotización debe contener al menos un ítem');
+      }
+      // El rol Jefe de Proyecto de Mina solo puede crear cotizaciones de la
+      // familia EPP. Se valida en backend además de en las reglas de Firestore.
+      if (normalizarRol(perfil?.role) === 'jefe_proyecto_mina' && data.tipoItem !== 'epp') {
+        throw new HttpsError(
+          'permission-denied',
+          'Tu rol solo puede crear cotizaciones de la familia EPP'
+        );
       }
       return data;
     }

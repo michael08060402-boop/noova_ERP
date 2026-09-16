@@ -1457,6 +1457,28 @@
   border-color: #fde68a;
 }
 
+/* Servicio: verde (servicios propios Noova) */
+.badge-tipo-cotizacion.badge-tipo-servicio {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
+
+/* EPP: violeta (equipos de protección personal) */
+.badge-tipo-cotizacion.badge-tipo-epp {
+  background: #f3e8ff;
+  color: #6b21a8;
+  border-color: #e9d5ff;
+}
+
+/* Filtro por familia (lista de cotizaciones): mismas píldoras que el filtro
+   de estado, separadas del grupo de estados por un borde izquierdo sutil. */
+.pestanas-familia {
+  margin-left: 0.75rem;
+  padding-left: 0.75rem;
+  border-left: 1px solid #e5e7eb;
+}
+
 .badge-tipo-cotizacion:hover {
   opacity: 0.9;
   cursor: help;
