@@ -38,10 +38,10 @@
   --spacing-xl: 2rem;
   --spacing-2xl: 3rem;
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
   --radius-full: 9999px;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -85,6 +85,27 @@ body {
 
 #root {
   min-height: 100vh;
+}
+
+/* Esquinas compartidas por todos los módulos, incluidos los de carga diferida. */
+#root :is(button, select, textarea, .nav-item,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"])) {
+  border-radius: var(--radius-md);
+}
+
+#root :is(.form-card, .tarjeta-tabla, .chart-card, .dashboard-kpi,
+  .actividad-reciente, .config-seccion, .perfil-card, .venta-card,
+  .modal, .modal-container, .confirm-dialog, .login-form-container,
+  .notifications-panel, .user-dropdown) {
+  border-radius: var(--radius-xl);
+}
+
+#root :is(.tabla-contenedor, .compras-items-wrap, .config-tabs, .mensaje-flash) {
+  border-radius: var(--radius-lg);
+}
+
+#root :is(.form-card-header, .modal-header) {
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
 }
 
 h1, h2, h3, h4, h5, h6 {

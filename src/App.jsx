@@ -96,6 +96,27 @@ function RutaSeccionConfiguracion({ seccion, children }) {
   return <Navigate to={destino} replace />;
 }
 
+function RutaConfiguracion({ children }) {
+  const { userProfile } = useAuth();
+  const location = useLocation();
+  const tieneAcceso = puede(userProfile, 'configuracion', 'read')
+    || puede(userProfile, 'perfil', 'read');
+
+  if (tieneAcceso) return children;
+
+  const destino = getRutaInicial(userProfile);
+  if (location.pathname === destino || destino === '/login') {
+    return (
+      <section className="pagina" role="alert">
+        <h1 className="pagina-titulo">Acceso no autorizado</h1>
+        <p>Tu rol no tiene permiso para acceder a esta sección.</p>
+      </section>
+    );
+  }
+
+  return <Navigate to={destino} replace />;
+}
+
 // Inyecta los datos de la empresa (desde ConfigContext) a Facturacion.
 function FacturacionWrapper() {
   const { config, loadingConfig, configError, refreshConfig } = useConfig();
@@ -257,9 +278,9 @@ function App() {
             <Route
               path="configuracion"
               element={
-                <RutaConPermiso modulo="configuracion">
+                <RutaConfiguracion>
                   <Configuracion />
-                </RutaConPermiso>
+                </RutaConfiguracion>
               }
             />
 

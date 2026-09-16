@@ -1219,24 +1219,19 @@ exports.usuariosCambiarEstado = onCall(
 );
 
 // ── Limpieza automática de auditoría ──
-// Corre sola una vez por semana y borra los logs de más de 7 días, para que
-// la colección `logs` no crezca sin límite. Usa el Admin SDK (no pasa por
-// las reglas de Firestore, que hoy bloquean el borrado desde el cliente).
-const LOGS_RETENCION_DIAS = 7;
-
-
-
+// Cada domingo vacía el historial existente al iniciar la ejecución,
+// incluidos los registros recientes. Las acciones posteriores se conservan
+// para la siguiente semana. Usa Admin SDK para realizar el borrado.
+// Se conserva el nombre desplegado para actualizar la tarea existente.
 exports.limpiarLogsAntiguos = onSchedule(
   { schedule: '0 3 * * 0', timeZone: 'America/Lima', region: 'us-central1', memory: '256MiB' },
   async () => {
-    const corte = new Date();
-    corte.setDate(corte.getDate() - LOGS_RETENCION_DIAS);
-    const corteIso = corte.toISOString();
+    const corteIso = new Date().toISOString();
 
     let totalBorrados = 0;
     while (true) {
       const snapshot = await db.collection('logs')
-        .where('createdAt', '<', corteIso)
+        .where('createdAt', '<=', corteIso)
         .limit(400)
         .get();
 
@@ -1252,7 +1247,7 @@ exports.limpiarLogsAntiguos = onSchedule(
       if (snapshot.size < 400) break;
     }
 
-    console.log(`limpiarLogsAntiguos: ${totalBorrados} logs eliminados (anteriores a ${corteIso})`);
+    console.log(`limpiarLogsAntiguos: limpieza semanal completa, ${totalBorrados} logs eliminados (hasta ${corteIso})`);
   }
 );
 

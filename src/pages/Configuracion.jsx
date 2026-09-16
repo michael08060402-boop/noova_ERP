@@ -10,16 +10,19 @@ import {
   FiPlus,
   FiCheck,
   FiCheckCircle,
-  FiAlertCircle
+  FiAlertCircle,
+  FiUser
 } from 'react-icons/fi';
 import { useConfig } from '../context/ConfigContext';
 import { useAuth } from '../context/AuthContext';
 import { getLogs } from '../services/logService';
 import {
+  puede,
   puedeConfiguracion,
   puedeEditarConfiguracion
 } from '../services/userService';
 import Usuarios from './Usuarios';
+import Perfil from './Perfil';
 import Modal from '../components/Modal';
 import Loading from '../components/Loading';
 import Paginacion from '../components/Paginacion';
@@ -27,7 +30,7 @@ import '../styles/shared.css';
 import './Configuracion.css';
 
 export default function Configuracion() {
-  const { config, loadingConfig, updateConfig } = useConfig();
+  const { config, loadingConfig, configError, updateConfig } = useConfig();
   const [searchParams, setSearchParams] = useSearchParams();
   const { userProfile } = useAuth();
 
@@ -53,6 +56,12 @@ export default function Configuracion() {
   const puedeCorrelativo = puedeConfiguracion(userProfile, 'correlativo');
   const puedeUsuarios = puedeConfiguracion(userProfile, 'usuarios');
   const puedeLogs = puedeConfiguracion(userProfile, 'logs');
+  const puedePerfil = puede(userProfile, 'perfil', 'read');
+  const tieneSeccionesConfiguracion = puedeEmpresa
+    || puedePagos
+    || puedeCorrelativo
+    || puedeUsuarios
+    || puedeLogs;
 
   const puedeEditarEmpresa = puedeEditarConfiguracion(userProfile, 'empresa');
   const puedeEditarPagos = puedeEditarConfiguracion(userProfile, 'pagos');
@@ -69,7 +78,7 @@ export default function Configuracion() {
     const tab = searchParams.get('tab');
     if (
       tab
-      && ['empresa', 'pagos', 'correlativo', 'usuarios', 'logs'].includes(tab)
+      && ['empresa', 'pagos', 'correlativo', 'usuarios', 'logs', 'perfil'].includes(tab)
     ) {
       setPestanaActiva(tab);
     }
@@ -290,9 +299,10 @@ export default function Configuracion() {
     if (puedeCorrelativo) disponibles.push({ id: 'correlativo', label: 'Correlativos', icon: <FiHash /> });
     if (puedeUsuarios) disponibles.push({ id: 'usuarios', label: 'Usuarios y Roles', icon: <FiUsers /> });
     if (puedeLogs) disponibles.push({ id: 'logs', label: 'Auditoría', icon: <FiShield /> });
+    if (puedePerfil) disponibles.push({ id: 'perfil', label: 'Mi Perfil', icon: <FiUser /> });
 
     return disponibles;
-  }, [puedeEmpresa, puedePagos, puedeCorrelativo, puedeUsuarios, puedeLogs]);
+  }, [puedeEmpresa, puedePagos, puedeCorrelativo, puedeUsuarios, puedeLogs, puedePerfil]);
 
   useEffect(() => {
     if (
@@ -315,10 +325,14 @@ export default function Configuracion() {
     return <Loading message="Cargando configuración..." />;
   }
 
-  if (!configLocal) {
+  if (!configLocal && tieneSeccionesConfiguracion) {
     return (
-      <div className="estado-vacio">
-        <p>Error al cargar la configuración</p>
+      <div className="pagina">
+        <div className="estado-vacio" role="alert">
+          <p>{configError
+            ? 'No se pudo cargar la configuración. Comprueba la conexión e inténtalo nuevamente.'
+            : 'Cargando configuración...'}</p>
+        </div>
       </div>
     );
   }
@@ -852,6 +866,13 @@ export default function Configuracion() {
                   </div>
                 </>
               )}
+
+            </div>
+          )}
+
+          {pestanaActiva === 'perfil' && puedePerfil && (
+            <div className="config-seccion config-seccion-perfil">
+              <Perfil embebido />
             </div>
           )}
         </div>

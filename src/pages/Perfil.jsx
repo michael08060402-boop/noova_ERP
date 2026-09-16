@@ -19,7 +19,7 @@ import './Perfil.css';
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
-export default function Perfil() {
+export default function Perfil({ embebido = false }) {
   const { currentUser, userProfile, refreshProfile } = useAuth();
   const puedeEditarPerfil = puede(userProfile, 'perfil', 'update');
 
@@ -332,16 +332,18 @@ export default function Perfil() {
 
   return (
     <div className="pagina">
-      <div className="pagina-header">
-        <div>
-          <h1 className="pagina-titulo">Mi Perfil</h1>
-          <p className="pagina-subtitle">
-            {puedeEditarPerfil
-              ? 'Gestiona tu información personal'
-              : 'Información de perfil · acceso de solo lectura'}
-          </p>
+      {!embebido && (
+        <div className="pagina-header">
+          <div>
+            <h1 className="pagina-titulo">Mi Perfil</h1>
+            <p className="pagina-subtitle">
+              {puedeEditarPerfil
+                ? 'Gestiona tu información personal'
+                : 'Información de perfil · acceso de solo lectura'}
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       {mensaje && (
         <div className={`mensaje-flash mensaje-${mensaje.tipo}`}>

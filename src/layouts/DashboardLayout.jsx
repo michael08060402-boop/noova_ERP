@@ -2,19 +2,19 @@ import { useState, useRef, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   FiBarChart2, FiUsers, FiFileText, FiSettings,
-  FiMenu, FiLogOut, FiUser, FiX, FiChevronDown, FiDollarSign, FiBell, FiTool,
-  FiWind, FiMessageCircle, FiCloud, FiShoppingCart, FiTruck, FiTrendingUp, FiSearch, FiCalendar
+  FiMenu, FiLogOut, FiX, FiChevronDown, FiDollarSign, FiBell, FiTool,
+  FiWind, FiMessageCircle, FiCloud, FiShoppingCart, FiTruck, FiTrendingUp, FiSearch
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useCotizaciones } from '../hooks/useCotizaciones';
 import { puede, ROLES, normalizarRol } from '../services/userService';
 import { obtenerCalibracionesProximas } from '../utils/calibracion';
 import ConfirmDialog from '../components/ConfirmDialog';
-import logo from '../assets/noova-logo.png';
 import logoBlanco from '../assets/logo-blanco.png';
 import '../styles/shared.css';
 import './DashboardLayout.css';
 import '../styles/paleta-preview.css';
+import '../styles/erp-theme.css';
 
 const ITEMS_MENU = [
   { path: '/dashboard', label: 'Dashboard', icon: <FiBarChart2 />, key: 'dashboard' },
@@ -34,8 +34,7 @@ const ITEMS_MENU = [
 const GRUPOS_MENU = [
   { id: 'comercial', label: 'Comercial y clientes', keys: ['dashboard', 'clientes', 'cotizaciones', 'ventas'] },
   { id: 'operaciones', label: 'Operaciones y servicios', keys: ['equipos', 'mangas'] },
-  { id: 'logistica', label: 'Logística y facturación', keys: ['proveedores', 'compras', 'facturacion'] },
-  { id: 'sistema', label: 'Comunicación y archivos', keys: ['mensajeria', 'nube'] }
+  { id: 'logistica', label: 'Logística y facturación', keys: ['proveedores', 'compras', 'facturacion'] }
 ];
 
 function useEsMobile() {
@@ -65,21 +64,17 @@ export default function DashboardLayout() {
 
   const [sidebarMobileAbierto, setSidebarMobileAbierto] = useState(false);
 
-  const [menuUsuarioAbierto, setMenuUsuarioAbierto] = useState(false);
   const [confirmarCierreSesion, setConfirmarCierreSesion] = useState(false);
   const [notificacionesAbiertas, setNotificacionesAbiertas] = useState(false);
-  const menuUsuarioRef = useRef(null);
   const notificacionesRef = useRef(null);
 
   const itemsMenu = ITEMS_MENU.filter((item) =>
     puede(userProfile, item.key, 'read')
+      || (item.key === 'configuracion' && puedeVerPerfil)
   );
 
   useEffect(() => {
     function manejarClickFuera(e) {
-      if (menuUsuarioRef.current && !menuUsuarioRef.current.contains(e.target)) {
-        setMenuUsuarioAbierto(false);
-      }
       if (notificacionesRef.current && !notificacionesRef.current.contains(e.target)) {
         setNotificacionesAbiertas(false);
       }
@@ -184,7 +179,7 @@ export default function DashboardLayout() {
           )}
 
           <div className="sidebar-logo">
-            <img className="sidebar-logo-img" src={esDashboard ? logoBlanco : logo} alt="NOOVA Consulting" />
+            <img className="sidebar-logo-img" src={logoBlanco} alt="NOOVA Consulting" />
           </div>
         </div>
 
@@ -252,12 +247,20 @@ export default function DashboardLayout() {
                 <FiMenu size={20} />
               </button>
             )}
-            <div className="topbar-brand">
-              <span className="topbar-title">ERP NOOVA S.A.C.</span>
+            <div className="topbar-user-static"
+                title={nombreUsuario}
+                aria-label="Menú de usuario"
+              >
+                <span className="topbar-user-icon">
+                  {nombreUsuario.trim().split(/\s+/).slice(0, 2).map((nombre) => nombre[0]).join('').toUpperCase()}
+                </span>
+                <span className="topbar-user-data">
+                  <span className="topbar-user-name">{nombreUsuario}</span>
+                  <span className="topbar-user-role">{rolUsuario}</span>
+                </span>
             </div>
           </div>
 
-          {esDashboard && (
             <div className="dashboard-module-search" role="search">
               <FiSearch aria-hidden="true" />
               <input
@@ -278,16 +281,27 @@ export default function DashboardLayout() {
                 </div>
               )}
             </div>
-          )}
-
           <div className="topbar-actions">
-            {esDashboard && (
-              <time className="dashboard-current-month" dateTime={new Date().toISOString().slice(0, 7)}>
-                <FiCalendar aria-hidden="true" />
-                {new Date().toLocaleDateString('es-PE', { month: 'long', year: 'numeric' })}
-              </time>
-            )}
-            {puedeVerConfiguracion && (
+            {['mensajeria', 'nube'].map((key) => {
+              const item = itemsMenu.find((modulo) => modulo.key === key);
+              return item && (
+                <NavLink
+                  key={key}
+                  to={item.path}
+                  className={({ isActive }) => `topbar-shortcut ${isActive ? 'topbar-shortcut-active' : ''}`}
+                  aria-label={item.label}
+                  title={item.label}
+                  onClick={() => {
+                    setSidebarMobileAbierto(false);
+                    setNotificacionesAbiertas(false);
+                    setBusquedaModulo('');
+                  }}
+                >
+                  {item.icon}
+                </NavLink>
+              );
+            })}
+            {(puedeVerConfiguracion || puedeVerPerfil) && (
               <NavLink
                 to="/configuracion"
                 className={({ isActive }) => `topbar-settings ${isActive ? 'topbar-settings-active' : ''}`}
@@ -295,7 +309,6 @@ export default function DashboardLayout() {
                 title="Configuración"
                 onClick={() => {
                   setSidebarMobileAbierto(false);
-                  setMenuUsuarioAbierto(false);
                   setNotificacionesAbiertas(false);
                 }}
               >
@@ -305,7 +318,7 @@ export default function DashboardLayout() {
             {puedeVerCotizaciones && (
               <div className="notification-wrapper" ref={notificacionesRef}>
                 <button
-                  className="notification-btn"
+                  className="notification-btn notification-btn-circular"
                   onClick={() => {
                     setNotificacionesAbiertas((p) => !p);
                     fetchCotizaciones();
@@ -351,60 +364,7 @@ export default function DashboardLayout() {
               </div>
             )}
 
-            <div className="topbar-user-wrapper" ref={menuUsuarioRef}>
-              <button
-                className="topbar-user-trigger"
-                onClick={() => setMenuUsuarioAbierto((p) => !p)}
-                title={nombreUsuario}
-                aria-label="Menú de usuario"
-                aria-expanded={menuUsuarioAbierto}
-              >
-                <span className="topbar-user-icon">
-                  {esDashboard
-                    ? nombreUsuario.trim().split(/\s+/).slice(0, 2).map((nombre) => nombre[0]).join('').toUpperCase()
-                    : <FiUser size={17} />}
-                </span>
-                <span className="topbar-user-data">
-                  <span className="topbar-user-name">{nombreUsuario}</span>
-                  <span className="topbar-user-role">{rolUsuario}</span>
-                </span>
-                <FiChevronDown
-                  className={`topbar-user-chevron ${menuUsuarioAbierto ? 'topbar-user-chevron-open' : ''}`}
-                  size={15}
-                  aria-hidden="true"
-                />
-              </button>
 
-              {menuUsuarioAbierto && (
-                <div className="user-dropdown topbar-user-dropdown">
-                  <div className="dropdown-header">
-                    <div className="dropdown-profile">
-                      <div className="dropdown-profile-data">
-                        <span className="dropdown-name">{nombreUsuario}</span>
-                        <span className="dropdown-email">{currentUser?.email}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {puedeVerPerfil && (
-                    <>
-                      <div className="dropdown-divider" />
-                      <button
-                        className="dropdown-item"
-                        onClick={() => {
-                          setMenuUsuarioAbierto(false);
-                          navigate('/perfil');
-                        }}
-                      >
-                        <FiUser size={16} />
-                        <span>Mi Perfil</span>
-                      </button>
-                    </>
-                  )}
-
-                </div>
-              )}
-            </div>
           </div>
         </header>
 
