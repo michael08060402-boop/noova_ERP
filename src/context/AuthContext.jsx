@@ -3,7 +3,7 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebas
 import { auth, authPersistenceReady } from '../firebase/config';
 import { getUserProfile } from '../services/userService';
 import { addLog } from '../services/logService';
-import Loading from '../components/Loading';
+import Loading, { startInitialLoadingCycle } from '../components/Loading';
 
 const AuthContext = createContext();
 
@@ -45,8 +45,6 @@ export function AuthProvider({ children }) {
       setUserProfile(profile);
       return profile;
     } catch (err) {
-      // Sin un perfil vigente de Firestore no se conserva ni se inventa una
-      // autorización local: se cierra la sesión de forma segura.
       if (auth.currentUser?.uid === user.uid) {
         await signOut(auth);
         setUserProfile(null);
@@ -62,8 +60,19 @@ export function AuthProvider({ children }) {
     const profile = await loadUserProfile(credential.user);
 
     if (profile) {
+      /*
+        La SPA no se recarga al pasar de /login al ERP.
+        Rearmamos el ÚNICO loader inicial para cubrir:
+        perfil -> config -> dashboard/datos iniciales.
+      */
+      startInitialLoadingCycle('Preparando ERP...');
+
       try {
-        await addLog({ usuario: profile.nombre || email, accion: 'inicio_sesion', detalle: email });
+        await addLog({
+          usuario: profile.nombre || email,
+          accion: 'inicio_sesion',
+          detalle: email
+        });
       } catch (error) {
         console.warn('No se pudo registrar el inicio de sesión:', error);
       }
@@ -119,7 +128,6 @@ export function AuthProvider({ children }) {
         try {
           await loadUserProfile(user);
         } catch (err) {
-          // Auth/loadUserProfile cierra la sesión si no existe un perfil válido.
           console.error('No se pudo establecer un perfil válido para la sesión:', err);
         } finally {
           if (mounted) setLoading(false);

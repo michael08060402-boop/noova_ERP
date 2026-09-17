@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { getConfig as fetchConfig, updateConfig as saveConfig } from '../services/configService';
 import { puede } from '../services/accessControl';
 import { useAuth } from './AuthContext';
+import Loading from '../components/Loading';
 
 const ConfigContext = createContext();
 
@@ -29,18 +30,22 @@ export function ConfigProvider({ children }) {
       setLoadingConfig(false);
       return;
     }
+
     let mounted = true;
 
     async function loadConfig() {
       setLoadingConfig(true);
+
       try {
         const data = await fetchConfig();
+
         if (mounted) {
           setConfig(data);
           setConfigError(null);
         }
       } catch (err) {
         console.error('Error cargando configuración:', err);
+
         if (mounted) {
           setConfigError(err);
         }
@@ -52,6 +57,7 @@ export function ConfigProvider({ children }) {
     }
 
     loadConfig();
+
     return () => {
       mounted = false;
     };
@@ -59,6 +65,7 @@ export function ConfigProvider({ children }) {
 
   async function refreshConfig() {
     setLoadingConfig(true);
+
     try {
       const latest = await fetchConfig(true);
       setConfig(latest);
@@ -84,9 +91,20 @@ export function ConfigProvider({ children }) {
   }
 
   const value = useMemo(
-    () => ({ config, loadingConfig, configError, refreshConfig, updateConfig }),
+    () => ({
+      config,
+      loadingConfig,
+      configError,
+      refreshConfig,
+      updateConfig
+    }),
     [config, loadingConfig, configError]
   );
 
-  return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>;
+  return (
+    <ConfigContext.Provider value={value}>
+      {loadingConfig ? <Loading message="Cargando configuración..." /> : null}
+      {children}
+    </ConfigContext.Provider>
+  );
 }

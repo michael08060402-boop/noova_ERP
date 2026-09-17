@@ -1,6 +1,5 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
-import { lazy, Suspense } from 'react';
 import Loading from './components/Loading';
 import { useConfig } from './context/ConfigContext';
 import {
@@ -8,26 +7,27 @@ import {
   puedeConfiguracion,
   getRutaInicial
 } from './services/userService';
-import './App.css';
 
-const Login = lazy(() => import('./pages/Login'));
-const DashboardLayout = lazy(() => import('./layouts/DashboardLayout'));
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-const Clientes = lazy(() => import('./pages/Clientes'));
-const Cotizaciones = lazy(() => import('./pages/Cotizaciones'));
-const Solicitudes = lazy(() => import('./pages/SolicitudesEPP'));
-const Ventas = lazy(() => import('./pages/Ventas'));
-const Equipos = lazy(() => import('./pages/Equipos'));
-const Mangas = lazy(() => import('./pages/Mangas'));
-const Servicios = lazy(() => import('./pages/Servicios'));
-const EPP = lazy(() => import('./pages/EPP'));
-const Configuracion = lazy(() => import('./pages/Configuracion'));
-const Perfil = lazy(() => import('./pages/Perfil'));
-const Facturacion = lazy(() => import('./pages/Facturacion'));
-const Mensajeria = lazy(() => import('./pages/Mensajeria'));
-const NubePage = lazy(() => import('./modules/nube/pages/NubePage'));
-const Compras = lazy(() => import('./pages/Compras'));
-const Proveedores = lazy(() => import('./pages/Proveedores'));
+import Login from './pages/Login';
+import DashboardLayout from './layouts/DashboardLayout';
+import Dashboard from './pages/Dashboard';
+import Clientes from './pages/Clientes';
+import Cotizaciones from './pages/Cotizaciones';
+import Solicitudes from './pages/SolicitudesEPP';
+import Ventas from './pages/Ventas';
+import Equipos from './pages/Equipos';
+import Mangas from './pages/Mangas';
+import Servicios from './pages/Servicios';
+import EPP from './pages/EPP';
+import Configuracion from './pages/Configuracion';
+import Perfil from './pages/Perfil';
+import Facturacion from './pages/Facturacion';
+import Mensajeria from './pages/Mensajeria';
+import NubePage from './modules/nube/pages/NubePage';
+import Compras from './pages/Compras';
+import Proveedores from './pages/Proveedores';
+
+import './App.css';
 
 function RutaProtegida({ children }) {
   const { currentUser, userProfile } = useAuth();
@@ -85,6 +85,7 @@ function RutaSeccionConfiguracion({ seccion, children }) {
   }
 
   const destino = getRutaInicial(userProfile);
+
   if (location.pathname === destino || destino === '/login') {
     return (
       <section className="pagina" role="alert">
@@ -100,12 +101,14 @@ function RutaSeccionConfiguracion({ seccion, children }) {
 function RutaConfiguracion({ children }) {
   const { userProfile } = useAuth();
   const location = useLocation();
+
   const tieneAcceso = puede(userProfile, 'configuracion', 'read')
     || puede(userProfile, 'perfil', 'read');
 
   if (tieneAcceso) return children;
 
   const destino = getRutaInicial(userProfile);
+
   if (location.pathname === destino || destino === '/login') {
     return (
       <section className="pagina" role="alert">
@@ -119,7 +122,12 @@ function RutaConfiguracion({ children }) {
 }
 
 function FacturacionWrapper() {
-  const { config, loadingConfig, configError, refreshConfig } = useConfig();
+  const {
+    config,
+    loadingConfig,
+    configError,
+    refreshConfig
+  } = useConfig();
 
   if (loadingConfig) {
     return <Loading message="Cargando configuración de la empresa..." />;
@@ -134,7 +142,12 @@ function FacturacionWrapper() {
 }
 
 function ComprasWrapper() {
-  const { config, loadingConfig, configError, refreshConfig } = useConfig();
+  const {
+    config,
+    loadingConfig,
+    configError,
+    refreshConfig
+  } = useConfig();
 
   if (loadingConfig) {
     return <Loading message="Cargando configuración de compras..." />;
@@ -152,7 +165,11 @@ function ErrorConfiguracion({ onRetry }) {
     <section className="pagina" role="alert">
       <h1 className="pagina-titulo">No se pudo cargar la configuración</h1>
       <p>Comprueba la conexión con Firebase e inténtalo nuevamente.</p>
-      <button type="button" className="btn-principal" onClick={onRetry}>
+      <button
+        type="button"
+        className="btn-principal"
+        onClick={onRetry}
+      >
         Reintentar
       </button>
     </section>
@@ -162,198 +179,202 @@ function ErrorConfiguracion({ onRetry }) {
 function App() {
   return (
     <div className="app">
-      <Suspense fallback={<Loading message="Cargando..." />}>
-        <Routes>
+      <Routes>
+        <Route
+          path="/login"
+          element={
+            <RutaPublica>
+              <Login />
+            </RutaPublica>
+          }
+        />
+
+        <Route
+          path="/"
+          element={
+            <RutaProtegida>
+              <DashboardLayout />
+            </RutaProtegida>
+          }
+        >
+          <Route index element={<InicioPorRol />} />
+
           <Route
-            path="/login"
+            path="dashboard"
             element={
-              <RutaPublica>
-                <Login />
-              </RutaPublica>
+              <RutaConPermiso modulo="dashboard">
+                <Dashboard />
+              </RutaConPermiso>
             }
           />
 
           <Route
-            path="/"
+            path="clientes"
             element={
-              <RutaProtegida>
-                <DashboardLayout />
-              </RutaProtegida>
-            }
-          >
-            <Route index element={<InicioPorRol />} />
-
-            <Route
-              path="dashboard"
-              element={
-                <RutaConPermiso modulo="dashboard">
-                  <Dashboard />
-                </RutaConPermiso>
-              }
-            />
-
-            <Route
-              path="clientes"
-              element={
-                <RutaConPermiso modulo="clientes">
-                  <Clientes />
-                </RutaConPermiso>
-              }
-            />
-
-            <Route
-              path="cotizaciones"
-              element={
-                <RutaConPermiso modulo="cotizaciones">
-                  <Cotizaciones />
-                </RutaConPermiso>
-              }
-            />
-
-            <Route
-              path="solicitudes"
-              element={
-                <RutaConPermiso modulo="solicitudes">
-                  <Solicitudes />
-                </RutaConPermiso>
-              }
-            />
-
-            <Route
-              path="solicitudes-epp"
-              element={<Navigate to="/solicitudes" replace />}
-            />
-
-            <Route
-              path="ventas"
-              element={
-                <RutaConPermiso modulo="ventas">
-                  <Ventas />
-                </RutaConPermiso>
-              }
-            />
-
-            <Route
-              path="equipos"
-              element={
-                <RutaConPermiso modulo="equipos">
-                  <Equipos />
-                </RutaConPermiso>
-              }
-            />
-
-            <Route
-              path="mangas"
-              element={
-                <RutaConPermiso modulo="mangas">
-                  <Mangas />
-                </RutaConPermiso>
-              }
-            />
-
-            <Route
-              path="servicios"
-              element={
-                <RutaConPermiso modulo="servicios">
-                  <Servicios />
-                </RutaConPermiso>
-              }
-            />
-
-            <Route
-              path="epp"
-              element={
-                <RutaConPermiso modulo="epp">
-                  <EPP />
-                </RutaConPermiso>
-              }
-            />
-
-            <Route
-              path="mensajeria"
-              element={
-                <RutaConPermiso modulo="mensajeria">
-                  <Mensajeria />
-                </RutaConPermiso>
-              }
-            />
-
-            <Route
-              path="compras"
-              element={
-                <RutaConPermiso modulo="compras">
-                  <ComprasWrapper />
-                </RutaConPermiso>
-              }
-            />
-
-            <Route
-              path="proveedores"
-              element={
-                <RutaConPermiso modulo="proveedores">
-                  <Proveedores />
-                </RutaConPermiso>
-              }
-            />
-
-            <Route path="compras/proveedores" element={<Navigate to="/proveedores" replace />} />
-
-            <Route
-              path="facturacion"
-              element={
-                <RutaConPermiso modulo="facturacion">
-                  <FacturacionWrapper />
-                </RutaConPermiso>
-              }
-            />
-
-            <Route
-              path="configuracion"
-              element={
-                <RutaConfiguracion>
-                  <Configuracion />
-                </RutaConfiguracion>
-              }
-            />
-
-            <Route
-              path="perfil"
-              element={
-                <RutaConPermiso modulo="perfil">
-                  <Perfil />
-                </RutaConPermiso>
-              }
-            />
-
-            <Route
-              path="nube"
-              element={
-                <RutaConPermiso modulo="nube">
-                  <NubePage />
-                </RutaConPermiso>
-              }
-            />
-
-            <Route
-              path="usuarios"
-              element={
-                <RutaSeccionConfiguracion seccion="usuarios">
-                  <Navigate to="/configuracion?tab=usuarios" replace />
-                </RutaSeccionConfiguracion>
-              }
-            />
-          </Route>
-
-          <Route
-            path="*"
-            element={
-              <RutaProtegida>
-                <InicioPorRol />
-              </RutaProtegida>
+              <RutaConPermiso modulo="clientes">
+                <Clientes />
+              </RutaConPermiso>
             }
           />
-        </Routes>
-      </Suspense>
+
+          <Route
+            path="cotizaciones"
+            element={
+              <RutaConPermiso modulo="cotizaciones">
+                <Cotizaciones />
+              </RutaConPermiso>
+            }
+          />
+
+          <Route
+            path="solicitudes"
+            element={
+              <RutaConPermiso modulo="solicitudes">
+                <Solicitudes />
+              </RutaConPermiso>
+            }
+          />
+
+          <Route
+            path="solicitudes-epp"
+            element={<Navigate to="/solicitudes" replace />}
+          />
+
+          <Route
+            path="ventas"
+            element={
+              <RutaConPermiso modulo="ventas">
+                <Ventas />
+              </RutaConPermiso>
+            }
+          />
+
+          <Route
+            path="equipos"
+            element={
+              <RutaConPermiso modulo="equipos">
+                <Equipos />
+              </RutaConPermiso>
+            }
+          />
+
+          <Route
+            path="mangas"
+            element={
+              <RutaConPermiso modulo="mangas">
+                <Mangas />
+              </RutaConPermiso>
+            }
+          />
+
+          <Route
+            path="servicios"
+            element={
+              <RutaConPermiso modulo="servicios">
+                <Servicios />
+              </RutaConPermiso>
+            }
+          />
+
+          <Route
+            path="epp"
+            element={
+              <RutaConPermiso modulo="epp">
+                <EPP />
+              </RutaConPermiso>
+            }
+          />
+
+          <Route
+            path="mensajeria"
+            element={
+              <RutaConPermiso modulo="mensajeria">
+                <Mensajeria />
+              </RutaConPermiso>
+            }
+          />
+
+          <Route
+            path="compras"
+            element={
+              <RutaConPermiso modulo="compras">
+                <ComprasWrapper />
+              </RutaConPermiso>
+            }
+          />
+
+          <Route
+            path="proveedores"
+            element={
+              <RutaConPermiso modulo="proveedores">
+                <Proveedores />
+              </RutaConPermiso>
+            }
+          />
+
+          <Route
+            path="compras/proveedores"
+            element={<Navigate to="/proveedores" replace />}
+          />
+
+          <Route
+            path="facturacion"
+            element={
+              <RutaConPermiso modulo="facturacion">
+                <FacturacionWrapper />
+              </RutaConPermiso>
+            }
+          />
+
+          <Route
+            path="configuracion"
+            element={
+              <RutaConfiguracion>
+                <Configuracion />
+              </RutaConfiguracion>
+            }
+          />
+
+          <Route
+            path="perfil"
+            element={
+              <RutaConPermiso modulo="perfil">
+                <Perfil />
+              </RutaConPermiso>
+            }
+          />
+
+          <Route
+            path="nube"
+            element={
+              <RutaConPermiso modulo="nube">
+                <NubePage />
+              </RutaConPermiso>
+            }
+          />
+
+          <Route
+            path="usuarios"
+            element={
+              <RutaSeccionConfiguracion seccion="usuarios">
+                <Navigate
+                  to="/configuracion?tab=usuarios"
+                  replace
+                />
+              </RutaSeccionConfiguracion>
+            }
+          />
+        </Route>
+
+        <Route
+          path="*"
+          element={
+            <RutaProtegida>
+              <InicioPorRol />
+            </RutaProtegida>
+          }
+        />
+      </Routes>
     </div>
   );
 }
