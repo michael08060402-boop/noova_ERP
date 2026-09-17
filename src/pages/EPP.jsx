@@ -1,7 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
-import { FiEdit2, FiTrash2, FiSearch, FiPlus } from 'react-icons/fi';
+import { FiEdit2, FiTrash2, FiSearch, FiPlus, FiDownload } from 'react-icons/fi';
 import { useEpp } from '../hooks/useEpp';
+import { useAuth } from '../context/AuthContext';
+import { puede } from '../services/userService';
+import { EPP_MINERIA } from '../data/eppMineria';
 import { formatUSD } from '../utils/formatCurrency';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -45,12 +48,15 @@ const UNIDADES_MEDIDA = ['UNIDAD', 'LT.', 'KG.', 'DOC.', 'PZ.', 'EQ.', 'M.', 'KI
 
 export default function EPP() {
   const { epp, loading, addEpp, editEpp, removeEpp } = useEpp();
+  const { userProfile } = useAuth();
+  const puedeCrear = puede(userProfile, 'epp', 'create');
 
   const [mostrarModal, setMostrarModal] = useState(false);
   const [mostrarConfirm, setMostrarConfirm] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [eliminarId, setEliminarId] = useState(null);
   const [mensaje, setMensaje] = useState(null);
+  const [importando, setImportando] = useState(false);
 
   function mostrarMensaje(tipo, texto) {
     setMensaje({ tipo, texto });
@@ -211,6 +217,44 @@ export default function EPP() {
     }
   }
 
+  // Importa el catálogo base de EPP de minería. Idempotente: omite los
+  // códigos que ya existen (comparación sin distinción de mayúsculas).
+  async function importarEppMineria() {
+    if (importando) return;
+    setImportando(true);
+    try {
+      const existentes = new Set(
+        epp.map((e) => String(e.codigo || '').trim().toLowerCase())
+      );
+      const nuevos = EPP_MINERIA.filter(
+        (item) => !existentes.has(String(item.codigo || '').trim().toLowerCase())
+      );
+
+      if (nuevos.length === 0) {
+        mostrarMensaje('success', 'El catálogo de EPP de minería ya está importado (sin ítems nuevos).');
+        return;
+      }
+
+      let creados = 0;
+      for (const item of nuevos) {
+        // Secuencial para respetar las reglas/validaciones de Firestore.
+        await addEpp({ ...item });
+        creados += 1;
+      }
+
+      const omitidos = EPP_MINERIA.length - creados;
+      mostrarMensaje(
+        'success',
+        `Importación completada: ${creados} EPP agregados${omitidos > 0 ? `, ${omitidos} ya existían` : ''}.`
+      );
+    } catch (err) {
+      console.error('Error importando EPP de minería:', err);
+      mostrarMensaje('error', 'Error al importar EPP de minería: ' + err.message);
+    } finally {
+      setImportando(false);
+    }
+  }
+
   async function confirmarEliminar() {
     try {
       await removeEpp(eliminarId);
@@ -231,9 +275,23 @@ export default function EPP() {
           <h1 className="pagina-titulo">EPP</h1>
           <p className="pagina-subtitle">{epp.length} equipos de protección personal registrados</p>
         </div>
-        <button className="btn-principal" onClick={nuevoEpp}>
-          <FiPlus size={16} /> Nuevo EPP
-        </button>
+        <div className="epp-header-acciones">
+          {puedeCrear && (
+            <button
+              className="btn-secundario"
+              onClick={importarEppMineria}
+              disabled={importando}
+              title="Agrega al catálogo los EPP de minería (chalecos, lente, polo y EPP habituales). No duplica códigos existentes."
+            >
+              <FiDownload size={16} /> {importando ? 'Importando...' : 'Importar EPP de minería'}
+            </button>
+          )}
+          {puedeCrear && (
+            <button className="btn-principal" onClick={nuevoEpp}>
+              <FiPlus size={16} /> Nuevo EPP
+            </button>
+          )}
+        </div>
       </div>
 
       {mensaje && (

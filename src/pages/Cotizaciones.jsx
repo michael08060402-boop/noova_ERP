@@ -18,7 +18,7 @@ import { searchServicioByCodigo } from '../services/servicioService';
 import { addLog } from '../services/logService';
 import { useRucLookup } from '../hooks/useRucLookup';
 import { formatDate, formatDateISO } from '../utils/formatDate';
-import { formatUSD, formatCurrency, calcularSubtotal, calcularIGV, calcularTotal } from '../utils/formatCurrency';
+import { formatUSD, formatCurrency, calcularTotalesCotizacion } from '../utils/formatCurrency';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Paginacion from '../components/Paginacion';
 import Loading from '../components/Loading';
@@ -165,6 +165,10 @@ const FORMULARIO_VACIO = {
   tiempoEntregaUnidad: 'semanas',
   tipoItem: 'equipo',
   sinIGV: false,
+  // EPP en formato factura: los precios pueden estar cargados con IGV incluido
+  // (importes redondos como en una factura). La base y el IGV se calculan
+  // dividiendo entre 1.18. Solo aplica a la familia EPP.
+  preciosIncluyenIGV: false,
   items: [{ ...ITEM_VACIO }],
   estado: 'Generada'
 };
@@ -500,6 +504,7 @@ export default function Cotizaciones() {
       tiempoEntregaUnidad: cot.tiempoEntregaUnidad || (cot.tiempoEntrega && /mes/i.test(cot.tiempoEntrega) ? 'meses' : cot.tiempoEntrega && /d[ií]a/i.test(cot.tiempoEntrega) ? 'días' : 'semanas'),
       tipoItem: esMinas ? FAMILIA_COTIZACION_MINAS : (cot.tipoItem || 'equipo'),
       sinIGV: !!cot.sinIGV,
+      preciosIncluyenIGV: !!cot.preciosIncluyenIGV,
       items: cot.items?.length ? cot.items.map((i) => ({ ...i })) : [{ ...ITEM_VACIO }],
       estado: cot.estado || 'Generada'
     });
@@ -804,9 +809,14 @@ export default function Cotizaciones() {
     setGuardando(true);
     try {
       const cliente = clientes.find((c) => c.id === form.clienteId);
-      const subtotal = calcularSubtotal(form.items);
-      const igv = form.sinIGV ? 0 : calcularIGV(subtotal);
-      const total = form.sinIGV ? subtotal : calcularTotal(subtotal);
+      const preciosConIGV = form.tipoItem === 'epp' && !!form.preciosIncluyenIGV;
+      const totalesCot = calcularTotalesCotizacion(form.items, {
+        sinIGV: form.sinIGV,
+        preciosIncluyenIGV: preciosConIGV
+      });
+      const subtotal = totalesCot.valorVenta;
+      const igv = totalesCot.igv;
+      const total = totalesCot.total;
 
       const clienteContactos = obtenerContactosCliente(cliente);
       let contactoSeleccionado = null;
@@ -858,6 +868,7 @@ export default function Cotizaciones() {
         })),
         subtotal, igv, total,
         sinIGV: !!form.sinIGV,
+        preciosIncluyenIGV: preciosConIGV,
         estado: form.estado,
         fechaEmision: formatDateISO(),
         fecha: formatDateISO(),
@@ -946,9 +957,13 @@ export default function Cotizaciones() {
     }
   }
 
-  const subtotal = calcularSubtotal(form.items);
-  const igv = form.sinIGV ? 0 : calcularIGV(subtotal);
-  const total = form.sinIGV ? subtotal : calcularTotal(subtotal);
+  const totalesResumen = calcularTotalesCotizacion(form.items, {
+    sinIGV: form.sinIGV,
+    preciosIncluyenIGV: form.tipoItem === 'epp' && !!form.preciosIncluyenIGV
+  });
+  const subtotal = totalesResumen.valorVenta;
+  const igv = totalesResumen.igv;
+  const total = totalesResumen.total;
 
   if (loading) return <Loading message="Cargando cotizaciones..." />;
 
@@ -1486,6 +1501,20 @@ export default function Cotizaciones() {
               Calcular sin IGV (algunas empresas no lo aplican)
             </label>
           </div>
+
+          {/* Precios con IGV incluido (solo EPP / formato factura) */}
+          {form.tipoItem === 'epp' && !form.sinIGV && (
+            <div className="fila-form fila-form-1">
+              <label className="checkbox-sin-igv">
+                <input
+                  type="checkbox"
+                  checked={!!form.preciosIncluyenIGV}
+                  onChange={(e) => handleChange('preciosIncluyenIGV', e.target.checked)}
+                />
+                Los precios ya incluyen IGV (formato factura: la base y el IGV se calculan dividiendo entre 1.18)
+              </label>
+            </div>
+          )}
 
           {import.meta.env.DEV && editandoId && (
             <div className="fila-form fila-form-1">
