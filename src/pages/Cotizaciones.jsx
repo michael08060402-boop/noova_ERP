@@ -325,17 +325,21 @@ function EquipoCombobox({ equipos, value, onSelect }) {
 
 export default function Cotizaciones() {
   const navigate = useNavigate();
-  const { cotizaciones, loading, addCotizacion, editCotizacion, removeCotizacion } = useCotizaciones();
   const { currentUser, userProfile } = useAuth();
-  const { config, refreshConfig } = useConfig();
 
-  // Modo especial del rol Jefe de Proyecto de Mina: la familia queda fijada
-  // en EPP. No hay selector de familia y solo ve/crea/edita cotizaciones EPP.
+  // En Minas este módulo funciona como SOLICITUD DE COTIZACIÓN de EPP.
+  // Se resuelve el rol antes de cargar datos para no consultar colecciones
+  // que el flujo de solicitud no necesita.
+  const perfilListo = Boolean(userProfile);
   const esMinas = esRolMinas(userProfile);
+  const { cotizaciones, loading, addCotizacion, editCotizacion, removeCotizacion } = useCotizaciones(perfilListo, { soloEpp: esMinas });
+  const { config, refreshConfig } = useConfig();
   const puedeEliminarCotizaciones = puede(userProfile, 'cotizaciones', 'delete');
   const puedeGenerarCompras = puede(userProfile, 'compras', 'read');
 
-  const { clientes, addCliente, editCliente } = useClientes();
+  // Una solicitud de EPP no requiere Cliente ni contacto. Evitar esta lectura
+  // hace que entrar/crear la solicitud sea más ligero y elimina campos confusos.
+  const { clientes, addCliente, editCliente } = useClientes(perfilListo && !esMinas);
   // Minas solo cotiza EPP: los catálogos de las demás familias ni siquiera
   // se consultan (sus reglas Firestore tampoco se lo permitirían).
   const { equipos } = useEquipos(!esMinas);
@@ -347,6 +351,7 @@ export default function Cotizaciones() {
   const [mostrarConfirm, setMostrarConfirm] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [eliminarId, setEliminarId] = useState(null);
+  const [eliminando, setEliminando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState(null);
 
@@ -509,8 +514,8 @@ export default function Cotizaciones() {
       estado: cot.estado || 'Generada'
     });
     setErroresForm({});
-    setBusquedaCliente(cot.cliente?.razonSocial || '');
-    setClienteSeleccionado(cot.cliente || null);
+    setBusquedaCliente(esMinas ? '' : (cot.cliente?.razonSocial || ''));
+    setClienteSeleccionado(esMinas ? null : (cot.cliente || null));
     setVista('form');
   }
 
@@ -787,13 +792,17 @@ export default function Cotizaciones() {
 
   function validarFormulario() {
     const errores = {};
-    if (!form.clienteId) errores.clienteId = 'Seleccione un cliente';
+    if (!esMinas && !form.clienteId) errores.clienteId = 'Seleccione un cliente';
 
     form.items.forEach((item, i) => {
       if (!item.descripcion) errores[`item_${i}_descripcion`] = 'Descripción requerida';
       if (!item.cantidad || item.cantidad <= 0) errores[`item_${i}_cantidad`] = 'Cantidad inválida';
-      if (!item.precioUnitario || item.precioUnitario <= 0) errores[`item_${i}_precio`] = 'Precio inválido';
-      if (item.tipo !== 'transporte' && (item.tiempoEntregaNumero === '' || item.tiempoEntregaNumero === undefined || item.tiempoEntregaNumero === null || Number(item.tiempoEntregaNumero) <= 0)) {
+
+      // En una solicitud de EPP el precio y el plazo los informa el proveedor.
+      if (!esMinas && (!item.precioUnitario || item.precioUnitario <= 0)) {
+        errores[`item_${i}_precio`] = 'Precio inválido';
+      }
+      if (!esMinas && item.tipo !== 'transporte' && (item.tiempoEntregaNumero === '' || item.tiempoEntregaNumero === undefined || item.tiempoEntregaNumero === null || Number(item.tiempoEntregaNumero) <= 0)) {
         errores[`item_${i}_entrega`] = 'Elija el tiempo de entrega (OC)';
       }
     });
@@ -808,12 +817,14 @@ export default function Cotizaciones() {
 
     setGuardando(true);
     try {
-      const cliente = clientes.find((c) => c.id === form.clienteId);
-      const preciosConIGV = form.tipoItem === 'epp' && !!form.preciosIncluyenIGV;
-      const totalesCot = calcularTotalesCotizacion(form.items, {
-        sinIGV: form.sinIGV,
-        preciosIncluyenIGV: preciosConIGV
-      });
+      const cliente = esMinas ? null : clientes.find((c) => c.id === form.clienteId);
+      const preciosConIGV = !esMinas && form.tipoItem === 'epp' && !!form.preciosIncluyenIGV;
+      const totalesCot = esMinas
+        ? { valorVenta: 0, igv: 0, total: 0 }
+        : calcularTotalesCotizacion(form.items, {
+            sinIGV: form.sinIGV,
+            preciosIncluyenIGV: preciosConIGV
+          });
       const subtotal = totalesCot.valorVenta;
       const igv = totalesCot.igv;
       const total = totalesCot.total;
@@ -826,8 +837,8 @@ export default function Cotizaciones() {
       }
 
       const data = {
-        clienteId: form.clienteId,
-        cliente: {
+        clienteId: esMinas ? '' : form.clienteId,
+        cliente: esMinas ? {} : {
           razonSocial: cliente?.razonSocial || '',
           ruc: cliente?.ruc || '',
           direccion: cliente?.direccion || '',
@@ -842,32 +853,32 @@ export default function Cotizaciones() {
         emailResponsable,
         telefonoResponsable,
         contactoSeleccionado,
-        condicionPago: form.condicionPago,
-        validez: `${form.validezNumero} días`,
-        tiempoEntregaNumero: Number(form.tiempoEntregaNumero) || 0,
-        tiempoEntregaUnidad: form.tiempoEntregaUnidad || 'semanas',
-        tiempoEntrega: `${form.tiempoEntregaNumero} ${form.tiempoEntregaUnidad} recibida la OC`,
+        condicionPago: esMinas ? '' : form.condicionPago,
+        validez: esMinas ? '' : `${form.validezNumero} días`,
+        tiempoEntregaNumero: esMinas ? 0 : (Number(form.tiempoEntregaNumero) || 0),
+        tiempoEntregaUnidad: esMinas ? '' : (form.tiempoEntregaUnidad || 'semanas'),
+        tiempoEntrega: esMinas ? '' : `${form.tiempoEntregaNumero} ${form.tiempoEntregaUnidad} recibida la OC`,
         tipoItem: form.tipoItem || 'equipo',
         items: form.items.map((item) => ({
           codigo: item.codigo,
           descripcion: item.descripcion,
           cantidad: Number(item.cantidad),
           unidadMedida: item.unidadMedida || 'UNIDAD',
-          precioUnitario: Number(item.precioUnitario),
+          precioUnitario: esMinas ? 0 : Number(item.precioUnitario),
           diametro: item.diametro || '',
           longitud: item.longitud || '',
           material: item.material || '',
           tipoAcople: item.tipoAcople || '',
           marca: item.marca || '',
           modelo: item.modelo || '',
-          tiempoEntrega: item.tiempoEntrega || '',
-          tiempoEntregaNumero: item.tiempoEntregaNumero || '',
-          tiempoEntregaUnidad: item.tiempoEntregaUnidad || '',
+          tiempoEntrega: esMinas ? '' : (item.tiempoEntrega || ''),
+          tiempoEntregaNumero: esMinas ? '' : (item.tiempoEntregaNumero || ''),
+          tiempoEntregaUnidad: esMinas ? '' : (item.tiempoEntregaUnidad || ''),
           esAccesorio: !!item.esAccesorio,
           tipo: item.tipo || 'producto'
         })),
         subtotal, igv, total,
-        sinIGV: !!form.sinIGV,
+        sinIGV: esMinas ? false : !!form.sinIGV,
         preciosIncluyenIGV: preciosConIGV,
         estado: form.estado,
         fechaEmision: formatDateISO(),
@@ -877,12 +888,15 @@ export default function Cotizaciones() {
 
       if (editandoId) {
         await editCotizacion(editandoId, data);
-        await addLog({ usuario: responsable, accion: 'editar_cotizacion', detalle: data.codigo || editandoId });
+        setVista('lista');
+        addLog({ usuario: responsable, accion: 'editar_cotizacion', detalle: data.codigo || editandoId })
+          .catch((err) => console.warn('No se pudo registrar el log de edición:', err));
       } else {
         const result = await addCotizacion(data);
-        await addLog({ usuario: responsable, accion: 'crear_cotizacion', detalle: result.codigo || '' });
+        setVista('lista');
+        addLog({ usuario: responsable, accion: 'crear_cotizacion', detalle: result.codigo || '' })
+          .catch((err) => console.warn('No se pudo registrar el log de creación:', err));
       }
-      setVista('lista');
     } catch (err) {
       console.error('Error guardando cotización:', err);
       mostrarMensaje('error', 'Error al guardar cotización: ' + err.message);
@@ -946,14 +960,20 @@ export default function Cotizaciones() {
   }
 
   async function confirmarEliminar() {
+    if (!eliminarId || eliminando) return;
+    const id = eliminarId;
+    setEliminando(true);
     try {
-      await removeCotizacion(eliminarId);
-      await addLog({ usuario: responsable, accion: 'eliminar_cotizacion' });
+      await removeCotizacion(id);
       setMostrarConfirm(false);
       setEliminarId(null);
+      addLog({ usuario: responsable, accion: 'eliminar_cotizacion' })
+        .catch((err) => console.warn('No se pudo registrar el log de eliminación:', err));
     } catch (err) {
       console.error('Error eliminando cotización:', err);
       mostrarMensaje('error', 'Error al eliminar cotización');
+    } finally {
+      setEliminando(false);
     }
   }
 
@@ -971,16 +991,18 @@ export default function Cotizaciones() {
     <div className="pagina">
       <div className="pagina-header">
         <div>
-          <h1 className="pagina-titulo">Cotizaciones</h1>
+          <h1 className="pagina-titulo">{esMinas ? 'Solicitudes de cotización' : 'Cotizaciones'}</h1>
           {vista === 'lista' && (
             <p className="pagina-subtitle">
-              {cotizaciones.length} cotizaciones registradas • {pendientesCount} pendientes
+              {esMinas
+                ? `${cotizacionesVisibles.length} solicitudes registradas`
+                : `${cotizaciones.length} cotizaciones registradas • ${pendientesCount} pendientes`}
             </p>
           )}
         </div>
         {vista === 'lista' && (
           <button className="btn-principal" onClick={nuevaCotizacion}>
-            <FiPlus size={16} /> Nueva Cotización
+            <FiPlus size={16} /> {esMinas ? 'Nueva solicitud' : 'Nueva Cotización'}
           </button>
         )}
       </div>
@@ -988,16 +1010,16 @@ export default function Cotizaciones() {
       <div className="tabs-cotizaciones">
         {vista === 'form' ? (
           <button type="button" className="tab-cotizacion tab-volver" onClick={() => setVista('lista')}>
-            <FiArrowLeft size={14} /> Volver a la lista de cotizaciones
+            <FiArrowLeft size={14} /> {esMinas ? 'Volver a solicitudes' : 'Volver a la lista de cotizaciones'}
           </button>
         ) : (
           <button type="button" className="tab-cotizacion activa" onClick={() => setVista('lista')}>
-            Lista de cotizaciones
+            {esMinas ? 'Solicitudes' : 'Lista de cotizaciones'}
           </button>
         )}
         {vista === 'form' && (
           <button type="button" className="tab-cotizacion activa" disabled>
-            {editandoId ? 'Editar Cotización' : 'Nueva Cotización'}
+            {esMinas ? (editandoId ? 'Editar solicitud' : 'Nueva solicitud') : (editandoId ? 'Editar Cotización' : 'Nueva Cotización')}
           </button>
         )}
       </div>
@@ -1055,7 +1077,7 @@ export default function Cotizaciones() {
           <FiSearch className="icono-busqueda" size={18} />
           <input
             type="text"
-            placeholder="Buscar por código, cliente o responsable..."
+            placeholder={esMinas ? 'Buscar por código o solicitante...' : 'Buscar por código, cliente o responsable...'}
             value={terminoBusqueda}
             onChange={(e) => alCambiarBusqueda(e.target.value)}
           />
@@ -1085,10 +1107,19 @@ export default function Cotizaciones() {
                   <tr>
                     <th>Código</th>
                     <th>Fecha</th>
-                    <th>Cliente</th>
-                    <th>Responsable</th>
-                    <th>Cond. Pago</th>
-                    <th className="texto-derecha">Total</th>
+                    {esMinas ? (
+                      <>
+                        <th>Solicitante</th>
+                        <th>Moneda</th>
+                      </>
+                    ) : (
+                      <>
+                        <th>Cliente</th>
+                        <th>Responsable</th>
+                        <th>Cond. Pago</th>
+                        <th className="texto-derecha">Total</th>
+                      </>
+                    )}
                     <th className="texto-centro">
                       Estado
                       <span className="info-icon" title="El estado se actualiza automáticamente desde SUNAT">i</span>
@@ -1103,22 +1134,31 @@ export default function Cotizaciones() {
                     <tr key={cot.id} className={COLOR_FILA_ESTADO[cot.estado] || ''}>
                       <td className="texto-codigo">{cot.codigo}</td>
                       <td>{formatDate(cot.fecha || cot.fechaEmision || cot.createdAt)}</td>
-                      <td>
-                        <div className="cliente-con-avatar">
-                          <div className="cliente-con-avatar-info">
-                            <span className="cliente-con-avatar-nombre">{cot.cliente?.razonSocial || '-'}</span>
-                            <span
-                              className={`badge-tipo-cotizacion badge-tipo-${tipoCot}`}
-                              title={cot.tipoItem ? 'Tipo guardado al crear' : 'Tipo detectado automáticamente'}
-                            >
-                              {ETIQUETA_FAMILIA[tipoCot] || 'Equipo'}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td>{cot.responsable || '-'}</td>
-                      <td>{cot.condicionPago || '-'}</td>
-                      <td className="texto-derecha texto-negrita cotizacion-total-lista">{formatMoneda(cot.total || 0, cot.moneda)}</td>
+                      {esMinas ? (
+                        <>
+                          <td>{cot.responsable || '-'}</td>
+                          <td>{cot.moneda === 'S/' ? 'Soles (S/)' : 'Dólares (US$)'}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td>
+                            <div className="cliente-con-avatar">
+                              <div className="cliente-con-avatar-info">
+                                <span className="cliente-con-avatar-nombre">{cot.cliente?.razonSocial || '-'}</span>
+                                <span
+                                  className={`badge-tipo-cotizacion badge-tipo-${tipoCot}`}
+                                  title={cot.tipoItem ? 'Tipo guardado al crear' : 'Tipo detectado automáticamente'}
+                                >
+                                  {ETIQUETA_FAMILIA[tipoCot] || 'Equipo'}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td>{cot.responsable || '-'}</td>
+                          <td>{cot.condicionPago || '-'}</td>
+                          <td className="texto-derecha texto-negrita cotizacion-total-lista">{formatMoneda(cot.total || 0, cot.moneda)}</td>
+                        </>
+                      )}
                       <td className="texto-centro">
                         <span
                           className={`badge-estado-sunat estado-${(cot.estado || 'Generada').toLowerCase()}`}
@@ -1160,7 +1200,7 @@ export default function Cotizaciones() {
                           <button className="btn-accion" onClick={() => exportarPDF(cot)} title={`Exportar PDF (${ETIQUETA_FAMILIA[tipoCot] || 'Equipo'})`}>
                             <FiDownload size={18} />
                           </button>
-                          <button className="btn-accion" onClick={() => editarCotizacion(cot)} title="Editar">
+                          <button className="btn-accion" onClick={() => editarCotizacion(cot)} title={esMinas ? 'Editar solicitud' : 'Editar'}>
                             <FiEdit2 size={18} />
                           </button>
                           {puedeEliminarCotizaciones && (
@@ -1190,6 +1230,8 @@ export default function Cotizaciones() {
         <div className="form-card">
           <div className="form-card-header"><span className="form-card-icon"><FiBriefcase size={16} /></span><h3>Datos comerciales</h3></div>
           <div className="form-card-body">
+          {!esMinas && (
+            <>
           {/* Cliente */}
           <div className="fila-form">
             <div className="campo campo-cliente-busqueda">
@@ -1432,51 +1474,69 @@ export default function Cotizaciones() {
             </div>
           )}
 
-          {/* Condición, Validez, Moneda, Tipo de item */}
-          <div className="fila-form fila-form-4">
-            <div className="campo">
-              <label>Condición de Pago</label>
-              <select value={form.condicionPago} onChange={(e) => handleChange('condicionPago', e.target.value)}>
-                {CONDICIONES_PAGO.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
-            <div className="campo">
-              <label>Validez</label>
-              <div className="input-con-sufijo">
-                <input
-                  type="number"
-                  value={form.validezNumero}
-                  onChange={(e) => handleChange('validezNumero', e.target.value === '' ? '' : Number(e.target.value))}
-                  min="1"
-                  placeholder="15"
-                  className="input-numero"
-                />
-                <span className="sufijo-input">días</span>
+            </>
+          )}
+
+          {/* Datos comerciales / datos de solicitud */}
+          {esMinas ? (
+            <div className="fila-form fila-form-3">
+              <div className="campo">
+                <label>Solicitante</label>
+                <input type="text" value={responsable} readOnly className="input-solo-lectura" />
               </div>
-            </div>
-            <div className="campo">
-              <label>Moneda</label>
-              <select value={form.moneda} onChange={(e) => handleChange('moneda', e.target.value)}>
-                {MONEDAS.map((m) => (
-                  <option key={m.codigo} value={m.codigo}>{m.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="campo">
-              <label>Familia de cotización</label>
-              {esMinas ? (
-                /* Minas: sin selector. La familia queda fijada en EPP y no
-                   puede cambiarla (además de estar protegido en backend). */
+              <div className="campo">
+                <label>Tipo de moneda</label>
+                <select value={form.moneda} onChange={(e) => handleChange('moneda', e.target.value)}>
+                  {MONEDAS.map((m) => (
+                    <option key={m.codigo} value={m.codigo}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="campo">
+                <label>Tipo de cotización</label>
                 <input
                   type="text"
                   value="EPP"
                   readOnly
                   className="input-solo-lectura"
-                  title="Tu rol cotiza únicamente EPP"
+                  title="El rol de Minas solicita únicamente EPP"
                 />
-              ) : (
+              </div>
+            </div>
+          ) : (
+            <div className="fila-form fila-form-4">
+              <div className="campo">
+                <label>Condición de Pago</label>
+                <select value={form.condicionPago} onChange={(e) => handleChange('condicionPago', e.target.value)}>
+                  {CONDICIONES_PAGO.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="campo">
+                <label>Validez</label>
+                <div className="input-con-sufijo">
+                  <input
+                    type="number"
+                    value={form.validezNumero}
+                    onChange={(e) => handleChange('validezNumero', e.target.value === '' ? '' : Number(e.target.value))}
+                    min="1"
+                    placeholder="15"
+                    className="input-numero"
+                  />
+                  <span className="sufijo-input">días</span>
+                </div>
+              </div>
+              <div className="campo">
+                <label>Moneda</label>
+                <select value={form.moneda} onChange={(e) => handleChange('moneda', e.target.value)}>
+                  {MONEDAS.map((m) => (
+                    <option key={m.codigo} value={m.codigo}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="campo">
+                <label>Tipo de cotización</label>
                 <select
                   value={form.tipoItem}
                   onChange={(e) => cambiarTipoItem(e.target.value)}
@@ -1486,10 +1546,12 @@ export default function Cotizaciones() {
                     <option key={f.key} value={f.key}>{f.label}</option>
                   ))}
                 </select>
-              )}
+              </div>
             </div>
-          </div>
+          )}
 
+          {!esMinas && (
+            <>
           {/* Calcular sin IGV */}
           <div className="fila-form fila-form-1">
             <label className="checkbox-sin-igv">
@@ -1516,7 +1578,10 @@ export default function Cotizaciones() {
             </div>
           )}
 
-          {import.meta.env.DEV && editandoId && (
+            </>
+          )}
+
+          {!esMinas && import.meta.env.DEV && editandoId && (
             <div className="fila-form fila-form-1">
               <div className="campo">
                 <label>Estado de cotización · pruebas</label>
@@ -1534,7 +1599,7 @@ export default function Cotizaciones() {
         </div>
 
         <div className="form-card">
-          <div className="form-card-header"><span className="form-card-icon"><FiList size={16} /></span><h3>Items de la cotización</h3></div>
+          <div className="form-card-header"><span className="form-card-icon"><FiList size={16} /></span><h3>{esMinas ? 'EPP solicitados' : 'Items de la cotización'}</h3></div>
           <div className="form-card-body">
           <div className="items-seccion">
             <div className="items-header">
@@ -1546,16 +1611,18 @@ export default function Cotizaciones() {
               </h3>
               <div className="items-header-botones">
                 <button type="button" className="btn-secundario btn-pequeno" onClick={() => agregarItem('producto')}>
-                  <FiPlus size={14} /> Agregar Item
+                  <FiPlus size={14} /> {esMinas ? 'Agregar EPP' : 'Agregar Item'}
                 </button>
                 {form.tipoItem === 'manga' && (
                   <button type="button" className="btn-secundario btn-pequeno" onClick={() => agregarItem('accesorio')}>
                     <FiPlus size={14} /> Agregar Accesorio
                   </button>
                 )}
-                <button type="button" className="btn-secundario btn-pequeno" onClick={() => agregarItem('transporte')} title="Fila libre sin catálogo: flete, transporte, seguro u otros cargos">
-                  <FiPlus size={14} /> Agregar Item libre
-                </button>
+                {!esMinas && (
+                  <button type="button" className="btn-secundario btn-pequeno" onClick={() => agregarItem('transporte')} title="Fila libre sin catálogo para cargos adicionales">
+                    <FiPlus size={14} /> Agregar Item libre
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1568,14 +1635,14 @@ export default function Cotizaciones() {
                     <th className="col-desc">Descripción</th>
                     <th className="col-cant">{form.tipoItem === 'manga' ? 'Cantidad (metros)' : 'Cant.'}</th>
                     <th className="col-unidad">Unidad</th>
-                    <th className="col-precio">{form.tipoItem === 'manga' ? 'Precio Lineal' : 'Precio Unit.'}</th>
-                    <th className="col-subtotal">Subtotal</th>
+                    {!esMinas && <th className="col-precio">{form.tipoItem === 'manga' ? 'Precio Lineal' : 'Precio Unit.'}</th>}
+                    {!esMinas && <th className="col-subtotal">Subtotal</th>}
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {form.items.map((item, index) => {
-                    const colSpanFila = 8;
+                    const colSpanFila = esMinas ? 6 : 8;
                     const numeroEnGrupo = form.items
                       .slice(0, index + 1)
                       .filter((it) => it.tipo === item.tipo).length;
@@ -1583,7 +1650,11 @@ export default function Cotizaciones() {
                       ? `Accesorio #${numeroEnGrupo}`
                       : item.tipo === 'transporte'
                         ? `Servicio #${numeroEnGrupo}`
-                        : (form.tipoItem === 'manga' ? `Manga #${numeroEnGrupo}` : `Equipo #${numeroEnGrupo}`);
+                        : (form.tipoItem === 'manga'
+                            ? `Manga #${numeroEnGrupo}`
+                            : form.tipoItem === 'epp'
+                              ? `EPP #${numeroEnGrupo}`
+                              : `Equipo #${numeroEnGrupo}`);
                     const finGrupoEnMain = item.tipo === 'transporte';
                     return (
                     <Fragment key={index}>
@@ -1663,19 +1734,23 @@ export default function Cotizaciones() {
                           {item.tipo === 'transporte' && <option value="SERVICIO">SERVICIO</option>}
                         </select>
                       </td>
-                      <td>
-                        <input
-                          type="number"
-                          value={item.precioUnitario}
-                          onChange={(e) => cambiarItem(index, 'precioUnitario', e.target.value)}
-                          min="0"
-                          step="0.01"
-                          className={`input-derecha ${erroresForm[`item_${index}_precio`] ? 'input-error' : ''}`}
-                        />
-                      </td>
-                      <td className="texto-derecha texto-negrita">
-                        {formatMoneda((Number(item.cantidad) || 0) * (Number(item.precioUnitario) || 0), form.moneda)}
-                      </td>
+                      {!esMinas && (
+                        <td>
+                          <input
+                            type="number"
+                            value={item.precioUnitario}
+                            onChange={(e) => cambiarItem(index, 'precioUnitario', e.target.value)}
+                            min="0"
+                            step="0.01"
+                            className={`input-derecha ${erroresForm[`item_${index}_precio`] ? 'input-error' : ''}`}
+                          />
+                        </td>
+                      )}
+                      {!esMinas && (
+                        <td className="texto-derecha texto-negrita">
+                          {formatMoneda((Number(item.cantidad) || 0) * (Number(item.precioUnitario) || 0), form.moneda)}
+                        </td>
+                      )}
                       <td>
                         <button
                           type="button"
@@ -1752,7 +1827,7 @@ export default function Cotizaciones() {
                         </td>
                       </tr>
                     )}
-                    {item.tipo !== 'transporte' && (
+                    {!esMinas && item.tipo !== 'transporte' && (
                       <tr className="fila-entrega-oc fila-item-divisor">
                         <td colSpan={colSpanFila}>
                           <div className="entrega-oc-label">
@@ -1812,6 +1887,7 @@ export default function Cotizaciones() {
         </div>
 
         <div className="cotizacion-form-sidebar">
+          {!esMinas && (
           <div className="form-card resumen-card">
             <div className="form-card-header"><span className="form-card-icon"><FiFileText size={16} /></span><h3>Resumen de cotización</h3></div>
             <div className="form-card-body">
@@ -1831,10 +1907,12 @@ export default function Cotizaciones() {
               </div>
             </div>
           </div>
+          )}
 
           {/* Sección INCLUYE (fija, se muestra en el PDF de la cotización).
               Cada familia usa su propia lista: los textos de calibración de
               fábrica y garantía Testo SOLO aplican a Equipos. */}
+          {!esMinas && (
           <div className="form-card">
             <div className="form-card-body">
             <div className="campo">
@@ -1847,13 +1925,18 @@ export default function Cotizaciones() {
             </div>
             </div>
           </div>
+          )}
 
           <div className="acciones-form acciones-form-sidebar">
             <button type="button" className="btn-secundario" onClick={() => setVista('lista')}>
               Cancelar
             </button>
             <button type="submit" className="btn-principal" disabled={guardando}>
-              {guardando ? 'Guardando...' : editandoId ? 'Actualizar Cotización' : 'Crear Cotización'}
+              {guardando
+                ? (esMinas ? 'Creando solicitud...' : 'Guardando...')
+                : esMinas
+                  ? (editandoId ? 'Actualizar solicitud' : 'Crear solicitud')
+                  : (editandoId ? 'Actualizar Cotización' : 'Crear Cotización')}
             </button>
           </div>
         </div>
@@ -1868,6 +1951,7 @@ export default function Cotizaciones() {
         onConfirm={confirmarEliminar}
         title="¿Eliminar cotización?"
         message="Esta acción eliminará la cotización permanentemente. ¿Está seguro?"
+        busy={eliminando}
       />
     </div>
   );

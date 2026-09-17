@@ -30,14 +30,6 @@
   border-color: #e5e7eb;
 }
 
-/* ── ACCIONES DE LA CABECERA (Importar + Nuevo EPP) ── */
-.epp-header-acciones {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-}
-
 /* ── FILA DE DOS COLUMNAS EN EL FORMULARIO (Marca/Modelo, Unidad/Precio) ── */
 .fila-form-2 {
   display: grid;

@@ -13,17 +13,16 @@ export const AREAS = {
 
 const TODO = ['read', 'create', 'update', 'delete'];
 
-// Familias de cotización. Una cotización pertenece a una sola familia y
-// sus productos se cargan exclusivamente del catálogo correspondiente.
+// Familias de COTIZACIÓN COMERCIAL. EPP se gestiona en un flujo separado
+// de Solicitudes para no mezclar cliente/precios/IGV con una solicitud
+// que NOOVA envía a proveedores.
 export const FAMILIAS_COTIZACION = [
   { key: 'equipo', label: 'Equipos' },
   { key: 'manga', label: 'Mangas' },
-  { key: 'servicio', label: 'Servicios' },
-  { key: 'epp', label: 'EPP' }
+  { key: 'servicio', label: 'Servicios' }
 ];
 
-// Familia forzada para el rol Jefe de Proyecto de Mina: cotiza únicamente
-// EPP (sin selector de familia en la UI ni acceso a las demás familias).
+// Compatibilidad con registros y reglas existentes de solicitudes EPP.
 export const FAMILIA_COTIZACION_MINAS = 'epp';
 
 const PERMISOS_TOTALES = {
@@ -34,6 +33,7 @@ const PERMISOS_TOTALES = {
   servicios: TODO,
   epp: TODO,
   cotizaciones: TODO,
+  solicitudes: TODO,
   ventas: TODO,
   mensajeria: TODO,
   proveedores: TODO,
@@ -66,7 +66,6 @@ export const ROLES = {
     label: 'Administrador',
     areaPredeterminada: 'administracion',
     permissions: { ...PERMISOS_TOTALES },
-    // El documento funcional indica: Configuración parcial, solo Correlativos.
     configuracion: ['correlativo'],
     nubeCarpeta: 'NOOVA SAC',
     rutaInicial: '/dashboard'
@@ -81,8 +80,6 @@ export const ROLES = {
       nube: TODO,
       mensajeria: TODO
     },
-    // Como el documento no marca Configuración como parcial para Soporte TI,
-    // se interpreta acceso completo a sus secciones.
     configuracion: ['*'],
     nubeCarpeta: 'NOOVA SAC/10. SISTEMAS',
     rutaInicial: '/configuracion'
@@ -103,22 +100,20 @@ export const ROLES = {
     rutaInicial: '/dashboard'
   },
 
-  // Jefe de Proyecto de Mina: interfaz muy limitada. Ve únicamente el grupo
-  // MINAS (Cotizaciones + EPP) y conserva Nube en el topbar.
-  // Cotizaciones funciona en modo especial: fijado a EPP, sin selector de
-  // familia y sin eliminar (solo leer, crear y editar cotizaciones EPP).
+  // Minas trabaja con una pantalla específica de Solicitudes.
+  // Puede leer, crear y editar; no eliminar. El catálogo EPP sigue en solo lectura.
   jefe_proyecto_mina: {
     label: 'Jefe de Proyecto de Mina',
     areaPredeterminada: 'minas',
     permissions: {
-      cotizaciones: ['read', 'create', 'update'],
+      solicitudes: ['read', 'create', 'update'],
       epp: ['read'],
       nube: TODO,
       perfil: ['read', 'update']
     },
     configuracion: [],
     nubeCarpeta: 'NOOVA SAC/13. PROYECTOS',
-    rutaInicial: '/cotizaciones'
+    rutaInicial: '/solicitudes'
   }
 };
 
@@ -130,6 +125,7 @@ export const MODULOS = [
   { key: 'servicios', label: 'Servicios' },
   { key: 'epp', label: 'EPP' },
   { key: 'cotizaciones', label: 'Cotizaciones' },
+  { key: 'solicitudes', label: 'Solicitudes' },
   { key: 'ventas', label: 'Ventas' },
   { key: 'mensajeria', label: 'Mensajería' },
   { key: 'proveedores', label: 'Proveedores' },
@@ -140,8 +136,6 @@ export const MODULOS = [
   { key: 'configuracion', label: 'Configuración' }
 ];
 
-// Alias únicamente para una transición segura desde valores antiguos que
-// tienen una equivalencia inequívoca. No crea roles adicionales en la UI.
 const ALIAS_ROL = {
   admin: 'administrador',
   gerente: 'gerencia',
@@ -200,12 +194,10 @@ export function puede(profile, modulo, accion = 'read') {
   return acciones.includes('all') || acciones.includes(accion);
 }
 
-// Compatibilidad con componentes existentes: equivale a poder leer/entrar.
 export function tienePermiso(profile, modulo) {
   return puede(profile, modulo, 'read');
 }
 
-// Compatibilidad con código que todavía espera una lista plana de módulos.
 export function getPermisosUsuario(profile) {
   if (!esUsuarioActivo(profile)) return [];
 
@@ -244,8 +236,6 @@ export function getRutaInicial(profile) {
   return primera ? `/${primera.key}` : '/login';
 }
 
-// Rol Jefe de Proyecto de Mina (con alias legacy). Se usa para el modo
-// especial de Cotizaciones (familia EPP forzada) y el grupo MINAS del sidebar.
 export function esRolMinas(profileOrRole) {
   const role = typeof profileOrRole === 'string'
     ? normalizarRol(profileOrRole)
@@ -253,11 +243,11 @@ export function esRolMinas(profileOrRole) {
   return role === 'jefe_proyecto_mina';
 }
 
-// Familia que puede cotizar un perfil. Minas solo cotiza EPP; el resto de
-// roles puede elegir cualquiera de las cuatro familias.
+// Se conserva por compatibilidad con componentes antiguos. En la interfaz
+// nueva, Minas crea EPP desde /solicitudes y no desde Cotizaciones.
 export function getFamiliasCotizables(profile) {
   if (esRolMinas(profile)) {
-    return FAMILIAS_COTIZACION.filter((f) => f.key === FAMILIA_COTIZACION_MINAS);
+    return [{ key: FAMILIA_COTIZACION_MINAS, label: 'EPP' }];
   }
   return FAMILIAS_COTIZACION;
 }

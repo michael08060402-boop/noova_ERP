@@ -1,10 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
-import { FiEdit2, FiTrash2, FiSearch, FiPlus, FiDownload } from 'react-icons/fi';
+import { FiEdit2, FiTrash2, FiSearch, FiPlus } from 'react-icons/fi';
 import { useEpp } from '../hooks/useEpp';
 import { useAuth } from '../context/AuthContext';
 import { puede } from '../services/userService';
-import { EPP_MINERIA } from '../data/eppMineria';
 import { formatUSD } from '../utils/formatCurrency';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -40,8 +39,7 @@ const FORMULARIO_VACIO = {
   modelo: '',
   unidadMedida: 'UNIDAD',
   precio: '',
-  descripcion: '',
-  activo: true
+  descripcion: ''
 };
 
 const UNIDADES_MEDIDA = ['UNIDAD', 'LT.', 'KG.', 'DOC.', 'PZ.', 'EQ.', 'M.', 'KIT.', '%.', 'MILL.'];
@@ -56,7 +54,6 @@ export default function EPP() {
   const [editandoId, setEditandoId] = useState(null);
   const [eliminarId, setEliminarId] = useState(null);
   const [mensaje, setMensaje] = useState(null);
-  const [importando, setImportando] = useState(false);
 
   function mostrarMensaje(tipo, texto) {
     setMensaje({ tipo, texto });
@@ -64,7 +61,6 @@ export default function EPP() {
   }
 
   const [terminoBusqueda, setTerminoBusqueda] = useState('');
-  const [filtroEstado, setFiltroEstado] = useState('');
   const [orden, setOrden] = useState('asc');
   const [guardando, setGuardando] = useState(false);
   const [paginaActual, setPaginaActual] = useState(1);
@@ -107,9 +103,7 @@ export default function EPP() {
           e.marca?.toLowerCase().includes(term) ||
           e.modelo?.toLowerCase().includes(term)
         );
-        const coincideEstado = !filtroEstado
-          || (filtroEstado === 'activos' ? e.activo !== false : e.activo === false);
-        return coincideBusqueda && coincideEstado;
+        return coincideBusqueda;
       })
       .sort((a, b) => {
         if (orden === 'asc' || orden === 'desc') {
@@ -122,7 +116,7 @@ export default function EPP() {
         if (orden === 'precio-desc') return (Number(b.precio) || 0) - (Number(a.precio) || 0);
         return 0;
       });
-  }, [epp, terminoBusqueda, filtroEstado, orden]);
+  }, [epp, terminoBusqueda, orden]);
 
   const eppPaginados = useMemo(() => {
     const inicio = (paginaActual - 1) * porPagina;
@@ -134,10 +128,6 @@ export default function EPP() {
     setPaginaActual(1);
   }
 
-  function alCambiarEstado(valor) {
-    setFiltroEstado(valor);
-    setPaginaActual(1);
-  }
 
   function alCambiarOrden(valor) {
     setOrden(valor);
@@ -166,8 +156,7 @@ export default function EPP() {
       modelo: item.modelo || '',
       unidadMedida: item.unidadMedida || 'UNIDAD',
       precio: item.precio ?? '',
-      descripcion: item.descripcion || '',
-      activo: item.activo !== false
+      descripcion: item.descripcion || ''
     });
     setMostrarModal(true);
   }
@@ -197,8 +186,7 @@ export default function EPP() {
         modelo: data.modelo || '',
         unidadMedida: data.unidadMedida || 'UNIDAD',
         precio: Number(data.precio) || 0,
-        descripcion: data.descripcion || '',
-        activo: data.activo !== false
+        descripcion: data.descripcion || ''
       };
       if (editandoId) {
         await editEpp(editandoId, payload);
@@ -217,52 +205,16 @@ export default function EPP() {
     }
   }
 
-  // Importa el catálogo base de EPP de minería. Idempotente: omite los
-  // códigos que ya existen (comparación sin distinción de mayúsculas).
-  async function importarEppMineria() {
-    if (importando) return;
-    setImportando(true);
-    try {
-      const existentes = new Set(
-        epp.map((e) => String(e.codigo || '').trim().toLowerCase())
-      );
-      const nuevos = EPP_MINERIA.filter(
-        (item) => !existentes.has(String(item.codigo || '').trim().toLowerCase())
-      );
-
-      if (nuevos.length === 0) {
-        mostrarMensaje('success', 'El catálogo de EPP de minería ya está importado (sin ítems nuevos).');
-        return;
-      }
-
-      let creados = 0;
-      for (const item of nuevos) {
-        // Secuencial para respetar las reglas/validaciones de Firestore.
-        await addEpp({ ...item });
-        creados += 1;
-      }
-
-      const omitidos = EPP_MINERIA.length - creados;
-      mostrarMensaje(
-        'success',
-        `Importación completada: ${creados} EPP agregados${omitidos > 0 ? `, ${omitidos} ya existían` : ''}.`
-      );
-    } catch (err) {
-      console.error('Error importando EPP de minería:', err);
-      mostrarMensaje('error', 'Error al importar EPP de minería: ' + err.message);
-    } finally {
-      setImportando(false);
-    }
-  }
-
   async function confirmarEliminar() {
     try {
       await removeEpp(eliminarId);
       setMostrarConfirm(false);
       setEliminarId(null);
+      return true;
     } catch (err) {
       console.error('Error eliminando EPP:', err);
       mostrarMensaje('error', 'Error al eliminar EPP: ' + err.message);
+      return false;
     }
   }
 
@@ -275,23 +227,11 @@ export default function EPP() {
           <h1 className="pagina-titulo">EPP</h1>
           <p className="pagina-subtitle">{epp.length} equipos de protección personal registrados</p>
         </div>
-        <div className="epp-header-acciones">
-          {puedeCrear && (
-            <button
-              className="btn-secundario"
-              onClick={importarEppMineria}
-              disabled={importando}
-              title="Agrega al catálogo los EPP de minería (chalecos, lente, polo y EPP habituales). No duplica códigos existentes."
-            >
-              <FiDownload size={16} /> {importando ? 'Importando...' : 'Importar EPP de minería'}
-            </button>
-          )}
-          {puedeCrear && (
-            <button className="btn-principal" onClick={nuevoEpp}>
-              <FiPlus size={16} /> Nuevo EPP
-            </button>
-          )}
-        </div>
+        {puedeCrear && (
+          <button className="btn-principal" onClick={nuevoEpp}>
+            <FiPlus size={16} /> Nuevo EPP
+          </button>
+        )}
       </div>
 
       {mensaje && (
@@ -310,15 +250,6 @@ export default function EPP() {
             onChange={(e) => alCambiarBusqueda(e.target.value)}
           />
         </div>
-        <select
-          className="selector-orden"
-          value={filtroEstado}
-          onChange={(e) => alCambiarEstado(e.target.value)}
-        >
-          <option value="">Todos los estados</option>
-          <option value="activos">Activos</option>
-          <option value="inactivos">Inactivos</option>
-        </select>
         <select
           className="selector-orden"
           value={orden}
@@ -358,7 +289,6 @@ export default function EPP() {
                     <th>Modelo</th>
                     <th>Unidad</th>
                     <th className="texto-derecha">Precio</th>
-                    <th className="texto-centro">Estado</th>
                     <th className="texto-centro">Acciones</th>
                   </tr>
                 </thead>
@@ -376,11 +306,6 @@ export default function EPP() {
                       <td>{e.modelo || '-'}</td>
                       <td>{e.unidadMedida || 'UNIDAD'}</td>
                       <td className="texto-derecha texto-negrita">{formatUSD(e.precio || 0)}</td>
-                      <td className="texto-centro">
-                        <span className={`badge-estado-catalogo ${e.activo !== false ? 'catalogo-activo' : 'catalogo-inactivo'}`}>
-                          {e.activo !== false ? 'Activo' : 'Inactivo'}
-                        </span>
-                      </td>
                       <td className="texto-centro">
                         <div className="acciones-tabla">
                           <button className="btn-accion" onClick={() => editarEpp(e)} title="Editar">
@@ -503,15 +428,6 @@ export default function EPP() {
             />
           </div>
 
-          <div className="campo campo-checkbox">
-            <label className="checkbox-inline">
-              <input
-                type="checkbox"
-                {...register('activo')}
-              />
-              EPP activo (disponible para cotizar)
-            </label>
-          </div>
 
           <div className="acciones-form">
             <button type="button" className="btn-secundario" onClick={() => setMostrarModal(false)}>

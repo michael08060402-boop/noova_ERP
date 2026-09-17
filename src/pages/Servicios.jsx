@@ -221,9 +221,11 @@ export default function Servicios() {
       await removeServicio(eliminarId);
       setMostrarConfirm(false);
       setEliminarId(null);
+      return true;
     } catch (err) {
       console.error('Error eliminando servicio:', err);
       mostrarMensaje('error', 'Error al eliminar servicio: ' + err.message);
+      return false;
     }
   }
 

@@ -4,7 +4,7 @@ import {
   FiBarChart2, FiUsers, FiFileText, FiSettings,
   FiMenu, FiLogOut, FiX, FiChevronDown, FiDollarSign, FiBell, FiTool,
   FiWind, FiMessageCircle, FiCloud, FiShoppingCart, FiTruck, FiTrendingUp, FiSearch,
-  FiShield, FiBriefcase
+  FiShield, FiBriefcase, FiClipboard
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useCotizaciones } from '../hooks/useCotizaciones';
@@ -21,6 +21,7 @@ const ITEMS_MENU = [
   { path: '/dashboard', label: 'Dashboard', icon: <FiBarChart2 />, key: 'dashboard' },
   { path: '/clientes', label: 'Clientes', icon: <FiUsers />, key: 'clientes' },
   { path: '/cotizaciones', label: 'Cotizaciones', icon: <FiFileText />, key: 'cotizaciones' },
+  { path: '/solicitudes', label: 'Solicitudes', icon: <FiClipboard />, key: 'solicitudes' },
   { path: '/ventas', label: 'Ventas', icon: <FiTrendingUp />, key: 'ventas' },
   { path: '/facturacion', label: 'Boletas / Facturas', icon: <FiDollarSign />, key: 'facturacion' },
   { path: '/equipos', label: 'Equipos', icon: <FiTool />, key: 'equipos' },
@@ -34,19 +35,17 @@ const ITEMS_MENU = [
   { path: '/configuracion', label: 'Configuración', icon: <FiSettings />, key: 'configuracion' }
 ];
 
-// Grupos del sidebar para gerencia, administración y demás roles generales.
-// Mensajería, Nube y Configuración no pertenecen a ningún grupo: se acceden
-// desde el topbar (atajos y botón de ajustes).
 const GRUPOS_MENU = [
-  { id: 'comercial', label: 'COMERCIAL', keys: ['dashboard', 'clientes', 'cotizaciones', 'ventas', 'facturacion'] },
+  { id: 'comercial', label: 'COMERCIAL', keys: ['dashboard', 'clientes', 'cotizaciones', 'solicitudes', 'ventas', 'facturacion'] },
   { id: 'catalogo', label: 'CATÁLOGO', keys: ['equipos', 'mangas', 'servicios', 'epp'] },
   { id: 'abastecimiento', label: 'ABASTECIMIENTO', keys: ['proveedores', 'compras'] }
 ];
 
-// Grupo único del sidebar para Jefe de Proyecto de Mina: solo ve Cotizaciones
-// (en modo EPP) y EPP. Nube se conserva en el topbar.
+// Vista compacta para Minas. Nube se muestra también en el sidebar para que
+// el acceso al repositorio del proyecto sea explícito y no dependa solo del
+// icono del topbar. El atajo superior se conserva para mantener consistencia.
 const GRUPOS_MENU_MINAS = [
-  { id: 'minas', label: 'MINAS', keys: ['cotizaciones', 'epp'] }
+  { id: 'minas', label: 'MINAS', keys: ['solicitudes', 'epp', 'nube'] }
 ];
 
 function useEsMobile() {
@@ -65,11 +64,19 @@ export default function DashboardLayout() {
   const { currentUser, userProfile, logout } = useAuth();
   const esMinas = esRolMinas(userProfile);
   const puedeVerCotizaciones = puede(userProfile, 'cotizaciones', 'read');
+  const puedeVerSolicitudes = puede(userProfile, 'solicitudes', 'read');
+  const puedeVerDocumentos = puedeVerCotizaciones || puedeVerSolicitudes;
   const puedeVerPerfil = puede(userProfile, 'perfil', 'read');
   const puedeVerConfiguracion = puede(userProfile, 'configuracion', 'read');
-  // Para Minas las reglas de Firestore solo permiten leer cotizaciones EPP:
-  // la consulta debe incluir where('tipoItem','==','epp') (rules no son filtros).
-  const { cotizaciones, fetchCotizaciones } = useCotizaciones(puedeVerCotizaciones, { soloEpp: esMinas });
+
+  // Minas solo puede leer EPP por reglas de Firestore. Los demás roles
+  // generales reciben únicamente cotizaciones comerciales en este resumen.
+  const soloEppNotificaciones = esMinas || (!puedeVerCotizaciones && puedeVerSolicitudes);
+  const { cotizaciones, fetchCotizaciones } = useCotizaciones(
+    puedeVerDocumentos,
+    { soloEpp: soloEppNotificaciones, excluirEpp: !soloEppNotificaciones }
+  );
+
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const esDashboard = pathname === '/dashboard' || pathname === '/dashboard/';
@@ -78,7 +85,6 @@ export default function DashboardLayout() {
   const esMobile = useEsMobile();
 
   const [sidebarMobileAbierto, setSidebarMobileAbierto] = useState(false);
-
   const [confirmarCierreSesion, setConfirmarCierreSesion] = useState(false);
   const [notificacionesAbiertas, setNotificacionesAbiertas] = useState(false);
   const notificacionesRef = useRef(null);
@@ -116,15 +122,14 @@ export default function DashboardLayout() {
     userProfile?.nombre ||
     currentUser?.email?.split('@')[0] ||
     'Usuario';
-  const rolUsuario = ROLES[normalizarRol(userProfile?.role)]?.label
-    || 'Sin rol asignado';
+  const rolUsuario = esMinas
+    ? 'Área de Minas'
+    : (ROLES[normalizarRol(userProfile?.role)]?.label || 'Sin rol asignado');
 
-  const cotizacionesPendientes = puedeVerCotizaciones
+  const cotizacionesPendientes = puedeVerDocumentos
     ? cotizaciones.filter((c) => c.estado === 'Borrador' || c.estado === 'Enviada' || c.estado === 'Generada')
     : [];
 
-  // La calibración próxima aplica únicamente a cotizaciones de Equipos;
-  // Minas solo ve EPP, por lo que no se calcula para ese rol.
   const calibracionesProximas = (puedeVerCotizaciones && !esMinas)
     ? obtenerCalibracionesProximas(cotizaciones)
     : [];
@@ -168,6 +173,7 @@ export default function DashboardLayout() {
       <span className="nav-label">{item.label}</span>
     </NavLink>
   );
+
   const normalizarBusqueda = (texto) => texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const resultadosModulos = itemsMenu.filter((item) =>
     normalizarBusqueda(item.label).includes(normalizarBusqueda(busquedaModulo.trim()))
@@ -265,39 +271,40 @@ export default function DashboardLayout() {
               </button>
             )}
             <div className="topbar-user-static"
-                title={nombreUsuario}
-                aria-label="Menú de usuario"
-              >
-                <span className="topbar-user-icon">
-                  {nombreUsuario.trim().split(/\s+/).slice(0, 2).map((nombre) => nombre[0]).join('').toUpperCase()}
-                </span>
-                <span className="topbar-user-data">
-                  <span className="topbar-user-name">{nombreUsuario}</span>
-                  <span className="topbar-user-role">{rolUsuario}</span>
-                </span>
+              title={nombreUsuario}
+              aria-label="Menú de usuario"
+            >
+              <span className="topbar-user-icon">
+                {nombreUsuario.trim().split(/\s+/).slice(0, 2).map((nombre) => nombre[0]).join('').toUpperCase()}
+              </span>
+              <span className="topbar-user-data">
+                <span className="topbar-user-name">{nombreUsuario}</span>
+                <span className="topbar-user-role">{rolUsuario}</span>
+              </span>
             </div>
           </div>
 
-            <div className="dashboard-module-search" role="search">
-              <FiSearch aria-hidden="true" />
-              <input
-                type="search"
-                aria-label="Buscar módulo del ERP"
-                placeholder="Buscar módulo del ERP…"
-                value={busquedaModulo}
-                onChange={(event) => setBusquedaModulo(event.target.value)}
-                onKeyDown={(event) => { if (event.key === 'Escape') setBusquedaModulo(''); }}
-              />
-              {busquedaModulo.trim() && (
-                <div className="dashboard-search-results">
-                  {resultadosModulos.length ? resultadosModulos.map((item) => (
-                    <NavLink key={item.path} to={item.path} onClick={() => setBusquedaModulo('')}>
-                      {item.icon}<span>{item.label}</span>
-                    </NavLink>
-                  )) : <p role="status">No se encontraron módulos.</p>}
-                </div>
-              )}
-            </div>
+          <div className="dashboard-module-search" role="search">
+            <FiSearch aria-hidden="true" />
+            <input
+              type="search"
+              aria-label="Buscar módulo del ERP"
+              placeholder="Buscar módulo del ERP…"
+              value={busquedaModulo}
+              onChange={(event) => setBusquedaModulo(event.target.value)}
+              onKeyDown={(event) => { if (event.key === 'Escape') setBusquedaModulo(''); }}
+            />
+            {busquedaModulo.trim() && (
+              <div className="dashboard-search-results">
+                {resultadosModulos.length ? resultadosModulos.map((item) => (
+                  <NavLink key={item.path} to={item.path} onClick={() => setBusquedaModulo('')}>
+                    {item.icon}<span>{item.label}</span>
+                  </NavLink>
+                )) : <p role="status">No se encontraron módulos.</p>}
+              </div>
+            )}
+          </div>
+
           <div className="topbar-actions">
             {['mensajeria', 'nube'].map((key) => {
               const item = itemsMenu.find((modulo) => modulo.key === key);
@@ -318,6 +325,7 @@ export default function DashboardLayout() {
                 </NavLink>
               );
             })}
+
             {(puedeVerConfiguracion || puedeVerPerfil) && (
               <NavLink
                 to="/configuracion"
@@ -332,7 +340,8 @@ export default function DashboardLayout() {
                 <FiSettings size={19} aria-hidden="true" />
               </NavLink>
             )}
-            {puedeVerCotizaciones && (
+
+            {puedeVerDocumentos && (
               <div className="notification-wrapper" ref={notificacionesRef}>
                 <button
                   className="notification-btn notification-btn-circular"
@@ -380,8 +389,6 @@ export default function DashboardLayout() {
                 )}
               </div>
             )}
-
-
           </div>
         </header>
 

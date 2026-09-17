@@ -1,36 +1,16 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatDate } from './formatDate';
-import { calcularTotalesCotizacion } from './formatCurrency';
-import { montoEnLetras } from './numeroALetras';
-
 import noovaLogo from '../assets/noova-logo.png';
-import interbankImg from '../assets/interbank.png';
 
 // ============================================================
-// PDF DE COTIZACIÓN DE EPP — FORMATO TIPO FACTURA (Noova S.A.C.)
+// SOLICITUD DE COTIZACIÓN DE EPP — NOOVA S.A.C.
 // ------------------------------------------------------------
-// Reproduce la disposición visual de una factura peruana
-// (cabecera con logo + datos del emisor, recuadro del documento,
-// grilla de datos del cliente, tabla de ítems Cantidad / Unidad /
-// Código / Descripción / Valor Unitario / Subtotal, monto en
-// letras y recuadro de totales), PERO como COTIZACIÓN de Noova:
-//
-//   - Es un documento NO tributario: se rotula como COTIZACIÓN y
-//     lleva la leyenda correspondiente. No imita una factura
-//     electrónica de SUNAT (no incluye hash de resumen, QR ni
-//     código de barras oficiales).
-//   - Usa el logo y los datos de NUESTRA empresa (Noova). Los
-//     datos vienen de configuracion/general y, si faltan, se usan
-//     los valores conocidos de Noova como respaldo.
-//   - Las cuentas bancarias son las de Noova (nunca las del
-//     proveedor de la factura de compra).
-//   - Soporta precios con IGV incluido (para replicar importes
-//     redondos de factura) o precios sin IGV (estándar).
+// Este formato se utiliza para solicitar precios a un proveedor.
+// No representa una cotización comercial emitida por Noova ni un
+// comprobante tributario.
 // ============================================================
 
-// Datos de respaldo de Noova por si configuracion/general aún no
-// tiene la empresa cargada. Se sobrescriben con lo que haya en config.
 const NOOVA_FALLBACK = {
   razonSocial: 'CONTRATISTAS GENERALES NOOVA S.A.C.',
   ruc: '20550622930',
@@ -41,22 +21,8 @@ const NOOVA_FALLBACK = {
   web: ''
 };
 
-// Cuentas bancarias de Noova (respaldo). Si config trae cuentas
-// estructuradas se usan esas; si no, estas.
-const NOOVA_BANCOS = [
-  {
-    logo: interbankImg,
-    nombre: 'Interbank',
-    cuentas: [
-      { moneda: 'Soles', numero: '898-3003796684', cci: '003-898-003003796684-40' },
-      { moneda: 'Dólares', numero: '898-3003796691', cci: '003-898-003003796691-45' },
-    ],
-  },
-];
-
-const COLOR_DARK = [31, 55, 75];      // Slate para encabezados de tabla / recuadros
-const COLOR_ACCENT = [244, 122, 0];   // Naranja Noova para el rótulo del documento
-const COLOR_LINE = [150, 150, 150];
+const COLOR_DARK = [31, 55, 75];
+const COLOR_ACCENT = [244, 122, 0];
 const COLOR_LINE_SOFT = [205, 205, 205];
 const COLOR_TXT = [30, 30, 30];
 const COLOR_TXT_SOFT = [95, 95, 95];
@@ -72,41 +38,6 @@ function nombreMoneda(codigo) {
   return etiquetaMoneda(codigo) === 'S/' ? 'SOLES' : 'DÓLARES AMERICANOS';
 }
 
-function fmt(monto, codigoMoneda) {
-  const etiqueta = etiquetaMoneda(codigoMoneda);
-  const locale = etiqueta === 'S/' ? 'es-PE' : 'en-US';
-  const numero = Number(monto || 0).toLocaleString(locale, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
-  return `${etiqueta} ${numero}`;
-}
-
-function fmtNum(monto, codigoMoneda) {
-  const etiqueta = etiquetaMoneda(codigoMoneda);
-  const locale = etiqueta === 'S/' ? 'es-PE' : 'en-US';
-  return Number(monto || 0).toLocaleString(locale, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
-}
-
-// Cuentas bancarias efectivas: config.cuentas (array) o respaldo Noova.
-function obtenerBancos(config) {
-  const empresa = config?.empresa || {};
-  const cuentas = empresa.cuentas || config?.cuentas;
-  if (Array.isArray(cuentas) && cuentas.length > 0) {
-    return cuentas.map((b) => ({
-      logo: b.logo || null,
-      nombre: b.nombre || b.banco || 'Banco',
-      cuentas: Array.isArray(b.cuentas)
-        ? b.cuentas
-        : [{ moneda: b.moneda || 'Soles', numero: b.numero || b.cuenta || '', cci: b.cci || '' }]
-    }));
-  }
-  return NOOVA_BANCOS;
-}
-
 export function generateEppPDF(cotizacion, config = {}) {
   const doc = new jsPDF({ format: 'a4', unit: 'mm', compress: true });
   const pageW = doc.internal.pageSize.getWidth();
@@ -115,7 +46,6 @@ export function generateEppPDF(cotizacion, config = {}) {
   const contentW = pageW - 2 * margin;
 
   const empresa = { ...NOOVA_FALLBACK, ...(config?.empresa || {}) };
-  // No permitir que un valor vacío del config borre el respaldo de Noova.
   const emp = {
     razonSocial: empresa.razonSocial || NOOVA_FALLBACK.razonSocial,
     ruc: empresa.ruc || NOOVA_FALLBACK.ruc,
@@ -126,106 +56,94 @@ export function generateEppPDF(cotizacion, config = {}) {
     web: empresa.web || ''
   };
 
-  const cliente = cotizacion.cliente || {};
-  const contacto =
-    cotizacion.contactoSeleccionado ||
-    cliente.contactoSeleccionado ||
-    (cliente.contactos && cliente.contactos.length > 0 ? cliente.contactos[0] : {}) ||
-    {};
+  // En una solicitud de cotización, Noova es quien solicita la oferta.
+  // El responsable queda registrado en la cotización al momento de crearla.
+  const solicitante = cotizacion.responsable || cotizacion.creadoPor || '-';
 
   const items = cotizacion.items || [];
   const monedaCod = cotizacion.moneda;
-  const totales = calcularTotalesCotizacion(items, {
-    sinIGV: !!cotizacion.sinIGV,
-    preciosIncluyenIGV: !!cotizacion.preciosIncluyenIGV
-  });
-
   const fechaEmision = cotizacion.fechaEmision || cotizacion.fecha || cotizacion.createdAt;
-  const condicionPago = cotizacion.condicionPago || 'Contado';
   const observacion = cotizacion.observacion || '';
+  const HEADER_H = 38;
 
-  const HEADER_H = 34; // altura reservada para la cabecera en cada página
-
-  // --------------------------------------------------------
-  // Cabecera: logo + datos del emisor (izq) y recuadro del
-  // documento (der). `compacta` para páginas de continuación.
-  // --------------------------------------------------------
   function drawHeader(compacta = false) {
-    const top = 10;
-    // Logo
-    const logoSize = compacta ? 14 : 20;
-    try {
-      doc.addImage(noovaLogo, 'PNG', margin, top, logoSize, logoSize);
-    } catch { /* si el logo no carga, se omite sin romper el PDF */ }
+    const top = 8;
 
-    const infoX = margin + logoSize + 4;
-    const infoW = contentW - logoSize - 4 - 62; // deja 62mm para el recuadro derecho
+    // Logo original de Noova Consulting.
+    // Mantiene aproximadamente el tamaño visual del formato anterior,
+    // pero respetando la proporción real del logo original (305 x 216).
+    const logoH = compacta ? 14 : 20;
+    const logoW = logoH * (305 / 216);
+    try {
+      doc.addImage(noovaLogo, 'PNG', margin, top, logoW, logoH);
+    } catch {
+      // Si el logo no carga, el PDF sigue generándose.
+    }
+
+    const boxW = 66;
+    const boxX = pageW - margin - boxW;
+    const infoX = margin + logoW + 4;
+    const infoW = boxX - infoX - 4;
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(compacta ? 9 : 11);
+    doc.setFontSize(compacta ? 8.5 : 10);
     doc.setTextColor(...COLOR_DARK);
     const razonLines = doc.splitTextToSize(emp.razonSocial, infoW);
     doc.text(razonLines, infoX, top + (compacta ? 4 : 5));
 
     if (!compacta) {
-      let yInfo = top + 5 + razonLines.length * 4.4 + 1;
+      let yInfo = top + 5 + razonLines.length * 4 + 1;
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
+      doc.setFontSize(7.1);
       doc.setTextColor(...COLOR_TXT_SOFT);
       const dirLines = doc.splitTextToSize(emp.direccion, infoW);
       doc.text(dirLines, infoX, yInfo);
-      yInfo += dirLines.length * 3.4 + 0.5;
+      yInfo += dirLines.length * 3.2 + 0.5;
+
       const contactoLinea = [
         emp.celular ? `Cel.: ${emp.celular}` : '',
         emp.email ? `Email: ${emp.email}` : '',
-        emp.web ? emp.web : ''
+        emp.web || ''
       ].filter(Boolean).join('   ');
+
       if (contactoLinea) {
         doc.text(doc.splitTextToSize(contactoLinea, infoW), infoX, yInfo);
       }
     }
 
-    // Recuadro del documento (derecha)
-    const boxW = 60;
-    const boxX = pageW - margin - boxW;
-    const boxH = compacta ? 16 : 24;
-    doc.setDrawColor(...COLOR_DARK);
-    doc.setLineWidth(0.5);
-    doc.roundedRect(boxX, top, boxW, boxH, 1.5, 1.5);
+    const boxH = compacta ? 14 : 20;
 
+    // Cabecera naranja + marco azul con esquinas rectas. El marco se
+    // dibuja al final para evitar los cortes/solapes visibles en las esquinas.
     doc.setFillColor(...COLOR_ACCENT);
-    doc.rect(boxX, top, boxW, compacta ? 6 : 8, 'F');
+    doc.rect(boxX, top, boxW, compacta ? 7 : 10, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(compacta ? 8.5 : 10);
+    doc.setFontSize(compacta ? 7.5 : 8.3);
     doc.setTextColor(255, 255, 255);
-    doc.text('COTIZACIÓN', boxX + boxW / 2, top + (compacta ? 4.1 : 5.4), { align: 'center' });
+    doc.text('SOLICITUD DE COTIZACIÓN', boxX + boxW / 2, top + (compacta ? 4.8 : 6.5), { align: 'center' });
 
     doc.setTextColor(...COLOR_DARK);
-    doc.setFontSize(compacta ? 7.5 : 9);
-    doc.text(`RUC: ${emp.ruc}`, boxX + boxW / 2, top + (compacta ? 10 : 14), { align: 'center' });
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(compacta ? 8.5 : 11);
-    doc.setTextColor(...COLOR_ACCENT);
-    doc.text(String(cotizacion.codigo || 'S/N'), boxX + boxW / 2, top + (compacta ? 14 : 20), { align: 'center' });
+    doc.setFontSize(compacta ? 7.2 : 8.5);
+    doc.text(`RUC: ${emp.ruc}`, boxX + boxW / 2, top + (compacta ? 11.5 : 15.5), { align: 'center' });
 
-    // Línea separadora bajo la cabecera
+    doc.setDrawColor(...COLOR_DARK);
+    doc.setLineWidth(0.5);
+    doc.rect(boxX, top, boxW, boxH);
+
     doc.setDrawColor(...COLOR_DARK);
     doc.setLineWidth(0.4);
-    doc.line(margin, top + HEADER_H - 4, pageW - margin, top + HEADER_H - 4);
+    doc.line(margin, top + HEADER_H - 3, pageW - margin, top + HEADER_H - 3);
   }
 
-  // --------------------------------------------------------
-  // Grilla de datos del cliente (tipo factura).
-  // --------------------------------------------------------
   function drawMetaBox(y) {
     const labelW = 40;
     const rows = [
-      ['Condición de pago', condicionPago],
       ['Fecha de Emisión', formatDate(fechaEmision)],
-      ['Señor(es)', cliente.razonSocial || contacto.nombre || '-'],
-      ['RUC', cliente.ruc || '-'],
-      ['Dirección', cliente.direccion || '-'],
-      ['Tipo de Moneda', nombreMoneda(monedaCod)],
+      ['Solicitante', solicitante],
+      ['Empresa', emp.razonSocial],
+      ['RUC', emp.ruc],
+      ['Dirección', emp.direccion],
+      ['Tipo de Moneda', nombreMoneda(monedaCod)]
     ];
     if (observacion) rows.push(['Observación', observacion]);
 
@@ -240,13 +158,11 @@ export function generateEppPDF(cotizacion, config = {}) {
     });
     const totalH = rowHeights.reduce((a, b) => a + b, 0);
 
-    // Marco exterior + separador vertical de la columna de etiquetas
     doc.rect(margin, y, contentW, totalH);
     doc.line(margin + labelW, y, margin + labelW, y + totalH);
 
     rows.forEach(([label, value], i) => {
       const h = rowHeights[i];
-      // separadores horizontales
       if (i > 0) doc.line(margin, yy, margin + contentW, yy);
 
       doc.setFont('helvetica', 'bold');
@@ -263,38 +179,34 @@ export function generateEppPDF(cotizacion, config = {}) {
     return y + totalH;
   }
 
-  // ---- Página 1: cabecera + datos del cliente ----
   drawHeader(false);
-  let y = 10 + HEADER_H;
+  let y = 8 + HEADER_H;
   y = drawMetaBox(y) + 4;
 
-  // --------------------------------------------------------
-  // Tabla de ítems (Cantidad / Unidad / Código / Descripción /
-  // Valor Unitario / Subtotal). El subtotal de línea = cant x VU.
-  // --------------------------------------------------------
+  // Solicitud a proveedor: el ERP envía únicamente la identificación del
+  // ítem, descripción, unidad y cantidad. El proveedor responde con su propia
+  // propuesta económica; por eso este formato no incluye columnas de precio.
   const head = [[
-    'Cantidad',
-    'Unidad\nMedida',
+    'Ítem',
     'Código',
     'Descripción',
-    `Valor Unitario\n(${etiquetaMoneda(monedaCod)})`,
-    `Subtotal\n(${etiquetaMoneda(monedaCod)})`
+    'Unidad',
+    'Cantidad'
   ]];
 
-  const body = items.map((item) => {
+  const body = items.map((item, index) => {
     const cant = Number(item.cantidad) || 0;
-    const pu = Number(item.precioUnitario) || 0;
     const detalleExtra = [item.marca, item.modelo].filter(Boolean).join(' · ');
     const descripcion = detalleExtra
       ? `${item.descripcion || ''}\n${detalleExtra}`
       : (item.descripcion || '');
+
     return [
-      cant.toFixed(2),
-      item.unidadMedida || 'UNIDAD',
+      String(index + 1).padStart(2, '0'),
       item.codigo || '',
       descripcion,
-      fmtNum(pu, monedaCod),
-      fmtNum(cant * pu, monedaCod),
+      item.unidadMedida || 'UNIDAD',
+      cant ? (Number.isInteger(cant) ? String(cant) : cant.toFixed(2)) : ''
     ];
   });
 
@@ -302,203 +214,145 @@ export function generateEppPDF(cotizacion, config = {}) {
     head,
     body,
     startY: y,
-    margin: { left: margin, right: margin, top: 10 + HEADER_H },
+    margin: { left: margin, right: margin, top: 8 + HEADER_H },
     tableWidth: contentW,
     styles: {
-      fontSize: 8,
-      cellPadding: 2.2,
+      fontSize: 7.7,
+      cellPadding: 2.1,
       lineColor: COLOR_LINE_SOFT,
       lineWidth: 0.25,
       textColor: COLOR_TXT,
-      valign: 'middle',
+      valign: 'middle'
     },
     headStyles: {
       fillColor: COLOR_DARK,
       textColor: [255, 255, 255],
       fontStyle: 'bold',
       halign: 'center',
-      fontSize: 8,
-      valign: 'middle',
+      fontSize: 7.4,
+      valign: 'middle'
     },
     columnStyles: {
-      0: { halign: 'center', cellWidth: 20 },
-      1: { halign: 'center', cellWidth: 20 },
-      2: { halign: 'center', cellWidth: 20 },
-      3: { cellWidth: 'auto' },
-      4: { halign: 'right', cellWidth: 30 },
-      5: { halign: 'right', cellWidth: 30 },
+      0: { halign: 'center', cellWidth: 14 },
+      1: { halign: 'center', cellWidth: 24 },
+      2: { cellWidth: 'auto' },
+      3: { halign: 'center', cellWidth: 28 },
+      4: { halign: 'center', cellWidth: 28, fontStyle: 'bold' }
     },
     didDrawPage: (data) => {
       if (data.pageNumber > 1) drawHeader(true);
-    },
+    }
   });
 
-  y = (doc.lastAutoTable?.finalY || y) + 4;
+  y = (doc.lastAutoTable?.finalY || y) + 5;
 
-  // --------------------------------------------------------
-  // Salto de página si no hay espacio para totales + firma.
-  // --------------------------------------------------------
-  const BLOQUE_FINAL_H = 78;
-  function asegurarEspacio(alto) {
-    if (y + alto > pageH - 20) {
+
+  // La solicitud no calcula totales: el proveedor devuelve su estructura
+  // económica en su propia propuesta.
+
+  // ============================================================
+  // CONDICIONES + DATOS BANCARIOS
+  // ------------------------------------------------------------
+  // Se muestran inmediatamente después de la tabla de ítems. Son dos
+  // bloques informativos para indicar al proveedor qué datos debe incluir
+  // en su respuesta. No se dejan campos para escribir sobre este PDF.
+  // ============================================================
+  const CARD_BG = [246, 247, 248];
+  const CARD_BORDER = [224, 228, 231];
+  const CARD_GAP = 5;
+  const CARD_W = (contentW - CARD_GAP) / 2;
+  const CARD_H = 40;
+
+  function asegurarEspacioTarjetas() {
+    // Las tarjetas van inmediatamente después de la tabla. Si no caben
+    // completas, pasan juntas a la siguiente página.
+    if (y + CARD_H > pageH - 18) {
       doc.addPage();
       drawHeader(true);
-      y = 10 + HEADER_H;
+      y = 8 + HEADER_H;
     }
   }
-  asegurarEspacio(BLOQUE_FINAL_H);
 
-  // --------------------------------------------------------
-  // Recuadro de totales (derecha) + monto en letras (izquierda).
-  // --------------------------------------------------------
-  const totW = 66;
-  const totX = pageW - margin - totW;
-  const rowH = 6.2;
-  const filasTot = [];
-  filasTot.push(['Sub Total Ventas', fmt(totales.valorVenta, monedaCod)]);
-  filasTot.push(['Descuentos', fmt(0, monedaCod)]);
-  filasTot.push(['Valor Venta', fmt(totales.valorVenta, monedaCod)]);
-  if (!cotizacion.sinIGV) filasTot.push(['I.G.V. (18%)', fmt(totales.igv, monedaCod)]);
+  function drawBloqueInformativo(x, yPos, ancho, titulo, lineas) {
+    doc.setFillColor(...CARD_BG);
+    doc.setDrawColor(...CARD_BORDER);
+    doc.setLineWidth(0.25);
+    doc.roundedRect(x, yPos, ancho, CARD_H, 1.6, 1.6, 'FD');
 
-  const yTot = y;
-  doc.setDrawColor(...COLOR_LINE);
-  doc.setLineWidth(0.3);
-  doc.setFontSize(8.5);
-  let yr = yTot;
-  filasTot.forEach(([label, valor]) => {
-    doc.rect(totX, yr, totW, rowH);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...COLOR_TXT);
-    doc.text(label, totX + 2.5, yr + 4.2);
-    doc.text(valor, totX + totW - 2.5, yr + 4.2, { align: 'right' });
-    yr += rowH;
-  });
-  // Importe total destacado
-  doc.setFillColor(...COLOR_DARK);
-  doc.rect(totX, yr, totW, rowH + 1, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(9);
-  doc.text('IMPORTE TOTAL', totX + 2.5, yr + 4.8);
-  doc.text(fmt(totales.total, monedaCod), totX + totW - 2.5, yr + 4.8, { align: 'right' });
-  yr += rowH + 1;
+    // Acento superior sobrio para mantener continuidad con la marca.
+    doc.setFillColor(...COLOR_ACCENT);
+    doc.rect(x, yPos, ancho, 1.1, 'F');
 
-  // Monto en letras (izquierda), alineado con el recuadro de totales
-  const letrasW = totX - margin - 6;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(...COLOR_DARK);
-  const letras = `${montoEnLetras(totales.total, monedaCod)}`;
-  const letrasLines = doc.splitTextToSize(letras, letrasW);
-  doc.text(letrasLines, margin, yTot + 4.2);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.6);
+    doc.setTextColor(...COLOR_DARK);
+    doc.text(titulo, x + 5.5, yPos + 6.7);
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(...COLOR_TXT_SOFT);
-  doc.text(
-    doc.splitTextToSize('Cotización — documento no tributario. No válido como comprobante de pago.', letrasW),
-    margin,
-    yTot + 4.2 + letrasLines.length * 4 + 2
+    let yy = yPos + 12.8;
+    lineas.forEach((texto, index) => {
+      if (index > 0) {
+        doc.setDrawColor(...CARD_BORDER);
+        doc.setLineWidth(0.18);
+        doc.line(x + 5.5, yy - 2.35, x + ancho - 5.5, yy - 2.35);
+      }
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.45);
+      doc.setTextColor(...COLOR_TXT);
+      const wrapped = doc.splitTextToSize(texto, ancho - 11);
+      doc.text(wrapped, x + 5.5, yy);
+      yy += Math.max(5.15, wrapped.length * 3.1 + 1.9);
+    });
+  }
+
+  asegurarEspacioTarjetas();
+
+  const cardsY = y;
+  const leftX = margin;
+  const rightX = margin + CARD_W + CARD_GAP;
+
+  drawBloqueInformativo(
+    leftX,
+    cardsY,
+    CARD_W,
+    'CONDICIONES DE LA OFERTA',
+    [
+      'Indicar validez de la oferta.',
+      'Indicar tiempo de entrega.',
+      'Indicar condiciones de pago.',
+      'Indicar si los precios incluyen IGV.',
+      'Indicar si el envío está incluido o se cotiza como servicio adicional.'
+    ]
   );
 
-  y = Math.max(yr, yTot + 22) + 6;
+  drawBloqueInformativo(
+    rightX,
+    cardsY,
+    CARD_W,
+    'DATOS BANCARIOS PARA PAGO',
+    [
+      'Indicar entidad bancaria.',
+      'Indicar tipo de cuenta.',
+      'Indicar moneda de la cuenta.',
+      'Indicar N.° de cuenta.',
+      'Indicar CCI.'
+    ]
+  );
 
-  // --------------------------------------------------------
-  // Condiciones comerciales (breves).
-  // --------------------------------------------------------
-  const validez = cotizacion.validez || '15 días';
-  const tiempoEntrega = cotizacion.tiempoEntrega
-    || (cotizacion.tiempoEntregaNumero
-      ? `${cotizacion.tiempoEntregaNumero} ${cotizacion.tiempoEntregaUnidad || 'semanas'} recibida la OC`
-      : '');
-  const condiciones = [
-    `• Validez de la oferta: ${validez}.`,
-    tiempoEntrega ? `• Tiempo de entrega: ${tiempoEntrega}.` : '',
-    '• Para la atención del pedido se solicita el envío de la Orden de Compra.',
-    '• Precios incluyen IGV según se indique. Sujeto a disponibilidad de stock.'
-  ].filter(Boolean);
+  y = cardsY + CARD_H;
 
-  asegurarEspacio(condiciones.length * 4.2 + 8);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(...COLOR_DARK);
-  doc.text('CONDICIONES COMERCIALES', margin, y);
-  y += 5;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.8);
-  doc.setTextColor(...COLOR_TXT);
-  condiciones.forEach((c) => {
-    const lines = doc.splitTextToSize(c, contentW);
-    doc.text(lines, margin, y);
-    y += lines.length * 3.8;
-  });
-  y += 4;
-
-  // --------------------------------------------------------
-  // Cuentas bancarias de Noova.
-  // --------------------------------------------------------
-  const bancos = obtenerBancos(config);
-  asegurarEspacio(18 + bancos.length * 16);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(...COLOR_DARK);
-  doc.text('CUENTAS BANCARIAS', margin, y);
-  y += 3;
-
-  bancos.forEach((banco) => {
-    if (banco.logo) {
-      try { doc.addImage(banco.logo, 'PNG', margin, y, 34, 11); } catch { /* omitir logo */ }
-    }
-    const headRow = [banco.nombre.toUpperCase(), 'MONEDA', 'N° CUENTA', 'CCI'];
-    const bodyRows = (banco.cuentas || []).map((c) => [
-      'Cuenta Corriente', c.moneda || '', c.numero || '-', c.cci || '-'
-    ]);
-    autoTable(doc, {
-      startY: y + (banco.logo ? 12 : 0),
-      margin: { left: margin, right: margin },
-      tableWidth: contentW,
-      head: [headRow],
-      body: bodyRows,
-      styles: {
-        fontSize: 7.5,
-        cellPadding: 1.8,
-        lineColor: COLOR_LINE_SOFT,
-        lineWidth: 0.25,
-        textColor: COLOR_TXT,
-        valign: 'middle',
-      },
-      headStyles: {
-        fillColor: COLOR_DARK,
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-        halign: 'center',
-        fontSize: 7.5,
-      },
-      columnStyles: {
-        0: { cellWidth: 'auto' },
-        1: { cellWidth: 26, halign: 'center' },
-        2: { cellWidth: 48, halign: 'center' },
-        3: { cellWidth: 58, halign: 'center' },
-      },
-    });
-    y = (doc.lastAutoTable?.finalY || y) + 5;
-  });
-
-  // --------------------------------------------------------
-  // Pie: numeración de páginas + leyenda del emisor.
-  // --------------------------------------------------------
+  // Footer mínimo: separador + paginación. No repite código, razón social ni RUC.
   const totalPages = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= totalPages; i++) {
+  for (let i = 1; i <= totalPages; i += 1) {
     doc.setPage(i);
     doc.setDrawColor(...COLOR_LINE_SOFT);
-    doc.setLineWidth(0.3);
+    doc.setLineWidth(0.25);
     doc.line(margin, pageH - 12, pageW - margin, pageH - 12);
+
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.8);
     doc.setTextColor(...COLOR_TXT_SOFT);
-    doc.text(`${emp.razonSocial}  ·  RUC ${emp.ruc}`, margin, pageH - 8);
-    doc.text(`Página ${i} de ${totalPages}`, pageW - margin, pageH - 8, { align: 'right' });
+    doc.text(`Página ${i} de ${totalPages}`, pageW - margin, pageH - 7.8, { align: 'right' });
   }
 
   return doc;
@@ -506,5 +360,10 @@ export function generateEppPDF(cotizacion, config = {}) {
 
 export function downloadEppPDF(cotizacion, config) {
   const doc = generateEppPDF(cotizacion, config);
-  doc.save(`${cotizacion.codigo || 'cotizacion-epp'}.pdf`);
+  const fechaArchivo = (() => {
+    const d = new Date(cotizacion?.fechaEmision || cotizacion?.fecha || cotizacion?.createdAt || Date.now());
+    if (Number.isNaN(d.getTime())) return new Date().toISOString().slice(0, 10);
+    return d.toISOString().slice(0, 10);
+  })();
+  doc.save(`solicitud-cotizacion-${fechaArchivo}.pdf`);
 }

@@ -15,6 +15,7 @@ const DashboardLayout = lazy(() => import('./layouts/DashboardLayout'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Clientes = lazy(() => import('./pages/Clientes'));
 const Cotizaciones = lazy(() => import('./pages/Cotizaciones'));
+const Solicitudes = lazy(() => import('./pages/SolicitudesEPP'));
 const Ventas = lazy(() => import('./pages/Ventas'));
 const Equipos = lazy(() => import('./pages/Equipos'));
 const Mangas = lazy(() => import('./pages/Mangas'));
@@ -53,7 +54,6 @@ function InicioPorRol() {
   return <Navigate to={getRutaInicial(userProfile)} replace />;
 }
 
-// Segunda capa además del sidebar. Impide entrar escribiendo la URL a mano.
 function RutaConPermiso({ modulo, accion = 'read', children }) {
   const { userProfile } = useAuth();
   const location = useLocation();
@@ -64,7 +64,6 @@ function RutaConPermiso({ modulo, accion = 'read', children }) {
 
   const destino = getRutaInicial(userProfile);
 
-  // Evita bucles si un perfil está mal configurado.
   if (location.pathname === destino || destino === '/login') {
     return (
       <section className="pagina" role="alert">
@@ -119,7 +118,6 @@ function RutaConfiguracion({ children }) {
   return <Navigate to={destino} replace />;
 }
 
-// Inyecta los datos de la empresa (desde ConfigContext) a Facturacion.
 function FacturacionWrapper() {
   const { config, loadingConfig, configError, refreshConfig } = useConfig();
 
@@ -210,6 +208,20 @@ function App() {
                   <Cotizaciones />
                 </RutaConPermiso>
               }
+            />
+
+            <Route
+              path="solicitudes"
+              element={
+                <RutaConPermiso modulo="solicitudes">
+                  <Solicitudes />
+                </RutaConPermiso>
+              }
+            />
+
+            <Route
+              path="solicitudes-epp"
+              element={<Navigate to="/solicitudes" replace />}
             />
 
             <Route

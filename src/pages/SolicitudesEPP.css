@@ -1,0 +1,89 @@
+.solicitudes-epp-page .pagina-header {
+  align-items: center;
+}
+
+.solicitudes-epp-filtros {
+  grid-template-columns: minmax(280px, 1fr);
+}
+
+
+.solicitud-epp-datos {
+  align-items: end;
+}
+
+
+.solicitud-epp-items-tabla {
+  table-layout: fixed;
+  min-width: 720px;
+}
+
+.solicitud-epp-items-tabla th:nth-child(1),
+.solicitud-epp-items-tabla td:nth-child(1) {
+  width: 100px;
+}
+
+.solicitud-epp-items-tabla .solicitud-epp-col-select,
+.solicitud-epp-items-tabla td:nth-child(2) {
+  width: 190px;
+}
+
+.solicitud-epp-items-tabla th:nth-child(4),
+.solicitud-epp-items-tabla td:nth-child(4) {
+  width: 104px;
+  min-width: 104px;
+}
+
+.solicitud-epp-items-tabla th:nth-child(5),
+.solicitud-epp-items-tabla td:nth-child(5) {
+  width: 110px;
+}
+
+.solicitud-epp-items-tabla .solicitud-epp-col-acciones,
+.solicitud-epp-items-tabla td:nth-child(6) {
+  width: 44px;
+}
+
+.solicitud-epp-items-tabla select,
+.solicitud-epp-items-tabla input {
+  width: 100%;
+}
+
+.solicitud-epp-meta {
+  display: block;
+  margin-top: 0.25rem;
+  color: #6b7280;
+  font-size: 0.68rem;
+}
+
+.solicitud-epp-resumen-texto {
+  max-width: 150px;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+@media (max-width: 900px) {
+  .solicitud-epp-items-tabla {
+    min-width: 720px;
+  }
+}
+
+.solicitud-epp-items-tabla .solicitud-cantidad-input {
+  min-width: 68px;
+  width: 100%;
+  text-align: center;
+  font-weight: 700;
+  color: #1f2937;
+  background: #fff;
+}
+
+.solicitud-epp-items-tabla th:nth-child(4) {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.solicitud-items-header {
+  justify-content: flex-end;
+}

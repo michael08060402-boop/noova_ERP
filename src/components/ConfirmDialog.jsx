@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import './ConfirmDialog.css';
 
 export default function ConfirmDialog({
@@ -11,11 +12,34 @@ export default function ConfirmDialog({
   icon = null,
   busy = false
 }) {
+  const [confirmandoInterno, setConfirmandoInterno] = useState(false);
+  const ocupado = busy || confirmandoInterno;
+
   if (!isOpen) return null;
 
+  async function confirmar() {
+    if (ocupado) return;
+    setConfirmandoInterno(true);
+    try {
+      const resultado = await onConfirm?.();
+      // Los diálogos de eliminación deben cerrarse cuando la acción termina.
+      // Si un consumidor necesita mantenerlo abierto puede retornar false.
+      if (resultado !== false) onClose?.();
+    } finally {
+      setConfirmandoInterno(false);
+    }
+  }
+
   return (
-    <div className="confirm-overlay" onClick={busy ? undefined : onClose}>
-      <div className="confirm-dialog" role="alertdialog" aria-modal="true" aria-label={title || 'Confirmar eliminación'} aria-busy={busy} onClick={(e) => e.stopPropagation()}>
+    <div className="confirm-overlay" onClick={ocupado ? undefined : onClose}>
+      <div
+        className="confirm-dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-label={title || 'Confirmar eliminación'}
+        aria-busy={ocupado}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="confirm-icon">
           {icon || (
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -28,8 +52,10 @@ export default function ConfirmDialog({
         <h3 className="confirm-title">{title || '¿Está seguro?'}</h3>
         <p className="confirm-message">{message || 'Esta acción no se puede deshacer.'}</p>
         <div className="confirm-actions">
-          <button className="btn btn-cancel" onClick={onClose} disabled={busy}>Cancelar</button>
-          <button className="btn btn-danger" onClick={onConfirm} disabled={busy}>{busy ? busyLabel : confirmLabel}</button>
+          <button className="btn btn-cancel" onClick={onClose} disabled={ocupado}>Cancelar</button>
+          <button className="btn btn-danger" onClick={confirmar} disabled={ocupado}>
+            {ocupado ? busyLabel : confirmLabel}
+          </button>
         </div>
       </div>
     </div>
