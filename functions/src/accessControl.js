@@ -11,6 +11,7 @@ const PERMISOS_TOTALES = {
   epp: TODO,
   cotizaciones: TODO,
   ventas: TODO,
+  calibraciones: ['read'],
   mensajeria: TODO,
   proveedores: TODO,
   compras: TODO,

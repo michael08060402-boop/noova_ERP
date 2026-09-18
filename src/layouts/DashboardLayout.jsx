@@ -4,7 +4,7 @@ import {
   FiBarChart2, FiUsers, FiFileText, FiSettings,
   FiMenu, FiLogOut, FiX, FiChevronDown, FiDollarSign, FiBell, FiTool,
   FiWind, FiMessageCircle, FiCloud, FiShoppingCart, FiTruck, FiTrendingUp, FiSearch,
-  FiShield, FiBriefcase, FiClipboard
+  FiShield, FiBriefcase, FiClipboard, FiTarget
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useCotizaciones } from '../hooks/useCotizaciones';
@@ -24,6 +24,7 @@ const ITEMS_MENU = [
   { path: '/cotizaciones', label: 'Cotizaciones', icon: <FiFileText />, key: 'cotizaciones' },
   { path: '/solicitudes', label: 'Solicitudes', icon: <FiClipboard />, key: 'solicitudes' },
   { path: '/ventas', label: 'Ventas', icon: <FiTrendingUp />, key: 'ventas' },
+  { path: '/calibraciones', label: 'Calibraciones', icon: <FiTarget />, key: 'calibraciones' },
   { path: '/facturacion', label: 'Boletas / Facturas', icon: <FiDollarSign />, key: 'facturacion' },
   { path: '/equipos', label: 'Equipos', icon: <FiTool />, key: 'equipos' },
   { path: '/mangas', label: 'Mangas', icon: <FiWind />, key: 'mangas' },
@@ -37,7 +38,7 @@ const ITEMS_MENU = [
 ];
 
 const GRUPOS_MENU = [
-  { id: 'comercial', label: 'COMERCIAL', keys: ['dashboard', 'clientes', 'cotizaciones', 'solicitudes', 'ventas', 'facturacion'] },
+  { id: 'comercial', label: 'COMERCIAL', keys: ['dashboard', 'clientes', 'cotizaciones', 'solicitudes', 'ventas', 'calibraciones', 'facturacion'] },
   { id: 'catalogo', label: 'CATÁLOGO', keys: ['equipos', 'mangas', 'servicios', 'epp'] },
   { id: 'abastecimiento', label: 'ABASTECIMIENTO', keys: ['proveedores', 'compras'] }
 ];

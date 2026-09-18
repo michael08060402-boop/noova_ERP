@@ -15,6 +15,7 @@ import Clientes from './pages/Clientes';
 import Cotizaciones from './pages/Cotizaciones';
 import Solicitudes from './pages/SolicitudesEPP';
 import Ventas from './pages/Ventas';
+import Calibraciones from './pages/Calibraciones';
 import Equipos from './pages/Equipos';
 import Mangas from './pages/Mangas';
 import Servicios from './pages/Servicios';
@@ -198,6 +199,7 @@ function App() {
           }
         >
           <Route index element={<InicioPorRol />} />
+          <Route path="calibraciones" element={<RutaConPermiso modulo="calibraciones"><Calibraciones /></RutaConPermiso>} />
 
           <Route
             path="dashboard"

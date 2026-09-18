@@ -1,4 +1,14 @@
-import { parseFechaLocal } from './formatDate';
+import { parseFechaLocal } from './formatDate.js';
+
+export function calcularCalibracionAnual(fechaVenta) {
+  const fecha = parseFechaLocal(fechaVenta);
+  if (Number.isNaN(fecha.getTime())) return null;
+  const mes = fecha.getMonth();
+  fecha.setFullYear(fecha.getFullYear() + 1);
+  // El aniversario del 29 de febrero cae el 28 en un año no bisiesto.
+  if (fecha.getMonth() !== mes) fecha.setDate(0);
+  return fecha;
+}
 
 // Los intervalos se guardan en días para mantener el formato existente.
 export const INTERVALOS_CALIBRACION = [
