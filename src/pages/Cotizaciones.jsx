@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { FiDownload, FiEdit2, FiTrash2, FiPlus, FiSearch, FiUserPlus, FiLoader, FiX, FiShoppingCart, FiBriefcase, FiList, FiFileText, FiArrowLeft } from 'react-icons/fi';
+import { FiDownload, FiEdit2, FiTrash2, FiPlus, FiSearch, FiUserPlus, FiLoader, FiX, FiShoppingCart, FiBriefcase, FiList, FiFileText, FiArrowLeft, FiFilter } from 'react-icons/fi';
 import { useCotizaciones } from '../hooks/useCotizaciones';
 import { useClientes } from '../hooks/useClientes';
 import { useEquipos } from '../hooks/useEquipos';
@@ -1032,47 +1032,48 @@ export default function Cotizaciones() {
 
       {vista === 'lista' && (
       <>
-      <div className="filtros-barra filtros-barra-cotizaciones">
+      <div className="cotizaciones-panel-filtros">
+        <section className="cotizaciones-grupo-filtro" aria-label="Estado">
+        <h3>Estado</h3>
         <div className="pestanas-estado">
-          <button
-            type="button"
+          <button type="button"
             className={`pestana-estado${filtroEstado === '' ? ' activa' : ''}`}
-            onClick={() => alCambiarEstado('')}
-          >
-            Todos <span className="pestana-estado-contador">{cotizaciones.length}</span>
+            aria-pressed={filtroEstado === ''}
+            onClick={() => alCambiarEstado('')}>
+            Todos <span className="pestana-estado-contador">{cotizacionesVisibles.length}</span>
           </button>
           {ESTADOS.filter((e) => e !== 'Error').map((e) => (
             <button
               type="button"
               key={e}
               className={`pestana-estado${filtroEstado === e ? ' activa' : ''}`}
-              onClick={() => alCambiarEstado(e)}
+              aria-pressed={filtroEstado === e}
+              onClick={() => alCambiarEstado(filtroEstado === e ? '' : e)}
             >
               {e} <span className="pestana-estado-contador">{cotizaciones.filter((c) => c.estado === e).length}</span>
             </button>
           ))}
         </div>
+        </section>
         {!esMinas && (
+          <section className="cotizaciones-grupo-filtro cotizaciones-grupo-tipo" aria-label="Tipo">
+          <h3>Tipo</h3>
           <div className="pestanas-estado pestanas-familia">
-            <button
-              type="button"
-              className={`pestana-estado${filtroFamilia === '' ? ' activa' : ''}`}
-              onClick={() => { setFiltroFamilia(''); setPaginaActual(1); }}
-            >
-              Todas <span className="pestana-estado-contador">{cotizacionesVisibles.length}</span>
-            </button>
             {FAMILIAS_COTIZACION.map((f) => (
               <button
                 type="button"
                 key={f.key}
                 className={`pestana-estado${filtroFamilia === f.key ? ' activa' : ''}`}
-                onClick={() => { setFiltroFamilia(f.key); setPaginaActual(1); }}
+                aria-pressed={filtroFamilia === f.key}
+                onClick={() => { setFiltroFamilia(filtroFamilia === f.key ? '' : f.key); setPaginaActual(1); }}
               >
                 {f.label} <span className="pestana-estado-contador">{cotizacionesVisibles.filter((c) => detectarTipoItem(c) === f.key).length}</span>
               </button>
             ))}
           </div>
+          </section>
         )}
+        <div className="cotizaciones-busqueda-filtros">
         <div className="barra-busqueda">
           <FiSearch className="icono-busqueda" size={18} />
           <input
@@ -1082,7 +1083,13 @@ export default function Cotizaciones() {
             onChange={(e) => alCambiarBusqueda(e.target.value)}
           />
         </div>
+        </div>
       </div>
+      <div className="cotizaciones-herramientas">
+        <button type="button" className="btn-secundario cotizaciones-limpiar-filtros"
+          onClick={() => { setFiltroEstado(''); setFiltroFamilia(''); setTerminoBusqueda(''); setPaginaActual(1); }}>
+          <FiFilter size={18} /> Limpiar filtros
+        </button>
 
       <Paginacion
         total={cotizacionesFiltradas.length}
@@ -1092,6 +1099,7 @@ export default function Cotizaciones() {
         onCambiarPorPagina={setPorPagina}
         compacta
       />
+      </div>
 
       <div className="tarjeta-tabla">
         {cotizacionesFiltradas.length === 0 ? (
@@ -1122,7 +1130,6 @@ export default function Cotizaciones() {
                     )}
                     <th className="texto-centro">
                       Estado
-                      <span className="info-icon" title="El estado se actualiza automáticamente desde SUNAT">i</span>
                     </th>
                     <th className="texto-centro">Acciones</th>
                   </tr>

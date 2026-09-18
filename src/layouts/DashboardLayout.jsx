@@ -8,6 +8,7 @@ import {
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useCotizaciones } from '../hooks/useCotizaciones';
+import useNotificacionesVistas from '../hooks/useNotificacionesVistas';
 import { puede, ROLES, normalizarRol, esRolMinas } from '../services/userService';
 import { obtenerCalibracionesProximas } from '../utils/calibracion';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -126,30 +127,29 @@ export default function DashboardLayout() {
     ? 'Área de Minas'
     : (ROLES[normalizarRol(userProfile?.role)]?.label || 'Sin rol asignado');
 
+<<<<<<< HEAD
   const cotizacionesPendientes = puedeVerDocumentos
     ? cotizaciones.filter((c) => c.estado === 'Borrador' || c.estado === 'Enviada' || c.estado === 'Generada')
     : [];
 
+=======
+  // La calibración próxima aplica únicamente a cotizaciones de Equipos;
+  // Minas solo ve EPP, por lo que no se calcula para ese rol.
+>>>>>>> 184bfd2 (filtros cotizacion, notif. solo con calibracion por ahora)
   const calibracionesProximas = (puedeVerCotizaciones && !esMinas)
     ? obtenerCalibracionesProximas(cotizaciones)
     : [];
 
-  const notificacionesPendientes = [
-    ...cotizacionesPendientes.map((cot) => ({
-      key: `cot-${cot.id}`,
-      tipo: 'cotizacion',
-      texto: cot.codigo || 'Sin código',
-      subtexto: cot.estado
-    })),
-    ...calibracionesProximas.map((cal) => ({
-      key: `cal-${cal.cotizacionId}-${cal.itemIndex}`,
+  const notificacionesPendientes = calibracionesProximas.map((cal) => ({
+      key: `cal-${cal.cotizacionId}-${cal.itemIndex}-${cal.fecha}-${cal.dias < 0 ? 'vencida' : 'proxima'}`,
       tipo: 'calibracion',
       texto: `${cal.cotizacionCodigo} · ${cal.descripcion}`,
       subtexto: cal.dias < 0
         ? `Vencida hace ${Math.abs(cal.dias)} días · ${cal.cliente}`
         : `Vence en ${cal.dias} días · ${cal.cliente}`
-    }))
-  ];
+    }));
+
+  const notificacionesSinVer = useNotificacionesVistas(currentUser?.uid, notificacionesPendientes, notificacionesAbiertas);
 
   const sidebarClase = [
     'sidebar',
@@ -353,9 +353,9 @@ export default function DashboardLayout() {
                   aria-expanded={notificacionesAbiertas}
                 >
                   <FiBell size={18} />
-                  {notificacionesPendientes.length > 0 && (
+                  {notificacionesSinVer > 0 && (
                     <span className="notification-badge">
-                      {notificacionesPendientes.length}
+                      {notificacionesSinVer}
                     </span>
                   )}
                 </button>
@@ -364,23 +364,18 @@ export default function DashboardLayout() {
                   <div className="notifications-panel">
                     <div className="notifications-header">
                       <span>Notificaciones</span>
-                      <span>{notificacionesPendientes.length} pendientes</span>
                     </div>
 
                     <div className="notifications-list">
                       {notificacionesPendientes.length === 0 ? (
                         <div className="notification-empty">
-                          No hay elementos pendientes
+                          Todo está al día
                         </div>
                       ) : (
-                        notificacionesPendientes.slice(0, 5).map((n) => (
+                        notificacionesPendientes.map((n) => (
                           <div key={n.key} className="notification-item">
                             <span className="notification-texto">{n.texto}</span>
-                            {n.tipo === 'cotizacion' ? (
-                              <span className="notification-status">{n.subtexto}</span>
-                            ) : (
-                              <span className="notification-detail">{n.subtexto}</span>
-                            )}
+                            <span className="notification-detail">{n.subtexto}</span>
                           </div>
                         ))
                       )}

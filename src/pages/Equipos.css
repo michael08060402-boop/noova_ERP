@@ -40,8 +40,7 @@
   box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.15);
 }
 
-/* Asegura que los encabezados y celdas de la columna Precio estén alineados a la derecha */
-.tabla-datos th.texto-derecha,
+/* Mantiene los importes alineados a la derecha. */
 .tabla-datos td.texto-derecha {
   text-align: right !important;
 }

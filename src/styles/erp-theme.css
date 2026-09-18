@@ -1,4 +1,8 @@
 /* Estilo común de las páginas del ERP, independiente de la ruta visitada. */
+#root table thead th {
+  text-align: center;
+}
+
 .dashboard-layout.paleta-preview {
   --dashboard-ink: #08264d;
   --dashboard-muted: #506584;
