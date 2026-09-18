@@ -215,13 +215,7 @@
 .paleta-preview .venta-card .venta-total {
   padding-top: 0.5rem;
 }
-.paleta-preview .ventas-pagina .venta-card .tabla-datos { min-width: 740px; }
-.paleta-preview .ventas-pagina .venta-card .tabla-datos :is(th, td):nth-child(1) { width: 50%; overflow-wrap: anywhere; }
-.paleta-preview .ventas-pagina .venta-card .tabla-datos :is(th, td):nth-child(2) { width: 10%; }
-.paleta-preview .ventas-pagina .venta-card .tabla-datos :is(th, td):nth-child(3) { width: 18%; }
-.paleta-preview .ventas-pagina .venta-card .tabla-datos :is(th, td):nth-child(4) { width: 22%; }
-.paleta-preview .ventas-pagina .venta-card .tabla-datos th { white-space: normal; }
-.paleta-preview .ventas-pagina .venta-card .tabla-datos select { max-width: 190px; }
+
 .paleta-preview .badge-tipo-cotizacion.badge-tipo-equipo {
   background: #F3F7F8;
   color: #064C70;

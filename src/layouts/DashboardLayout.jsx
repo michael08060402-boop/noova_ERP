@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   FiBarChart2, FiUsers, FiFileText, FiSettings,
   FiMenu, FiLogOut, FiX, FiChevronDown, FiDollarSign, FiBell, FiTool,
-  FiWind, FiMessageCircle, FiCloud, FiShoppingCart, FiTruck, FiTrendingUp, FiSearch,
+  FiWind, FiMessageCircle, FiCloud, FiShoppingCart, FiTruck, FiSearch,
   FiShield, FiBriefcase, FiClipboard, FiTarget
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
@@ -22,14 +22,13 @@ const ITEMS_MENU = [
   { path: '/dashboard', label: 'Dashboard', icon: <FiBarChart2 />, key: 'dashboard' },
   { path: '/clientes', label: 'Clientes', icon: <FiUsers />, key: 'clientes' },
   { path: '/cotizaciones', label: 'Cotizaciones', icon: <FiFileText />, key: 'cotizaciones' },
-  { path: '/solicitudes', label: 'Solicitudes', icon: <FiClipboard />, key: 'solicitudes' },
-  { path: '/ventas', label: 'Ventas', icon: <FiTrendingUp />, key: 'ventas' },
-  { path: '/calibraciones', label: 'Calibraciones', icon: <FiTarget />, key: 'calibraciones' },
+  { path: '/solicitudes', label: 'Solicitudes EPP', icon: <FiClipboard />, key: 'solicitudes' },
   { path: '/facturacion', label: 'Boletas / Facturas', icon: <FiDollarSign />, key: 'facturacion' },
   { path: '/equipos', label: 'Equipos', icon: <FiTool />, key: 'equipos' },
   { path: '/mangas', label: 'Mangas', icon: <FiWind />, key: 'mangas' },
   { path: '/servicios', label: 'Servicios', icon: <FiBriefcase />, key: 'servicios' },
   { path: '/epp', label: 'EPP', icon: <FiShield />, key: 'epp' },
+  { path: '/calibraciones', label: 'Calibraciones', icon: <FiTarget />, key: 'calibraciones' },
   { path: '/mensajeria', label: 'Mensajería', icon: <FiMessageCircle />, key: 'mensajeria' },
   { path: '/nube', label: 'Nube', icon: <FiCloud />, key: 'nube' },
   { path: '/proveedores', label: 'Proveedores', icon: <FiTruck />, key: 'proveedores' },
@@ -38,9 +37,10 @@ const ITEMS_MENU = [
 ];
 
 const GRUPOS_MENU = [
-  { id: 'comercial', label: 'COMERCIAL', keys: ['dashboard', 'clientes', 'cotizaciones', 'solicitudes', 'ventas', 'calibraciones', 'facturacion'] },
+  { id: 'comercial', label: 'COMERCIAL', keys: ['dashboard', 'clientes', 'cotizaciones', 'facturacion'] },
+  { id: 'compras', label: 'COMPRAS', keys: ['solicitudes', 'proveedores', 'compras'] },
   { id: 'catalogo', label: 'CATÁLOGO', keys: ['equipos', 'mangas', 'servicios', 'epp'] },
-  { id: 'abastecimiento', label: 'ABASTECIMIENTO', keys: ['proveedores', 'compras'] }
+  { id: 'postventa', label: 'POSTVENTA', keys: ['calibraciones'] }
 ];
 
 // Vista compacta para Minas. Nube se muestra también en el sidebar para que
@@ -135,15 +135,19 @@ export default function DashboardLayout() {
     : [];
 
   const notificacionesPendientes = calibracionesProximas.map((cal) => ({
-      key: `cal-${cal.cotizacionId}-${cal.itemIndex}-${cal.fecha}-${cal.dias < 0 ? 'vencida' : 'proxima'}`,
-      tipo: 'calibracion',
-      texto: `${cal.cotizacionCodigo} · ${cal.descripcion}`,
-      subtexto: cal.dias < 0
-        ? `Vencida hace ${Math.abs(cal.dias)} días · ${cal.cliente}`
-        : `Vence en ${cal.dias} días · ${cal.cliente}`
-    }));
+    key: `cal-${cal.cotizacionId}-${cal.itemIndex}-${cal.fecha}-${cal.dias < 0 ? 'vencida' : 'proxima'}`,
+    tipo: 'calibracion',
+    texto: `${cal.cotizacionCodigo} · ${cal.descripcion}`,
+    subtexto: cal.dias < 0
+      ? `Vencida hace ${Math.abs(cal.dias)} días · ${cal.cliente}`
+      : `Vence en ${cal.dias} días · ${cal.cliente}`
+  }));
 
-  const notificacionesSinVer = useNotificacionesVistas(currentUser?.uid, notificacionesPendientes, notificacionesAbiertas);
+  const notificacionesSinVer = useNotificacionesVistas(
+    currentUser?.uid,
+    notificacionesPendientes,
+    notificacionesAbiertas
+  );
 
   const sidebarClase = [
     'sidebar',
@@ -168,7 +172,11 @@ export default function DashboardLayout() {
     </NavLink>
   );
 
-  const normalizarBusqueda = (texto) => texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const normalizarBusqueda = (texto) => texto
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
   const resultadosModulos = itemsMenu.filter((item) =>
     normalizarBusqueda(item.label).includes(normalizarBusqueda(busquedaModulo.trim()))
   );
@@ -202,9 +210,14 @@ export default function DashboardLayout() {
 
         <nav className="sidebar-nav" aria-label="Navegación principal">
           {(esMinas ? GRUPOS_MENU_MINAS : GRUPOS_MENU).map((grupo) => {
-            const items = grupo.keys.map((key) => itemsMenu.find((item) => item.key === key)).filter(Boolean);
+            const items = grupo.keys
+              .map((key) => itemsMenu.find((item) => item.key === key))
+              .filter(Boolean);
             const abierto = !gruposCerrados[grupo.id];
-            const activo = items.some((item) => pathname === item.path || pathname.startsWith(`${item.path}/`));
+            const activo = items.some(
+              (item) => pathname === item.path || pathname.startsWith(`${item.path}/`)
+            );
+
             return items.length > 0 && (
               <div className="sidebar-nav-group" key={grupo.id}>
                 <button
@@ -212,7 +225,10 @@ export default function DashboardLayout() {
                   className={`sidebar-group-toggle ${activo ? 'sidebar-group-active' : ''}`}
                   aria-expanded={abierto}
                   aria-controls={`sidebar-group-${grupo.id}`}
-                  onClick={() => setGruposCerrados((actual) => ({ ...actual, [grupo.id]: abierto }))}
+                  onClick={() => setGruposCerrados((actual) => ({
+                    ...actual,
+                    [grupo.id]: abierto
+                  }))}
                 >
                   <span>{grupo.label}</span>
                   <FiChevronDown aria-hidden="true" />
@@ -264,12 +280,19 @@ export default function DashboardLayout() {
                 <FiMenu size={20} />
               </button>
             )}
-            <div className="topbar-user-static"
+            <div
+              className="topbar-user-static"
               title={nombreUsuario}
               aria-label="Menú de usuario"
             >
               <span className="topbar-user-icon">
-                {nombreUsuario.trim().split(/\s+/).slice(0, 2).map((nombre) => nombre[0]).join('').toUpperCase()}
+                {nombreUsuario
+                  .trim()
+                  .split(/\s+/)
+                  .slice(0, 2)
+                  .map((nombre) => nombre[0])
+                  .join('')
+                  .toUpperCase()}
               </span>
               <span className="topbar-user-data">
                 <span className="topbar-user-name">{nombreUsuario}</span>
@@ -286,12 +309,18 @@ export default function DashboardLayout() {
               placeholder="Buscar módulo del ERP…"
               value={busquedaModulo}
               onChange={(event) => setBusquedaModulo(event.target.value)}
-              onKeyDown={(event) => { if (event.key === 'Escape') setBusquedaModulo(''); }}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') setBusquedaModulo('');
+              }}
             />
             {busquedaModulo.trim() && (
               <div className="dashboard-search-results">
                 {resultadosModulos.length ? resultadosModulos.map((item) => (
-                  <NavLink key={item.path} to={item.path} onClick={() => setBusquedaModulo('')}>
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setBusquedaModulo('')}
+                  >
                     {item.icon}<span>{item.label}</span>
                   </NavLink>
                 )) : <p role="status">No se encontraron módulos.</p>}

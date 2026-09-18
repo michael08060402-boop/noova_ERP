@@ -12,50 +12,28 @@ import {
 } from './accessControl.js';
 
 function perfil(role, extra = {}) {
-  return {
-    role,
-    activo: true,
-    ...extra
-  };
+  return { role, activo: true, ...extra };
 }
 
 test('solo existen los 5 roles funcionales definidos', () => {
-  assert.deepEqual(
-    Object.keys(ROLES),
-    [
-      'gerencia',
-      'administrador',
-      'soporte_ti',
-      'responsable_marketing',
-      'jefe_proyecto_mina'
-    ]
-  );
+  assert.deepEqual(Object.keys(ROLES), [
+    'gerencia',
+    'administrador',
+    'soporte_ti',
+    'responsable_marketing',
+    'jefe_proyecto_mina'
+  ]);
 });
 
 test('Gerencia tiene acceso completo a los módulos', () => {
   const user = perfil('gerencia');
 
   for (const modulo of [
-    'dashboard',
-    'clientes',
-    'equipos',
-    'mangas',
-    'servicios',
-    'epp',
-    'cotizaciones',
-    'mensajeria',
-    'proveedores',
-    'compras',
-    'facturacion',
-    'nube',
-    'perfil',
-    'configuracion'
+    'dashboard', 'clientes', 'equipos', 'mangas', 'servicios', 'epp',
+    'cotizaciones', 'solicitudes', 'calibraciones', 'mensajeria',
+    'proveedores', 'compras', 'facturacion', 'nube', 'perfil', 'configuracion'
   ]) {
-    assert.equal(
-      tienePermiso(user, modulo),
-      true,
-      `Gerencia debe poder leer ${modulo}`
-    );
+    assert.equal(tienePermiso(user, modulo), true, `Gerencia debe poder leer ${modulo}`);
   }
 
   assert.equal(puede(user, 'clientes', 'delete'), true);
@@ -70,39 +48,25 @@ test('Administrador ve todos los módulos pero Configuración solo Correlativos'
 
   assert.equal(tienePermiso(user, 'clientes'), true);
   assert.equal(tienePermiso(user, 'facturacion'), true);
+  assert.equal(tienePermiso(user, 'calibraciones'), true);
   assert.equal(tienePermiso(user, 'configuracion'), true);
   assert.equal(puedeConfiguracion(user, 'correlativo'), true);
 
   for (const seccion of ['empresa', 'pagos', 'usuarios', 'logs']) {
-    assert.equal(
-      puedeConfiguracion(user, seccion),
-      false,
-      `Administrador no debe acceder a Configuración/${seccion}`
-    );
+    assert.equal(puedeConfiguracion(user, seccion), false, `Administrador no debe acceder a Configuración/${seccion}`);
   }
 });
 
 test('Soporte TI solo recibe Configuración, Perfil, Nube y Mensajería', () => {
   const user = perfil('soporte_ti');
 
-  for (const modulo of [
-    'configuracion',
-    'perfil',
-    'nube',
-    'mensajeria'
-  ]) {
+  for (const modulo of ['configuracion', 'perfil', 'nube', 'mensajeria']) {
     assert.equal(tienePermiso(user, modulo), true);
   }
 
   for (const modulo of [
-    'dashboard',
-    'clientes',
-    'equipos',
-    'mangas',
-    'cotizaciones',
-    'proveedores',
-    'compras',
-    'facturacion'
+    'dashboard', 'clientes', 'equipos', 'mangas', 'cotizaciones',
+    'solicitudes', 'calibraciones', 'proveedores', 'compras', 'facturacion'
   ]) {
     assert.equal(tienePermiso(user, modulo), false);
   }
@@ -121,68 +85,43 @@ test('Marketing tiene lectura en Dashboard, Clientes y Perfil', () => {
   assert.equal(puede(user, 'clientes', 'create'), false);
   assert.equal(puede(user, 'clientes', 'update'), false);
   assert.equal(puede(user, 'clientes', 'delete'), false);
-
   assert.equal(puede(user, 'perfil', 'read'), true);
   assert.equal(puede(user, 'perfil', 'update'), false);
-
   assert.equal(puede(user, 'mensajeria', 'create'), true);
   assert.equal(puede(user, 'mensajeria', 'update'), true);
   assert.equal(puede(user, 'mensajeria', 'delete'), true);
-
   assert.equal(getCarpetaNube(user), 'NOOVA SAC/04. MARKETING');
   assert.equal(getRutaInicial(user), '/dashboard');
 });
 
-test('Jefe de Proyecto de Mina ve solo Cotizaciones (modo EPP), EPP y Nube', () => {
+test('Jefe de Proyecto de Mina ve solo Solicitudes EPP, EPP, Nube y Perfil', () => {
   const user = perfil('jefe_proyecto_mina');
 
-  // Accesos permitidos: Cotizaciones (sin eliminar), EPP (solo lectura), Nube y Perfil.
   assert.equal(tienePermiso(user, 'nube'), true);
   assert.equal(tienePermiso(user, 'perfil'), true);
-  assert.equal(tienePermiso(user, 'cotizaciones'), true);
-  assert.equal(puede(user, 'cotizaciones', 'create'), true);
-  assert.equal(puede(user, 'cotizaciones', 'update'), true);
-  assert.equal(puede(user, 'cotizaciones', 'delete'), false);
+  assert.equal(tienePermiso(user, 'solicitudes'), true);
+  assert.equal(puede(user, 'solicitudes', 'create'), true);
+  assert.equal(puede(user, 'solicitudes', 'update'), true);
+  assert.equal(puede(user, 'solicitudes', 'delete'), false);
   assert.equal(tienePermiso(user, 'epp'), true);
   assert.equal(puede(user, 'epp', 'create'), false);
   assert.equal(puede(user, 'epp', 'delete'), false);
 
-  // Módulos que NO debe ver en absoluto.
   for (const modulo of [
-    'dashboard',
-    'clientes',
-    'ventas',
-    'equipos',
-    'mangas',
-    'servicios',
-    'mensajeria',
-    'proveedores',
-    'compras',
-    'facturacion',
-    'configuracion'
+    'dashboard', 'clientes', 'cotizaciones', 'calibraciones', 'equipos',
+    'mangas', 'servicios', 'mensajeria', 'proveedores', 'compras',
+    'facturacion', 'configuracion'
   ]) {
-    assert.equal(
-      tienePermiso(user, modulo),
-      false,
-      `Minas no debe acceder a ${modulo}`
-    );
+    assert.equal(tienePermiso(user, modulo), false, `Minas no debe acceder a ${modulo}`);
   }
 
   assert.equal(getCarpetaNube(user), 'NOOVA SAC/13. PROYECTOS');
-  // Ruta inicial: directo a Cotizaciones (modo EPP).
-  assert.equal(getRutaInicial(user), '/cotizaciones');
+  assert.equal(getRutaInicial(user), '/solicitudes');
 });
 
 test('un usuario inactivo o con rol desconocido no recibe acceso', () => {
-  assert.equal(
-    tienePermiso(perfil('gerencia', { activo: false }), 'dashboard'),
-    false
-  );
-
-  assert.equal(
-    tienePermiso(perfil('operaciones'), 'dashboard'),
-    false
-  );
+  assert.equal(tienePermiso(perfil('gerencia', { activo: false }), 'dashboard'), false);
+  assert.equal(tienePermiso(perfil('operaciones'), 'dashboard'), false);
 });
 
 test('aliases legacy inequívocos se normalizan sin crear roles nuevos', () => {
