@@ -127,15 +127,8 @@ export default function DashboardLayout() {
     ? 'Área de Minas'
     : (ROLES[normalizarRol(userProfile?.role)]?.label || 'Sin rol asignado');
 
-<<<<<<< HEAD
-  const cotizacionesPendientes = puedeVerDocumentos
-    ? cotizaciones.filter((c) => c.estado === 'Borrador' || c.estado === 'Enviada' || c.estado === 'Generada')
-    : [];
-
-=======
   // La calibración próxima aplica únicamente a cotizaciones de Equipos;
   // Minas solo ve EPP, por lo que no se calcula para ese rol.
->>>>>>> 184bfd2 (filtros cotizacion, notif. solo con calibracion por ahora)
   const calibracionesProximas = (puedeVerCotizaciones && !esMinas)
     ? obtenerCalibracionesProximas(cotizaciones)
     : [];
