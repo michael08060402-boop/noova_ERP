@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { FiTarget, FiBox, FiCheckCircle, FiClock, FiAlertTriangle, FiSearch, FiEye } from 'react-icons/fi';
 import { useCotizaciones } from '../hooks/useCotizaciones';
+import { useOrdenesCompra } from '../hooks/useOrdenesCompra';
+import { useAuth } from '../context/AuthContext';
+import { puede } from '../services/userService';
 import { calcularCalibracionAnual, diasHasta } from '../utils/calibracion';
 import { formatDate } from '../utils/formatDate';
 import Paginacion from '../components/Paginacion';
@@ -12,11 +15,17 @@ const TIPOS_EXCLUIDOS = new Set(['servicio', 'epp', 'manga']);
 
 export default function Calibraciones() {
   const { cotizaciones, loading, error, fetchCotizaciones } = useCotizaciones();
+  const { userProfile } = useAuth();
+  const puedeVerCompras = puede(userProfile, 'compras', 'read');
+  const { ordenes, loading: cargandoOrdenes, error: errorOrdenes, refresh: recargarOrdenes } = useOrdenesCompra(puedeVerCompras);
   const [busqueda, setBusqueda] = useState('');
   const [estado, setEstado] = useState('');
   const [pagina, setPagina] = useState(1);
   const [porPagina, setPorPagina] = useState(10);
   const [detalle, setDetalle] = useState(null);
+  const ordenDetalle = detalle && puedeVerCompras ? ordenes.find((orden) =>
+    detalle.ordenCompraId ? orden.id === detalle.ordenCompraId : orden.origenCotizacionId === detalle.cotizacionId
+  ) : null;
   const registros = cotizaciones
     .filter((cot) => cot.estado === 'Aceptada' && (!cot.tipoItem || cot.tipoItem === 'equipo'))
     .flatMap((cot) => (cot.items || []).flatMap((item, index) => {
@@ -29,7 +38,8 @@ export default function Calibraciones() {
         marca: item.marca?.trim() || '', codigo: item.codigo || '—', cliente: cot.cliente?.razonSocial || '—',
         cotizacion: cot.codigo, venta, fecha, dias,
         cantidad: item.cantidad, unidad: item.unidadMedida,
-        ruc: cot.cliente?.ruc, responsable: cot.responsable,
+        ruc: cot.cliente?.ruc, cotizacionId: cot.id,
+        ordenCompraId: cot.ordenCompraId, ordenCompraCodigo: cot.ordenCompraCodigo,
         fechaAceptacionRegistrada: Boolean(cot.fechaAceptacion),
         estado: dias === null ? 'sin' : dias < 0 ? 'vencida' : dias <= 30 ? 'proxima' : 'vigente' }];
     }))
@@ -122,8 +132,18 @@ export default function Calibraciones() {
         <h4>Origen de la venta</h4>
         <dl>
           <div><dt>Cotización aceptada</dt><dd>{detalle.cotizacion || 'Sin código'}</dd></div>
-          <div><dt>Responsable comercial</dt><dd>{detalle.responsable || 'No registrado'}</dd></div>
+          <div><dt>Orden de compra vinculada</dt><dd>
+            {!puedeVerCompras ? 'Sin permiso para consultar compras' : cargandoOrdenes ? 'Cargando OC...' : errorOrdenes ? <>
+              No se pudo consultar la OC. <button type="button" className="btn-enlace" onClick={recargarOrdenes}>Reintentar</button>
+            </> : ordenDetalle ? (ordenDetalle.codigo || detalle.ordenCompraCodigo || 'Sin código')
+              : detalle.ordenCompraId ? `${detalle.ordenCompraCodigo || detalle.ordenCompraId} · Detalle no disponible` : 'Sin orden de compra vinculada'}
+          </dd></div>
           <div><dt>{detalle.fechaAceptacionRegistrada ? 'Fecha de venta / aceptación' : 'Fecha de referencia'}</dt><dd>{formatDate(detalle.venta) || 'No registrada'}</dd></div>
+          {ordenDetalle && !errorOrdenes && <>
+            <div><dt>Fecha de la OC</dt><dd>{formatDate(ordenDetalle.fecha) || 'No registrada'}</dd></div>
+            <div><dt>Proveedor</dt><dd>{ordenDetalle.proveedor?.razonSocial || 'No registrado'}</dd></div>
+            <div><dt>Estado de la OC</dt><dd>{ordenDetalle.estado || 'No registrado'}</dd></div>
+          </>}
         </dl>
         {!detalle.fechaAceptacionRegistrada && <p className="calibracion-detalle-nota">No hay fecha de aceptación registrada. Se utiliza la última actualización de la cotización como referencia.</p>}
         <h4>Programación de calibración</h4>
