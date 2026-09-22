@@ -10,7 +10,7 @@ import Paginacion from '../components/Paginacion';
 import Modal from '../components/Modal';
 import './Calibraciones.css';
 
-const ESTADOS = { vigente: 'Al día', proxima: 'Por vencer', vencida: 'Vencida', sin: 'Sin programar' };
+const ESTADOS = { vigente: 'Al día', proxima: 'Por vencer', vencida: 'Vencida' };
 const TIPOS_EXCLUIDOS = new Set(['servicio', 'epp', 'manga']);
 
 export default function Calibraciones() {
@@ -34,6 +34,7 @@ export default function Calibraciones() {
       const venta = cot.fechaAceptacion || cot.updatedAt;
       const fecha = calcularCalibracionAnual(venta);
       const dias = diasHasta(fecha);
+      if (dias === null) return [];
       return [{ key: `${cot.id}-${index}`, descripcion: item.descripcion || item.nombre || 'Sin descripción',
         marca: item.marca?.trim() || '', codigo: item.codigo || '—', cliente: cot.cliente?.razonSocial || '—',
         cotizacion: cot.codigo, venta, fecha, dias,
@@ -41,7 +42,7 @@ export default function Calibraciones() {
         ruc: cot.cliente?.ruc, cotizacionId: cot.id,
         ordenCompraId: cot.ordenCompraId, ordenCompraCodigo: cot.ordenCompraCodigo,
         fechaAceptacionRegistrada: Boolean(cot.fechaAceptacion),
-        estado: dias === null ? 'sin' : dias < 0 ? 'vencida' : dias <= 30 ? 'proxima' : 'vigente' }];
+        estado: dias < 0 ? 'vencida' : dias <= 30 ? 'proxima' : 'vigente' }];
     }))
     .sort((a, b) => (a.fecha?.getTime() ?? Infinity) - (b.fecha?.getTime() ?? Infinity));
   const termino = busqueda.trim().toLocaleLowerCase();
@@ -150,7 +151,7 @@ export default function Calibraciones() {
         <dl>
           <div><dt>Próxima calibración</dt><dd>{formatDate(detalle.fecha) || 'Sin fecha'}</dd></div>
           <div><dt>Plazo</dt><dd>Un año desde la fecha de venta</dd></div>
-          <div><dt>Tiempo restante</dt><dd>{detalle.dias === null ? 'Sin fecha para calcular' : detalle.dias < 0 ? `Vencida hace ${Math.abs(detalle.dias)} días` : detalle.dias === 0 ? 'Vence hoy' : `Faltan ${detalle.dias} días`}</dd></div>
+          <div><dt>Tiempo restante</dt><dd>{detalle.dias < 0 ? `Vencida hace ${Math.abs(detalle.dias)} días` : detalle.dias === 0 ? 'Vence hoy' : `Faltan ${detalle.dias} días`}</dd></div>
         </dl>
         <p className="calibracion-detalle-nota">Este aviso se genera automáticamente desde la venta. La fecha programada no confirma que se haya realizado una calibración ni que exista un certificado.</p>
         <div className="calibracion-detalle-cierre"><button type="button" className="btn-principal" onClick={() => setDetalle(null)}>Cerrar</button></div>

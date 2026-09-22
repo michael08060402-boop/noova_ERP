@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import './Loading.css';
 import logoSymbol from '../assets/noova-loader-symbol.png';
 import logoNoova from '../assets/noova-loader-wordmark.png';
@@ -7,7 +7,6 @@ import logoConsulting from '../assets/noova-loader-consulting.png';
 const requests = new Map();
 const listeners = new Set();
 
-let requestSequence = 0;
 let cycleId = 1;
 let cycleMessage = 'Preparando ERP...';
 
@@ -32,51 +31,31 @@ function subscribe(listener) {
   return () => listeners.delete(listener);
 }
 
-/*
-  Se llama después de un login correcto.
-  React NO se recarga, por eso necesitamos iniciar explícitamente
-  un nuevo ciclo de carga inicial al entrar al ERP desde /login.
-*/
 export function startInitialLoadingCycle(message = 'Preparando ERP...') {
   cycleId += 1;
   cycleMessage = message;
   emit();
 }
 
-/*
-  Los módulos existentes pueden seguir usando:
-      return <Loading message="..." />
-
-  Este componente YA NO dibuja nada.
-  Solo informa al loader inicial que todavía existe trabajo pendiente.
-
-  Cuando el ciclo inicial ya terminó, estos registros se ignoran visualmente:
-  al cambiar de módulo NO vuelve a aparecer ningún loader.
-*/
 export default function Loading({ message = 'Cargando...' }) {
-  const idRef = useRef(null);
-
-  if (idRef.current === null) {
-    requestSequence += 1;
-    idRef.current = `loading-${requestSequence}`;
-  }
+  const id = useId();
+  const initialMessageRef = useRef(message);
 
   useEffect(() => {
-    const id = idRef.current;
-    requests.set(id, message);
+    requests.set(id, initialMessageRef.current);
     emit();
 
     return () => {
       requests.delete(id);
       emit();
     };
-  }, []);
+  }, [id]);
 
   useEffect(() => {
-    if (!requests.has(idRef.current)) return;
-    requests.set(idRef.current, message);
+    if (!requests.has(id)) return;
+    requests.set(id, message);
     emit();
-  }, [message]);
+  }, [id, message]);
 
   return null;
 }

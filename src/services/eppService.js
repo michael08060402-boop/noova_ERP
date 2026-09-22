@@ -10,7 +10,8 @@ const COLLECTION_NAME = 'epp';
 // pueden conservar ese campo en Firestore, pero el frontend lo ignora y al
 // editar un EPP se elimina del documento.
 function sinEstadoActivo(data = {}) {
-  const { activo: _activo, ...resto } = data;
+  const resto = { ...data };
+  delete resto.activo;
   return resto;
 }
 

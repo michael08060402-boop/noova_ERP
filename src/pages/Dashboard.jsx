@@ -133,13 +133,12 @@ export default function Dashboard() {
   const mesSeleccionado = numeroMes - 1;
   const etiquetaPeriodo = new Date(anioSeleccionado, mesSeleccionado, 1).toLocaleDateString('es-PE', { month: 'long', year: 'numeric' });
 
-  // Todos los res?menes mensuales comparten el per?odo seleccionado.
   const cotizacionesMes = useMemo(
     () => filtrarPorMes(cotizaciones, periodo, fechaCotizacion),
     [cotizaciones, periodo]
   );
   const aceptadasMes = useMemo(() => cotizacionesMes.filter(esAceptada), [cotizacionesMes]);
-  const ventasMes = useMemo(
+  const cotizacionesAceptadasMes = useMemo(
     () => filtrarPorMes(cotizaciones.filter(esAceptada), periodo, fechaVenta),
     [cotizaciones, periodo]
   );
@@ -276,10 +275,10 @@ export default function Dashboard() {
     [conteoCategorias]
   );
 
-  const datosVentasMensuales = useMemo(() => ({
+  const datosCotizacionesAceptadasMensuales = useMemo(() => ({
     labels: ultimos12Meses.map((m) => m.label),
     datasets: [{
-      label: 'Ventas confirmadas',
+      label: 'Cotizaciones aceptadas',
       data: ultimos12Meses.map((m) => cotizaciones.filter((cot) => {
         const fecha = parseFechaLocal(cot.fechaAceptacion || cot.fechaEmision || cot.fecha || cot.createdAt);
         return ['Aceptada', 'Aprobada'].includes(cot.estado)
@@ -310,13 +309,13 @@ export default function Dashboard() {
   }), [ultimos12Meses, ordenes]);
 
   const clientesDestacados = useMemo(() => {
-    const registros = rankingClientes === 'ventas' ? ventasMes : cotizacionesMes;
+    const registros = rankingClientes === 'importeAceptado' ? cotizacionesAceptadasMes : cotizacionesMes;
     const conteo = registros.reduce((acumulado, cotizacion) => {
       const nombre = cotizacion.cliente?.razonSocial || 'Cliente sin nombre';
-      if (!acumulado[nombre]) acumulado[nombre] = { cotizaciones: 0, ventas: 0 };
+      if (!acumulado[nombre]) acumulado[nombre] = { cotizaciones: 0, importeAceptado: 0 };
       acumulado[nombre].cotizaciones += 1;
       if (['Aceptada', 'Aprobada'].includes(cotizacion.estado)) {
-        acumulado[nombre].ventas += Number(cotizacion.total) || 0;
+        acumulado[nombre].importeAceptado += Number(cotizacion.total) || 0;
       }
       return acumulado;
     }, {});
@@ -328,7 +327,7 @@ export default function Dashboard() {
       .filter((cliente) => cliente.valor > 0)
       .sort((clienteA, clienteB) => clienteB.valor - clienteA.valor)
       .slice(0, 5);
-  }, [cotizacionesMes, ventasMes, rankingClientes]);
+  }, [cotizacionesMes, cotizacionesAceptadasMes, rankingClientes]);
 
   const cotizacionesMesAnterior = useMemo(() => {
     const anterior = new Date(anioSeleccionado, mesSeleccionado - 1, 1);
@@ -341,10 +340,9 @@ export default function Dashboard() {
     ? Math.round(((cotizacionesMes.length - cotizacionesMesAnterior) / cotizacionesMesAnterior) * 100)
     : null;
   const totalCotizacionesMes = cotizacionesMes.reduce((total, cotizacion) => total + (Number(cotizacion.total) || 0), 0);
-  const totalVentasMes = ventasMes.reduce((total, cotizacion) => total + (Number(cotizacion.total) || 0), 0);
+  const totalAceptadoMes = cotizacionesAceptadasMes.reduce((total, cotizacion) => total + (Number(cotizacion.total) || 0), 0);
   const rangoGraficos = `${NOMBRES_MESES[ultimos12Meses[0].month]} ${ultimos12Meses[0].year} – ${NOMBRES_MESES[mesSeleccionado]} ${anioSeleccionado}`;
 
-  // --- Render ---
   if (cargandoClientes || cargandoCotizaciones || cargandoEquipos || cargandoOrdenes) {
     return <Loading message="Cargando dashboard..." />;
   }
@@ -420,12 +418,12 @@ export default function Dashboard() {
             <article className="dashboard-kpi">
               <div className="dashboard-kpi-heading">
                 <div className="dashboard-kpi-icon dashboard-kpi-icon-sales"><FiShoppingCart /></div>
-                <h2>Ventas del mes</h2>
+                <h2>Cotizaciones aceptadas</h2>
               </div>
-              <div className="dashboard-kpi-value"><strong>{ventasMes.length}</strong><FiTrendingUp className="dashboard-sales-icon" aria-hidden="true" /></div>
-              <p className="dashboard-kpi-description"><b>{formatCurrency(totalVentasMes)}</b> en aprobadas</p>
+              <div className="dashboard-kpi-value"><strong>{cotizacionesAceptadasMes.length}</strong><FiTrendingUp className="dashboard-sales-icon" aria-hidden="true" /></div>
+              <p className="dashboard-kpi-description"><b>{formatCurrency(totalAceptadoMes)}</b> aceptado</p>
               <div className="dashboard-kpi-footnote">
-                <span>Importe promedio</span><b>{formatCurrency(ventasMes.length ? totalVentasMes / ventasMes.length : 0)}</b>
+                <span>Importe promedio</span><b>{formatCurrency(cotizacionesAceptadasMes.length ? totalAceptadoMes / cotizacionesAceptadasMes.length : 0)}</b>
               </div>
             </article>
             <article className="dashboard-kpi">
@@ -433,7 +431,7 @@ export default function Dashboard() {
                 <div className="dashboard-kpi-icon dashboard-kpi-icon-amber"><FiTool /></div>
                 <h2>Calibraciones próximas</h2>
               </div>
-              <div className="dashboard-kpi-value"><strong>{calibracionesMes.length}</strong><span className="dashboard-status-chip">{calibracionesMes.length ? 'Por revisar' : 'Sin programaciones'}</span></div>
+              <div className="dashboard-kpi-value"><strong>{calibracionesMes.length}</strong>{calibracionesMes.length > 0 && <span className="dashboard-status-chip">Por revisar</span>}</div>
               <p className="dashboard-kpi-description">Hasta 30 días, incluidas vencidas</p>
               <div className="dashboard-calibration-note"><FiCheckCircle aria-hidden="true" /><span>Seguimiento de calibraciones registradas</span></div>
             </article>
@@ -442,7 +440,7 @@ export default function Dashboard() {
           <article className="dashboard-kpi dashboard-kpi-featured">
             <div className="dashboard-kpi-heading"><div className="dashboard-kpi-icon dashboard-kpi-icon-blue"><FiUsers /></div><h2>Clientes registrados en el mes</h2></div>
             <div className="dashboard-kpi-value"><strong>{clientesMes.length}</strong></div>
-            <p className="dashboard-kpi-description">Altas del per?odo seleccionado</p>
+            <p className="dashboard-kpi-description">Altas del período seleccionado</p>
             <button className="dashboard-client-link" onClick={() => navigate('/clientes')}>Consultar clientes <FiArrowRight /></button>
           </article>
         )}
@@ -492,8 +490,8 @@ export default function Dashboard() {
 
       {(puedeVerCotizaciones || puedeVerCompras) && <div className="dashboard-chart-grid dashboard-secondary-grid">
         {puedeVerCotizaciones && <div className="chart-card">
-          <div className="chart-card-header"><div className="dashboard-chart-title dashboard-chart-title-green"><FiTrendingUp /><div><h2>Ventas mensuales</h2><p>Cotizaciones aprobadas · {rangoGraficos}</p></div></div><span className="dashboard-chart-badge dashboard-chart-badge-green">{ventasMes.length} en el mes seleccionado</span></div>
-          <div className="chart-container"><Line data={datosVentasMensuales} options={opcionesLine} role="img" aria-label={`Ventas confirmadas por mes. ${rangoGraficos}`} /></div>
+          <div className="chart-card-header"><div className="dashboard-chart-title dashboard-chart-title-green"><FiTrendingUp /><div><h2>Cotizaciones aceptadas</h2><p>Últimos 12 meses · {rangoGraficos}</p></div></div><span className="dashboard-chart-badge dashboard-chart-badge-green">{cotizacionesAceptadasMes.length} en el mes seleccionado</span></div>
+          <div className="chart-container"><Line data={datosCotizacionesAceptadasMensuales} options={opcionesLine} role="img" aria-label={`Cotizaciones aceptadas por mes durante un año. ${rangoGraficos}`} /></div>
         </div>}
         {puedeVerCompras && <div className="chart-card">
           <div className="chart-card-header"><div className="dashboard-chart-title dashboard-chart-title-orange"><FiShoppingCart /><div><h2>Compras mensuales</h2><p>Órdenes de compra · {rangoGraficos}</p></div></div><span className="dashboard-chart-badge dashboard-chart-badge-orange">{datosComprasMensuales.datasets[0].data.at(-1)} en el mes seleccionado</span></div>
@@ -543,11 +541,11 @@ export default function Dashboard() {
                 Por cotizaciones
               </button>
               <button
-                className={`dashboard-toggle ${rankingClientes === 'ventas' ? 'active' : ''}`}
-                onClick={() => setRankingClientes('ventas')}
-                aria-pressed={rankingClientes === 'ventas'}
+                className={`dashboard-toggle ${rankingClientes === 'importeAceptado' ? 'active' : ''}`}
+                onClick={() => setRankingClientes('importeAceptado')}
+                aria-pressed={rankingClientes === 'importeAceptado'}
               >
-                Por ventas
+                Por importe aceptado
               </button>
             </div>
           </div>
@@ -556,13 +554,13 @@ export default function Dashboard() {
               <div className="top-cliente" key={nombre}>
                 <span title={nombre}>{nombre}</span>
                 <div className="top-cliente-bar"><i style={{ width: `${(valor / (clientesDestacados[0]?.valor || 1)) * 100}%` }} /></div>
-                <strong>{rankingClientes === 'ventas' ? formatCurrency(valor) : valor}</strong>
+                <strong>{rankingClientes === 'importeAceptado' ? formatCurrency(valor) : valor}</strong>
               </div>
             ))}
             {!clientesDestacados.length && (
               <div className="dashboard-empty">
-                {rankingClientes === 'ventas'
-                  ? 'No hay ventas aprobadas'
+                {rankingClientes === 'importeAceptado'
+                  ? 'No hay cotizaciones aceptadas'
                   : 'No hay clientes con cotizaciones'}
               </div>
             )}
@@ -579,7 +577,7 @@ export default function Dashboard() {
         </div>
         {cotizacionesRecientes.length === 0 ? (
           <div className="estado-vacio">
-            <p>No hay cotizaciones en el per?odo seleccionado</p>
+            <p>No hay cotizaciones en el período seleccionado</p>
             <button className="btn-principal" onClick={() => navigate('/cotizaciones')} style={{ marginTop: '0.75rem' }}>
               Ver cotizaciones
             </button>
