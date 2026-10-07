@@ -1,6 +1,6 @@
 import { parseFechaLocal } from './formatDate.js';
 
-export function periodoValido(periodo) {
+function periodoValido(periodo) {
   return /^\d{4}-(0[1-9]|1[0-2])$/.test(periodo) && Number(periodo.slice(0, 4)) > 0;
 }
 

@@ -3,11 +3,6 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 let cachedConfig = null;
 
-// Estructura base: los datos de empresa vienen exclusivamente de Firestore
-// (colección configuracion/general). Si el documento no existe, los campos
-// de empresa quedan vacíos. Los demás campos (condiciones de pago,
-// correlativos de cotización) sí tienen valores por defecto porque son
-// configuración operativa del sistema, no datos sensibles de la empresa.
 const CONFIG_BASE = {
   empresa: {
     razonSocial: '',
@@ -65,8 +60,4 @@ export async function updateConfig(data) {
   const docRef = doc(db, 'configuracion', 'general');
   await setDoc(docRef, { ...data, updatedAt: new Date().toISOString() }, { merge: true });
   cachedConfig = mergeConfig({ ...cachedConfig, ...data });
-}
-
-export function clearConfigCache() {
-  cachedConfig = null;
 }

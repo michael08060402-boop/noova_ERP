@@ -1,16 +1,13 @@
-/* ── PAGINA NUBE ── */
 .nube-pagina {
   max-width: 100%;
 }
 
-/* ── EXPLORADOR ── */
 .nube-explorador {
   display: flex;
   flex-direction: column;
   gap: 0.875rem;
 }
 
-/* ── BARRA SUPERIOR ── */
 .nube-barra-superior {
   display: flex;
   align-items: center;
@@ -26,7 +23,6 @@
   flex-shrink: 0;
 }
 
-/* ── BREADCRUMB ── */
 .nube-breadcrumb {
   display: flex;
   align-items: center;
@@ -85,7 +81,6 @@
   font-weight: 600;
 }
 
-/* ── BARRA DE BUSQUEDA ── */
 .nube-busqueda {
   display: flex;
   align-items: center;
@@ -124,7 +119,6 @@
   flex-shrink: 0;
 }
 
-/* Indicador de modo busqueda */
 .nube-modo-busqueda {
   display: flex;
   align-items: center;
@@ -138,7 +132,6 @@
   font-weight: 500;
 }
 
-/* ── LISTA DE ARCHIVOS ── */
 .nube-lista {
   background: #fff;
   border: 1px solid var(--gris-borde);
@@ -190,7 +183,6 @@
   gap: 0.3rem;
 }
 
-/* ── FILA DE ITEM ── */
 .nube-item {
   display: flex;
   align-items: center;
@@ -217,20 +209,17 @@
   background: var(--azul-claro);
 }
 
-/* Accesibilidad: foco visible para carpetas (navegacion con teclado) */
 .nube-item-carpeta:focus-visible {
   outline: 2px solid var(--azul-primario);
   outline-offset: -2px;
   border-radius: 4px;
 }
 
-/* Iconos */
 .nube-icono {
   flex-shrink: 0;
 }
 
 .nube-icono-carpeta {
-  /* El color se asigna dinamicamente via style={{ color }} */
   transition: transform 0.15s;
 }
 
@@ -242,7 +231,6 @@
   color: var(--texto-muy-suave);
 }
 
-/* Nombre del archivo */
 .nube-nombre-contenedor {
   display: flex;
   flex-direction: column;
@@ -267,7 +255,6 @@
   line-height: 1;
 }
 
-/* Ruta en resultados de busqueda */
 .nube-ruta-busqueda {
   font-size: 0.7rem;
   color: var(--texto-muy-suave);
@@ -284,14 +271,12 @@
   opacity: 1;
 }
 
-/* Texto "Abrir" en carpetas */
 .nube-accion-texto {
   font-size: 0.78rem;
   color: var(--azul-primario);
   font-weight: 500;
 }
 
-/* Boton abrir/descargar */
 .nube-btn-descargar {
   color: var(--azul-primario);
 }
@@ -307,7 +292,6 @@
   opacity: 0.5;
 }
 
-/* Columnas con alineacion derecha para numeros/fechas */
 .nube-col-tamano,
 .nube-col-fecha {
   font-size: 0.82rem;
@@ -315,7 +299,6 @@
   text-align: right;
 }
 
-/* ── ESTADO VACIO ── */
 .nube-vacio {
   text-align: center;
   padding: 3rem 1rem;
@@ -332,7 +315,6 @@
   margin: 0;
 }
 
-/* ── ERROR ── */
 .nube-error {
   text-align: center;
   padding: 2rem 1rem;
@@ -352,7 +334,6 @@
   font-weight: 500;
 }
 
-/* ── ANIMACION SPIN ── */
 .nube-spin {
   animation: nubeSpin 1s linear infinite;
 }
@@ -362,7 +343,6 @@
   to { transform: rotate(360deg); }
 }
 
-/* ── RESPONSIVE ── */
 @media (max-width: 768px) {
   .nube-barra-superior {
     flex-direction: column;
@@ -406,7 +386,6 @@
   }
 }
 
-/* ── CRUD: mensajes, carpeta de área y controles ── */
 .mensaje-flash {
   padding: 0.75rem 1rem;
   border-radius: 8px;

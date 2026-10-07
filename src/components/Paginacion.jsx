@@ -1,17 +1,6 @@
 import { useMemo } from 'react';
 import { FiChevronLeft, FiChevronRight, FiChevronsLeft, FiChevronsRight } from 'react-icons/fi';
 
-/**
- * Paginacion reutilizable para todas las tablas CRUD.
- * Muestra controles Anterior/Siguiente + números de página.
- *
- * Props:
- * - total: número total de items
- * - paginaActual: página actual (1-indexed)
- * - porPagina: items por página
- * - onCambiarPagina: callback(paginaNueva)
- * - onCambiarPorPagina: callback(nuevoPorPagina)
- */
 export default function Paginacion({
   total = 0,
   paginaActual = 1,
@@ -21,12 +10,10 @@ export default function Paginacion({
   mostrarInfo = true,
   compacta = false
 }) {
-  // Calcula total de páginas y rango visible
   const totalPaginas = Math.max(1, Math.ceil(total / porPagina));
   const paginaInicio = (paginaActual - 1) * porPagina + 1;
   const paginaFin = Math.min(paginaActual * porPagina, total);
 
-  // Genera números de página a mostrar (máximo 5 alrededor de la actual)
   const paginasVisibles = useMemo(() => {
     const maxVisibles = 5;
     if (totalPaginas <= maxVisibles) {
@@ -38,7 +25,6 @@ export default function Paginacion({
     return Array.from({ length: fin - inicio + 1 }, (_, i) => inicio + i);
   }, [paginaActual, totalPaginas]);
 
-  // No mostrar paginación si no hay items
   if (total === 0) return null;
 
   return (

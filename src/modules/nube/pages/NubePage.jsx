@@ -5,7 +5,6 @@ import Explorador from '../components/Explorador';
 import '../../../styles/shared.css';
 import './Nube.css';
 
-// Página principal del módulo Nube
 export default function NubePage() {
   const {
     items,
@@ -29,7 +28,6 @@ export default function NubePage() {
     eliminarItem
   } = useNube();
 
-  // Cargar raíz al montar
   useEffect(() => {
     cargarCarpeta(null);
   }, [cargarCarpeta]);

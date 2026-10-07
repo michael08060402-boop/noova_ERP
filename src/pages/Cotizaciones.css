@@ -1,30 +1,20 @@
-/* Sombra en la tabla de la lista, consistente con las tarjetas del
-   formulario (solo en esta página, no toca el estilo compartido). */
-.tarjeta-tabla {
-  border-color: #d5dae2;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 16px rgba(15, 23, 42, 0.06);
-}
-
-/* Fila de paginación de Cotizaciones: propia línea, sin la franja gris
-   pesada del componente compartido. */
-.paginacion-compacta {
-  padding: 0 0.25rem;
-  border-bottom: none;
-  background: none;
-  margin-bottom: 0.75rem;
-  gap: 1rem;
-}
-.paginacion-compacta .paginacion-info {
+.paleta-preview .cotizacion-total-lista {
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
-.tabla-datos .texto-codigo {
-  font-weight: 800;
-  font-size: 0.85rem;
-  color: var(--texto-oscuro);
+.paleta-preview .badge-tipo-cotizacion.badge-tipo-equipo {
+  background: #F3F7F8;
+  color: #064C70;
+  border-color: #d5e4ea;
 }
 
-/* ── FILTRO DE ESTADO POR PESTAÑAS (lista de cotizaciones) ── */
+.paleta-preview .badge-tipo-cotizacion.badge-tipo-manga {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
 .cotizaciones-panel-filtros {
   display: flex;
   flex-wrap: wrap;
@@ -110,7 +100,6 @@
   color: rgba(255, 255, 255, 0.65);
 }
 
-/* ── CLIENTE CON AVATAR EN LA TABLA DE COTIZACIONES ── */
 .cliente-con-avatar {
   display: flex;
   align-items: center;
@@ -133,82 +122,6 @@
   align-self: flex-start;
 }
 
-/* ── PESTAÑAS: LISTA / NUEVA COTIZACIÓN ── */
-.tabs-cotizaciones {
-  display: flex;
-  gap: 0.25rem;
-  border-bottom: 1px solid var(--gris-borde);
-  margin-bottom: 1.25rem;
-}
-.tab-cotizacion {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 1rem;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--texto-suave);
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-}
-.tab-cotizacion:hover {
-  color: var(--texto-medio);
-}
-.tab-cotizacion.activa {
-  color: var(--azul-primario);
-  border-bottom-color: var(--azul-primario);
-}
-.tab-cotizacion.activa:disabled {
-  cursor: default;
-  opacity: 1;
-}
-.tab-cotizacion.tab-volver {
-  color: var(--texto-medio);
-}
-.tab-cotizacion.tab-volver:hover {
-  color: var(--azul-primario);
-}
-
-/* ── VISTA DE FORMULARIO (Nueva / Editar cotización) ── */
-.cotizacion-form-grid {
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 1.25rem;
-  align-items: start;
-}
-.cotizacion-form-principal {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  min-width: 0;
-}
-.cotizacion-form-sidebar {
-  position: sticky;
-  top: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-.acciones-form-sidebar {
-  flex-direction: column-reverse;
-  margin-top: 0;
-  padding-top: 0;
-  border-top: none;
-}
-.acciones-form-sidebar .btn-principal,
-.acciones-form-sidebar .btn-secundario {
-  width: 100%;
-  justify-content: center;
-}
-.form-card {
-  background: #fff;
-  border: 1.5px solid #b9c2d0;
-  border-radius: 10px;
-  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.06), 0 10px 24px rgba(15, 23, 42, 0.1);
-}
 .form-card-header {
   display: flex;
   align-items: center;
@@ -242,90 +155,7 @@
   flex-direction: column;
   gap: 0.9rem;
 }
-.resumen-card .form-card-body {
-  gap: 0.35rem;
-}
-.resumen-card .total-fila {
-  font-size: 0.85rem;
-}
-.resumen-card .total-final {
-  font-size: 1rem;
-}
 
-@media (max-width: 1024px) {
-  .cotizacion-form-grid {
-    grid-template-columns: 1fr;
-  }
-  .cotizacion-form-sidebar {
-    position: static;
-  }
-}
-
-/* ── COLORES DE FILA SEGÚN ESTADO ── */
-.tabla-datos tbody tr.fila-borrador {
-  background: #f3f4f6;
-}
-.tabla-datos tbody tr.fila-borrador:hover {
-  background: #e5e7eb;
-}
-.tabla-datos tbody tr.fila-enviada {
-  background: #dbeafe;
-}
-.tabla-datos tbody tr.fila-enviada:hover {
-  background: #bfdbfe;
-}
-.tabla-datos tbody tr.fila-aprobada {
-  background: #d1fae5;
-}
-.tabla-datos tbody tr.fila-aprobada:hover {
-  background: #a7f3d0;
-}
-.tabla-datos tbody tr.fila-rechazada {
-  background: #fee2e2;
-}
-.tabla-datos tbody tr.fila-rechazada:hover {
-  background: #fecaca;
-}
-
-/* ── SELECTOR DE ESTADO EN TABLA ── */
-.selector-estado {
-  padding: 0.25rem 0.5rem;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  background: #fff;
-  color: #374151;
-  min-width: 120px;
-}
-.selector-estado:focus {
-  outline: none;
-  border-color: #1d4ed8;
-  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.15);
-}
-.selector-estado.borrador {
-  background: rgba(107, 114, 128, 0.15);
-  border-color: rgba(107, 114, 128, 0.4);
-  color: #374151;
-}
-.selector-estado.enviada {
-  background: rgba(29, 78, 216, 0.15);
-  border-color: rgba(29, 78, 216, 0.4);
-  color: #1e3a8a;
-}
-.selector-estado.aprobada {
-  background: rgba(5, 150, 105, 0.15);
-  border-color: rgba(5, 150, 105, 0.4);
-  color: #047857;
-}
-.selector-estado.rechazada {
-  background: rgba(220, 38, 38, 0.15);
-  border-color: rgba(220, 38, 38, 0.4);
-  color: #b91c1c;
-}
-
-/* ── BUSCADOR DE CLIENTE ── */
 .campo-cliente-busqueda {
   position: relative;
 }
@@ -454,7 +284,6 @@
   color: #dc2626;
 }
 
-/* ── INPUT CON SUFIJO ── */
 .input-con-sufijo {
   position: relative;
   display: flex;
@@ -488,27 +317,6 @@
   pointer-events: none;
 }
 
-/* ── FORMULARIO COMPACTO ── */
-.formulario-compacto {
-  gap: 0.75rem;
-}
-
-/* ── SECCIÓN DE ITEMS ── */
-.items-seccion {
-  border: none;
-  border-radius: 0;
-  overflow: hidden;
-}
-.items-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 0 0.75rem 0;
-  background: none;
-  border-bottom: 1px solid var(--gris-borde);
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
 .items-header-botones {
   display: flex;
   gap: 0.5rem;
@@ -525,11 +333,10 @@
   background: var(--azul-claro);
 }
 
-/* Sub-fila de especificaciones de manga (diámetro / longitud / material) */
 .fila-specs-manga td {
   background: #f8fafc;
   border-top: none;
-  padding: 5px 8px !important;
+  padding: 5px 8px;
 }
 .specs-manga-fila {
   display: flex;
@@ -551,75 +358,14 @@
   color: #1f2937;
   margin: 0;
 }
-.items-tabla-wrapper {
-  overflow-x: auto;
-  max-height: 420px;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
-  margin-top: 0.75rem;
-}
-.items-tabla {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.78rem;
-  table-layout: fixed;
-}
-.items-tabla th:last-child,
-.items-tabla td:last-child {
-  width: 40px;
-}
-.items-tabla th {
-  background: #eef0f3;
-  padding: 0.65rem 0.75rem;
-  text-align: left;
-  font-weight: 600;
-  color: #374151;
-  border-bottom: 1px solid var(--gris-borde);
-  white-space: nowrap;
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-.items-tabla th.col-precio,
-.items-tabla th.col-subtotal {
-  text-align: right;
-}
-.items-tabla td {
-  padding: 0.55rem 0.75rem;
-  border-bottom: 1px solid #f3f4f6;
-  vertical-align: top;
-}
-.items-tabla input,
-.items-tabla select {
-  padding: 0.3rem 0.5rem;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  font-size: 0.78rem;
-  width: 100%;
-  box-sizing: border-box;
-  transition: border-color 0.15s;
-  font-family: inherit;
-}
-.items-tabla input:focus,
-.items-tabla select:focus {
-  outline: none;
-  border-color: #1d4ed8;
-  box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.1);
-}
-.items-tabla .input-centro { text-align: center; }
 
-/* Sub-fila de "Tiempo de entrega (OC)" por ítem: ocupa todo el ancho de la
-   fila del producto en una segunda línea, para no forzar scroll horizontal. */
 .fila-entrega-oc td {
   background: #f8fafc;
   border-top: none;
-  padding: 3px 8px 6px !important;
+  padding: 3px 8px 6px;
 }
 .fila-item-divisor td {
-  border-bottom: 2px solid #cbd5e1 !important;
+  border-bottom: 2px solid #cbd5e1;
 }
 .entrega-oc-label {
   display: flex;
@@ -630,11 +376,7 @@
   color: #475569;
   flex-wrap: wrap;
 }
-.entrega-oc-nota {
-  font-size: 0.65rem;
-  font-weight: 400;
-  color: #94a3b8;
-}
+
 .fila-entrega-oc .tiempo-entrega-contenedor,
 .fila-entrega-oc .tiempo-entrega-spinner,
 .fila-entrega-oc .tiempo-entrega-unidad {
@@ -673,36 +415,15 @@
 }
 
 .fila-badge-tipo td {
-  padding: 10px 8px 4px !important;
   border-top: 2px solid transparent;
+  padding: 10px 8px 4px;
 }
 .fila-badge-contenido {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
-.btn-quitar-item-general {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: #dc2626;
-  cursor: pointer;
-  border-radius: 4px;
-  line-height: 0;
-}
-.btn-quitar-item-general:hover:not(:disabled) {
-  background: #fee2e2;
-  color: #b91c1c;
-}
-.btn-quitar-item-general:disabled {
-  color: #fca5a5;
-  cursor: not-allowed;
-}
+
 .badge-tipo-item {
   display: inline-block;
   padding: 1px 8px;
@@ -748,16 +469,6 @@
   color: #64748b;
 }
 
-.checkbox-inline {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.68rem;
-  font-weight: 600;
-  color: #475569;
-  white-space: nowrap;
-}
-
 .checkbox-sin-igv {
   display: flex;
   align-items: center;
@@ -768,34 +479,22 @@
   cursor: pointer;
 }
 
-/* Elimina las flechas del campo Cantidad */
-.items-tabla .input-sin-flechas {
-  -moz-appearance: textfield;
-}
-.items-tabla .input-sin-flechas::-webkit-outer-spin-button,
-.items-tabla .input-sin-flechas::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-.items-tabla .input-derecha { text-align: right; }
-.items-tabla td.texto-derecha { text-align: right; }
-.select-equipo {
-  font-size: 0.72rem !important;
-}
-
 .equipo-combobox {
   position: relative;
   min-width: 160px;
 }
 .equipo-combobox-input {
-  padding: 0.3rem 1.6rem 0.3rem 0.5rem !important;
   border: 1px solid #d1d5db;
   border-radius: 4px;
-  font-size: 0.72rem !important;
   width: 100%;
   box-sizing: border-box;
   font-family: inherit;
   cursor: text;
+}
+
+.items-tabla .equipo-combobox-input {
+  padding: 0.3rem 1.6rem 0.3rem 0.5rem;
+  font-size: 0.72rem;
 }
 .equipo-combobox-input:focus {
   outline: none;
@@ -864,25 +563,6 @@
   text-align: center;
 }
 
-.btn-quitar-item {
-  background: none;
-  border: none;
-  color: #9ca3af;
-  cursor: pointer;
-  font-size: 0.85rem;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  transition: all 0.15s;
-}
-.btn-quitar-item:hover:not(:disabled) {
-  background: #fef2f2;
-  color: #dc2626;
-}
-.btn-quitar-item:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
 .input-con-cargando {
   position: relative;
   display: flex;
@@ -891,8 +571,8 @@
 .input-con-cargando input {
   padding-right: 1.75rem;
 }
-.input-cargando {
-  border-color: #1d4ed8 !important;
+#root .input-cargando {
+  border-color: #1d4ed8;
 }
 .spinner-inline {
   position: absolute;
@@ -909,150 +589,15 @@
   100% { transform: rotate(360deg); }
 }
 
-.totales-seccion {
-  padding: 0.625rem 0.75rem;
-  border-top: 1px solid #e5e7eb;
-  display: flex;
-  justify-content: flex-end;
-  background: #f9fafb;
-}
-.totales-grid {
-  min-width: 220px;
-}
-.total-fila {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.15rem 0;
-  font-size: 0.82rem;
-  color: #374151;
-}
-.total-final {
-  border-top: 2px solid #1d4ed8;
-  margin-top: 0.4rem;
-  padding-top: 0.4rem;
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: #1e40af;
-}
-.total-valor {
-  font-family: 'JetBrains Mono', 'Courier New', monospace;
-}
-.total-monto {
-  font-size: 1.05rem;
-}
-
-.fila-form-3 {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
-}
-
-.badge-estado-sunat {
-  display: inline-block;
-  padding: 0.25rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  cursor: default;
-  border: 1px solid transparent;
-  white-space: nowrap;
-}
-.badge-estado-sunat.borrador {
-  background: rgba(107, 114, 128, 0.15);
-  color: #4b5563;
-  border-color: rgba(107, 114, 128, 0.35);
-}
-.badge-estado-sunat.enviada {
-  background: rgba(29, 78, 216, 0.12);
-  color: #1e3a8a;
-  border-color: rgba(29, 78, 216, 0.3);
-}
-.badge-estado-sunat.aprobada {
-  background: rgba(5, 150, 105, 0.12);
-  color: #047857;
-  border-color: rgba(5, 150, 105, 0.3);
-}
-.badge-estado-sunat.rechazada {
-  background: rgba(220, 38, 38, 0.12);
-  color: #b91c1c;
-  border-color: rgba(220, 38, 38, 0.3);
-}
-
-.info-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  margin-left: 5px;
-  border-radius: 50%;
-  background: #d1d5db;
-  color: #fff;
-  font-size: 0.62rem;
-  font-weight: 700;
-  font-style: normal;
-  text-transform: none;
-  letter-spacing: 0;
-  cursor: help;
-}
-
-.btn-enviar-sunat {
-  color: #1d4ed8;
-}
-.btn-enviar-sunat:hover {
-  color: #1e3a8a;
-  background: #dbeafe;
-}
-
-.col-codigo { width: 100px; }
 .col-select { width: 160px; }
-.col-desc { width: 180px; }
-.col-cant { width: 60px; }
-.col-unidad { width: 75px; }
-.col-precio { width: 95px; }
-.col-subtotal { width: 90px; }
-
-/* Recorte con "..." de respaldo para códigos/nombres largos, ya que las
-   columnas ahora se ajustan de forma proporcional al ancho disponible
-   (sin forzar scroll horizontal). */
-.items-tabla input {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
 
 @media (max-width: 1200px) {
-  .col-codigo { width: 85px; }
   .col-select { width: 120px; }
-  .col-precio { width: 90px; }
-  .col-subtotal { width: 90px; }
 }
 @media (max-width: 1024px) {
-  .fila-form-3 {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .col-codigo { width: 75px; }
   .col-select { width: 100px; }
-  .col-cant { width: 60px; }
-  .col-precio { width: 80px; }
 }
-@media (max-width: 768px) {
-  .items-tabla-wrapper {
-    max-height: 400px;
-    font-size: 0.72rem;
-  }
-  .items-tabla th,
-  .items-tabla td {
-    padding: 0.3rem 0.35rem;
-  }
-  .fila-form-3 {
-    grid-template-columns: 1fr;
-  }
-}
-/* ═══════════════════════════════════════════════════════════════════════
-   Estilos para autollenado por RUC desde SUNAT
-   ═══════════════════════════════════════════════════════════════════════ */
+
 .ruc-buscando-panel,
 .ruc-error-panel,
 .ruc-resultado-panel {
@@ -1078,9 +623,6 @@
   width: 100%;
   text-align: left;
   cursor: default;
-}
-
-.ruc-resultado {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
@@ -1147,7 +689,6 @@
   cursor: not-allowed;
 }
 
-/* Estilo para el panel de "servicios fuera de línea" */
 .ruc-error-panel .ruc-error {
   flex-direction: column;
   align-items: flex-start;
@@ -1170,7 +711,6 @@
   font-style: italic;
 }
 
-/* Formulario de contacto dentro del panel de RUC encontrado */
 .ruc-contacto-form {
   display: flex;
   flex-direction: column;
@@ -1220,10 +760,9 @@
   }
 }
 
-/* Estilo para contacto obligatorio */
-.ruc-contacto-input-error {
-  border-color: #dc2626 !important;
-  background: #fef2f2 !important;
+#root .ruc-contacto-input-error {
+  border-color: #dc2626;
+  background: #fef2f2;
 }
 
 .ruc-contacto-hint {
@@ -1233,53 +772,6 @@
   margin-top: 2px;
 }
 
-/* ─── BOTÓN RÁPIDO "MARCAR COMO ENVIADA" ─── */
-.btn-enviar-rapido {
-  background: #eafaf1;
-  border: 1px solid #1e7e34;
-  border-radius: 4px;
-  padding: 2px 6px;
-  font-size: 13px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.btn-enviar-rapido:hover {
-  background: #d1fae5;
-}
-
-/* ─── SELECTOR DE ESTADO EN FORMULARIO ─── */
-.selector-estado-form {
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.selector-estado-form.estado-borrador {
-  background-color: #f3f4f6;
-  border-color: #d1d5db;
-  color: #4b5563;
-}
-
-.selector-estado-form.estado-enviada {
-  background-color: #dbeafe;
-  border-color: #1d4ed8;
-  color: #1e40af;
-}
-
-.selector-estado-form.estado-aprobada {
-  background-color: #d1fae5;
-  border-color: #1e7e34;
-  color: #065f46;
-}
-
-.selector-estado-form.estado-rechazada {
-  background-color: #fee2e2;
-  border-color: #c0392b;
-  color: #7f1d1d;
-}
-
-/* ─── INFORMACIÓN ADICIONAL DEL CLIENTE SELECCIONADO ─── */
 .cliente-seleccionado .cliente-direccion {
   font-size: 11px;
   color: #4b5563;
@@ -1290,14 +782,6 @@
   word-break: break-word;
 }
 
-.cliente-seleccionado .cliente-contacto {
-  font-size: 11px;
-  color: #6b7280;
-  margin-top: 1px;
-}
-
-/* ─── NUEVOS COLORES DE FILA SEGÚN ESTADO ─── */
-/* Generada: gris claro (esperando facturación) */
 .tabla-datos tbody tr.fila-generada {
   background: #f9fafb;
 }
@@ -1305,7 +789,6 @@
   background: #f3f4f6;
 }
 
-/* Aceptada: verde claro */
 .tabla-datos tbody tr.fila-aceptada {
   background: #deefe2;
 }
@@ -1313,7 +796,6 @@
   background: #cfe8d7;
 }
 
-/* Error: rojo claro */
 .tabla-datos tbody tr.fila-error {
   background: #fee2e2;
 }
@@ -1321,7 +803,6 @@
   background: #fecaca;
 }
 
-/* Cancelada: rojo más intenso */
 .tabla-datos tbody tr.fila-cancelada {
   background: #fecaca;
 }
@@ -1329,29 +810,6 @@
   background: #fca5a5;
 }
 
-/* ─── BADGE DE ESTADO ─── */
-.badge-estado-sunat.estado-generada {
-  background: #e2e8f0;
-  color: #475569;
-  font-weight: bold;
-}
-.badge-estado-sunat.estado-aceptada {
-  background: #d1fae5;
-  color: #065f46;
-  font-weight: bold;
-}
-.badge-estado-sunat.estado-error {
-  background: #fee2e2;
-  color: #c0392b;
-  font-weight: bold;
-}
-.badge-estado-sunat.estado-cancelada {
-  background: #fecaca;
-  color: #7f1d1d;
-  font-weight: bold;
-}
-
-/* ─── LISTA "INCLUYE" (sección fija que aparece en el PDF) ─── */
 .incluye-lista {
   list-style: none;
   margin: 0;
@@ -1378,7 +836,6 @@
   font-weight: 700;
 }
 
-/* ─── TIEMPO DE ENTREGA: SPINNER + UNIDAD ─── */
 .tiempo-entrega-contenedor {
   display: flex;
   align-items: center;
@@ -1473,7 +930,6 @@
   box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
 }
 
-/* ─── BADGE DE TIPO DE COTIZACIÓN (EQUIPO / MANGA) ─── */
 .badge-tipo-cotizacion {
   display: inline-block;
   padding: 0.2rem 0.55rem;
@@ -1486,36 +942,24 @@
   text-transform: uppercase;
 }
 
-/* Equipo: azul (coincide con el color primario del ERP) */
 .badge-tipo-cotizacion.badge-tipo-equipo {
   background: #eff6ff;
   color: #1e3a8a;
   border-color: #dbeafe;
 }
 
-/* Manga: naranja/teal (diferenciado para que se distinga visualmente) */
 .badge-tipo-cotizacion.badge-tipo-manga {
   background: #fef3c7;
   color: #92400e;
   border-color: #fde68a;
 }
 
-/* Servicio: verde (servicios propios Noova) */
 .badge-tipo-cotizacion.badge-tipo-servicio {
   background: #ecfdf5;
   color: #065f46;
   border-color: #a7f3d0;
 }
 
-/* EPP: violeta (equipos de protección personal) */
-.badge-tipo-cotizacion.badge-tipo-epp {
-  background: #f3e8ff;
-  color: #6b21a8;
-  border-color: #e9d5ff;
-}
-
-/* Filtro por familia (lista de cotizaciones): mismas píldoras que el filtro
-   de estado, separadas del grupo de estados por un borde izquierdo sutil. */
 .pestanas-familia {
   margin-left: 0.75rem;
   padding-left: 0.75rem;

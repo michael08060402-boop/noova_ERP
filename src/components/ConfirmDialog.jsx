@@ -22,8 +22,6 @@ export default function ConfirmDialog({
     setConfirmandoInterno(true);
     try {
       const resultado = await onConfirm?.();
-      // Los diálogos de eliminación deben cerrarse cuando la acción termina.
-      // Si un consumidor necesita mantenerlo abierto puede retornar false.
       if (resultado !== false) onClose?.();
     } finally {
       setConfirmandoInterno(false);

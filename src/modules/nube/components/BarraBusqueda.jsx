@@ -1,17 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { FiSearch, FiX } from 'react-icons/fi';
 
-// Barra de búsqueda del explorador
 export default function BarraBusqueda({ onBuscar, onLimpiar, enBusqueda, termino, deshabilitado = false }) {
   const [valor, setValor] = useState(termino || '');
   const timerRef = useRef(null);
 
-  // Sincronizar valor externo
   useEffect(() => {
     setValor(termino || '');
   }, [termino]);
 
-  // Debounce: buscar después de 400ms sin escribir
   function manejarCambio(nuevoValor) {
     setValor(nuevoValor);
 

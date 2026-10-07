@@ -7,7 +7,6 @@ import Loading from '../../../components/Loading';
 import Modal from '../../../components/Modal';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 
-// Explorador principal del modulo Nube
 export default function Explorador({
   items,
   cargando,
@@ -45,7 +44,6 @@ export default function Explorador({
     setTimeout(() => setMensaje(null), 4000);
   }
 
-  // Manejar apertura de carpeta
   function handleAbrirCarpeta(item) {
     if (enBusqueda) {
       limpiarBusqueda();
@@ -120,7 +118,6 @@ export default function Explorador({
         <div className={`mensaje-flash mensaje-${mensaje.tipo}`}>{mensaje.texto}</div>
       )}
 
-      {/* Barra superior: breadcrumb + acciones */}
       <div className="nube-barra-superior">
         <Breadcrumb ruta={ruta} onNavegar={navegarA} />
         <div className="nube-acciones">
@@ -158,7 +155,6 @@ export default function Explorador({
         </div>
       </div>
 
-      {/* Barra de busqueda */}
       <BarraBusqueda
         onBuscar={buscar}
         onLimpiar={limpiarBusqueda}
@@ -166,7 +162,6 @@ export default function Explorador({
         termino={terminoBusqueda}
       />
 
-      {/* Indicador de busqueda */}
       {enBusqueda && (
         <div className="nube-modo-busqueda">
           <FiSearch size={14} />
@@ -179,7 +174,6 @@ export default function Explorador({
         </div>
       )}
 
-      {/* Contenido principal */}
       {error ? (
         <div className="nube-error">
           <FiAlertCircle size={20} />
@@ -202,7 +196,6 @@ export default function Explorador({
         />
       )}
 
-      {/* Modal: nueva carpeta */}
       <Modal isOpen={modalCarpeta} onClose={() => setModalCarpeta(false)} title="Nueva carpeta">
         <form onSubmit={confirmarCrearCarpeta} className="formulario">
           <div className="campo">
@@ -225,7 +218,6 @@ export default function Explorador({
         </form>
       </Modal>
 
-      {/* Modal: renombrar */}
       <Modal isOpen={!!itemARenombrar} onClose={() => setItemARenombrar(null)} title="Renombrar">
         <form onSubmit={confirmarRenombrar} className="formulario">
           <div className="campo">

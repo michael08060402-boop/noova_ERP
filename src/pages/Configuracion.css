@@ -1,8 +1,54 @@
-/* ====================================================
-   CONFIGURACIÓN - Pestañas y secciones
-   ==================================================== */
+.paleta-preview .config-guardar .btn-principal {
+  background: #064C70;
+  color: #fff;
+  border: 1px solid #064C70;
+  box-shadow: 0 2px 4px rgb(6 76 112 / 16%), 0 5px 10px rgb(6 76 112 / 17%);
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
 
-/* ── LAYOUT DE CONFIGURACIÓN ── */
+.paleta-preview .config-guardar .btn-principal:hover:not(:disabled) {
+  background: #053c59;
+  color: #fff;
+  border-color: #053c59;
+  box-shadow: 0 3px 5px rgb(6 76 112 / 18%), 0 7px 14px rgb(6 76 112 / 20%);
+}
+
+.paleta-preview .correlativo-preview {
+  background: #F3F7F8;
+  border: 1px solid #d5e4ea;
+  border-left: 3px solid #C8D91E;
+}
+
+.paleta-preview .correlativo-preview .preview-label,
+.paleta-preview .correlativo-preview .preview-value {
+  color: #064C70;
+}
+
+.paleta-preview .config-tab:hover {
+  background: #F3F7F8;
+  color: #064C70;
+}
+
+.paleta-preview .config-tab.config-tab-activa {
+  background: #E5F2F6;
+  color: #064C70;
+  border-color: #79c6d4;
+  box-shadow: inset 0 0 0 1px rgb(7 155 181 / 8%);
+}
+
+.paleta-preview .config-tab.config-tab-activa:hover {
+  background: #d3eaf2;
+  color: #064C70;
+}
+
+.paleta-preview .config-tabs { background: #F3F7F8; border-color: #d5e4ea; }
+
+.paleta-preview .tab-icon { color: #079BB5; }
+
+.dashboard-layout.paleta-preview .config-tab.config-tab-activa .tab-icon { color: #fff; }
+
+.dashboard-layout.paleta-preview .config-tab.config-tab-activa:hover { background: #053c59; color: #fff; }
+
 .config-layout {
   display: flex;
   flex-direction: column;
@@ -10,7 +56,6 @@
   width: 100%;
 }
 
-/* ── PESTAÑAS HORIZONTALES ── */
 .config-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -63,7 +108,6 @@
   display: inline-flex;
 }
 
-/* ── CONTENIDO ── */
 .config-contenido {
   width: 100%;
   min-width: 0;
@@ -127,29 +171,11 @@
   white-space: nowrap;
 }
 
-.auditoria-acciones .auditoria-eliminar {
-  color: #fff;
-  background: #dc2626;
-  border-color: #dc2626;
-}
-
-.auditoria-acciones .auditoria-eliminar:hover:not(:disabled) {
-  background: #b91c1c;
-  border-color: #b91c1c;
-}
-
 .auditoria-acciones .auditoria-boton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.separador-seccion {
-  margin: 1.5rem 0;
-  border: none;
-  border-top: 1px solid #e5e7eb;
-}
-
-/* ── CONDICIONES DE PAGO ── */
 .condiciones-lista {
   display: flex;
   flex-direction: column;
@@ -188,7 +214,6 @@
   background: #fef2f2;
 }
 
-/* ── CORRELATIVO ── */
 .correlativo-preview {
   display: flex;
   align-items: center;
@@ -231,7 +256,6 @@
   justify-content: flex-end;
 }
 
-/* ── BADGE DE ACCIÓN EN LOGS ── */
 .badge-accion {
   display: inline-block;
   padding: 0.15rem 0.5rem;
@@ -249,7 +273,6 @@
   font-size: 0.85rem;
 }
 
-/* ── RESPONSIVE ── */
 @media (max-width: 768px) {
   .config-tabs {
     width: 100%;

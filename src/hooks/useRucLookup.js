@@ -2,9 +2,6 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase/config';
 
-// Hook para autollenado de datos por RUC.
-// Dispara la consulta a la Cloud Function consultarRuc cuando el RUC ingresado
-// tiene 11 dígitos válidos, con debounce para no llamar en cada tecla.
 const DEBOUNCE_MS = 600;
 const RUC_REGEX = /^\d{11}$/;
 
@@ -45,7 +42,6 @@ export function useRucLookup() {
       return;
     }
 
-    // Evitar consultar el mismo RUC dos veces seguidas
     if (rucEnProcesoRef.current === rucLimpio) {
       return;
     }
@@ -87,4 +83,3 @@ export function useRucLookup() {
   return { lookupRuc, datosRuc, cargando, error, limpiar };
 }
 
-export default useRucLookup;

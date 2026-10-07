@@ -7,18 +7,6 @@ import headerImg from '../assets/header.png';
 import footerImg from '../assets/footer.png';
 import interbankImg from '../assets/interbank.png';
 
-// ============================================================
-// PDF DE COTIZACIÓN DE SERVICIOS (servicios propios de Noova:
-// ventilación minera, bombeo, drenaje, monitoreo, mediciones,
-// ingeniería, consultoría, montaje, mantenimiento y capacitación
-// técnica).
-// Mismo diseño que el PDF de Equipos (mismas tablas, colores,
-// fuentes y espaciados) con el contenido propio de la familia:
-//   - NUNCA usa textos de Equipos (calibración de fábrica,
-//     garantía Testo, capacitación en uso de equipos, stock).
-//   - La tabla incluye la columna UNIDAD (unidad de cobro).
-// ============================================================
-
 const IMG_FULL_HEADER = headerImg;
 const IMG_FULL_FOOTER = footerImg;
 
@@ -33,7 +21,6 @@ const BANCOS_PDF = [
   },
 ];
 
-// Lista INCLUYE propia de la familia Servicios.
 const INCLUYE_SERVICIO = [
   'Personal técnico especializado',
   'Supervisión y reporte de resultados',
@@ -81,7 +68,7 @@ function drawFieldRow(doc, x, y, label, value, labelW = 24, contentW = 182) {
   return lines.length * 4.8;
 }
 
-export function generateServicioPDF(cotizacion, config = {}) {
+function generateServicioPDF(cotizacion, config = {}) {
   const doc = new jsPDF({ format: 'a4', unit: 'mm' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -114,14 +101,12 @@ export function generateServicioPDF(cotizacion, config = {}) {
       ? `${cotizacion.tiempoEntregaNumero} ${cotizacion.tiempoEntregaUnidad} recibida la OC`
       : '03 semanas recibida la OC');
 
-  // 1. Lema anual
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(80, 80, 80);
   doc.text(`"${lemaAnual}"`, pageWidth / 2, y, { align: 'center' });
   y += 6;
 
-  // 2. Barra de cotización (naranja)
   const headerBoxH = 8;
   doc.setFillColor(...COLOR_ORANGE);
   doc.rect(margin, y, contentW, headerBoxH, 'F');
@@ -137,7 +122,6 @@ export function generateServicioPDF(cotizacion, config = {}) {
 
   y += headerBoxH + 7;
 
-  // 3. Datos del proveedor
   y += drawFieldRow(doc, margin, y, 'Proveedor', razonSocial);
   y += drawFieldRow(doc, margin, y, 'RUC', ruc);
   y += drawFieldRow(doc, margin, y, 'Dirección', direccion);
@@ -151,7 +135,6 @@ export function generateServicioPDF(cotizacion, config = {}) {
   doc.line(margin, y, pageWidth - margin, y);
   y += 5;
 
-  // 4. Datos del cliente
   y += 2;
 
   doc.setFillColor(...COLOR_ORANGE);
@@ -182,7 +165,6 @@ export function generateServicioPDF(cotizacion, config = {}) {
   doc.line(margin, y, pageWidth - margin, y);
   y += 5;
 
-  // 5. Tabla de items de servicios (con columna UNIDAD DE COBRO)
   const todosLosItems = cotizacion.items || [];
   const tableHeaders = [
     ['ITEM', 'CÓDIGO', 'DESCRIPCIÓN', 'UNIDAD', 'CANT.', `PRECIO UNIT.\n(${moneda})`, `TOTAL\n(${moneda})`],
@@ -231,7 +213,6 @@ export function generateServicioPDF(cotizacion, config = {}) {
 
   y = (doc.lastAutoTable?.finalY || y) + 4;
 
-  // 6. Sección de totales
   const subtotal = calcularSubtotal(todosLosItems);
   const sinIGV = !!cotizacion.sinIGV;
   const igv = sinIGV ? 0 : calcularIGV(subtotal);
@@ -264,7 +245,6 @@ export function generateServicioPDF(cotizacion, config = {}) {
   doc.text(formatoMonto(total, cotizacion.moneda), totX + totW - 3, y + 4.2, { align: 'right' });
   y += totRowH + 6;
 
-  // 7. INCLUYE (lista propia de la familia Servicios)
   {
     const incluyeItems = INCLUYE_SERVICIO;
 
@@ -291,12 +271,9 @@ export function generateServicioPDF(cotizacion, config = {}) {
     y += incluyeBodyH;
   }
 
-  // Salto a página 2 para condiciones y cuentas bancarias
   doc.addPage();
   y = 30;
 
-  // 8. Condiciones de venta propias de la familia Servicios.
-  // No aplican: garantía de equipos, stock ni capacitación Testo.
   const itemsConEntrega = todosLosItems.filter((it) => it.tipo !== 'transporte');
   const tiemposEntregaItems = itemsConEntrega.map((it) => (it.tiempoEntrega || '').trim()).filter(Boolean);
   const tiemposUnicos = [...new Set(tiemposEntregaItems)];
@@ -337,7 +314,6 @@ export function generateServicioPDF(cotizacion, config = {}) {
   }
   y += 7;
 
-  // 9. Cuentas bancarias
   const logoH = 16;
   const logoW = 50;
   const separacionLogoTabla = 2;
@@ -398,7 +374,6 @@ export function generateServicioPDF(cotizacion, config = {}) {
     y = (doc.lastAutoTable?.finalY || y) + separacionBancos;
   });
 
-  // 10. Cierre y firma
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(60, 60, 60);
@@ -417,7 +392,6 @@ export function generateServicioPDF(cotizacion, config = {}) {
   doc.setTextColor(100, 100, 100);
   doc.text((cargoResponsable || '').toUpperCase(), pageWidth / 2, y, { align: 'center' });
 
-  // 11. Header y footer fijos en todas las páginas
   const totalPages = doc.internal.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);

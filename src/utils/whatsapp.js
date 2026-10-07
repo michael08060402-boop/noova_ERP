@@ -1,21 +1,6 @@
-/**
- * Utilidades para WhatsApp Web / app.
- * El envío se hace abriendo wa.me en una nueva pestaña — el navegador
- * delega en WhatsApp Web o en la app de escritorio/móvil instalada.
- *
- * No se usa la API Business de WhatsApp (requiere token y número verificado).
- * Si en el futuro se desea envío programático, migrar a Cloud API.
- */
-
 import { normalizarCelularPE, sanitizarTexto } from './validation';
 
-/**
- * Construye la URL de wa.me con mensaje pre-llenado.
- * @param {string} celular - Número en cualquier formato peruano
- * @param {string} mensaje - Texto a pre-llenar
- * @returns {{ url: string; error: string|null; numero: string|null }}
- */
-export function construirUrlWhatsApp(celular, mensaje) {
+function construirUrlWhatsApp(celular, mensaje) {
   const numero = normalizarCelularPE(celular);
   if (!numero) {
     return {
@@ -36,11 +21,6 @@ export function construirUrlWhatsApp(celular, mensaje) {
   return { url, error: null, numero };
 }
 
-/**
- * Abre WhatsApp con el número y mensaje indicados.
- * Detecta ventanas bloqueadas, también en aperturas programadas sin gesto
- * del usuario. `ok` indica ventana abierta, no mensaje enviado.
- */
 export function abrirWhatsApp(celular, mensaje) {
   const { url, error } = construirUrlWhatsApp(celular, mensaje);
   if (error || !url) return { ok: false, error };
@@ -50,7 +30,6 @@ export function abrirWhatsApp(celular, mensaje) {
     if (!ventana) {
       return { ok: false, error: 'El navegador bloqueó WhatsApp. Permite ventanas emergentes para este ERP y vuelve a abrirlo.' };
     }
-    // Cortar acceso al ERP antes de navegar a un sitio externo.
     ventana.opener = null;
     const link = ventana.document.createElement('a');
     link.href = url;
@@ -64,9 +43,6 @@ export function abrirWhatsApp(celular, mensaje) {
   }
 }
 
-/**
- * Plantillas de mensajes predefinidas para agilizar el envío.
- */
 export const PLANTILLAS_WHATSAPP = [
   {
     id: 'saludo',
@@ -95,11 +71,6 @@ export const PLANTILLAS_WHATSAPP = [
   }
 ];
 
-/**
- * Rellena una plantilla con variables.
- * @param {string} cuerpo
- * @param {{ nombre?: string; responsable?: string; empresa?: string }} vars
- */
 export function rellenarPlantilla(cuerpo, vars = {}) {
   return cuerpo
     .replace(/\{nombre\}/g, vars.nombre || '')

@@ -8,12 +8,9 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import Paginacion from '../components/Paginacion';
 import Loading from '../components/Loading';
 import '../styles/shared.css';
-import './Equipos.css';
+import '../styles/catalogo.css';
 import './Servicios.css';
 
-// Líneas de servicios PROPIOS de Noova. Este catálogo NO incluye envío,
-// flete, courier, transporte ni cargos logísticos: esos cargos se registran
-// como filas libres dentro de la cotización, nunca aquí.
 const LINEAS_SERVICIO = [
   'Ventilación minera',
   'Bombeo',

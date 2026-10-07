@@ -3,7 +3,6 @@
   background: #f0f2f5;
 }
 
-/* Global scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -23,7 +22,6 @@
   background: #a1a1a1;
 }
 
-/* Selection */
 ::selection {
   background: rgba(0, 51, 102, 0.15);
   color: #003366;

@@ -60,15 +60,6 @@ export default function Loading({ message = 'Cargando...' }) {
   return null;
 }
 
-/*
-  ÚNICO loader visual del ERP.
-
-  - Aparece en refresh / primera entrada.
-  - También se rearma después de un login correcto.
-  - Cubre TODO el viewport para que sidebar/topbar nunca aparezcan
-    a mitad de la animación ni desplacen visualmente el logo.
-  - Cuando desaparece, queda desactivado para el resto de la sesión SPA.
-*/
 export function InitialLoadingHost({
   minVisible = 1600,
   settleDelay = 120,
@@ -87,7 +78,6 @@ export function InitialLoadingHost({
 
   useEffect(() => subscribe(setSource), []);
 
-  // Un refresh crea el primer ciclo. Un login correcto crea otro.
   useEffect(() => {
     if (source.cycleId === activeCycleRef.current) return;
 
@@ -106,12 +96,10 @@ export function InitialLoadingHost({
     window.clearTimeout(hideTimerRef.current);
     window.clearTimeout(exitTimerRef.current);
 
-    // El ciclo ya acabó: cargas posteriores de módulos NO muestran nada.
     if (finishedCycleRef.current === activeCycleRef.current) {
       return undefined;
     }
 
-    // Mientras exista al menos una carga inicial, mantenemos el overlay.
     if (source.active) {
       return undefined;
     }
@@ -121,10 +109,6 @@ export function InitialLoadingHost({
     const wait = Math.max(settleDelay, remainingMinimum);
 
     hideTimerRef.current = window.setTimeout(() => {
-      /*
-        Antes del fade forzamos el logo completo.
-        Así nunca desaparece a mitad de "isotipo -> NOOVA -> CONSULTING".
-      */
       setLeaving(true);
 
       exitTimerRef.current = window.setTimeout(() => {

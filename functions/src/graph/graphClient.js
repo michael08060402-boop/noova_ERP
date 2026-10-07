@@ -1,13 +1,9 @@
 const axios = require('axios');
 const { obtenerToken } = require('./graphAuth');
 
-// Cliente genérico para Microsoft Graph API
-// Maneja autenticación, paginación y reintentos básicos.
-
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 const TIMEOUT_MS = 30000;
 
-// Realizar petición GET a Graph API
 async function get(endpoint, params = {}, headers = {}) {
   const token = await obtenerToken();
 
@@ -22,8 +18,6 @@ async function get(endpoint, params = {}, headers = {}) {
   return respuesta.data;
 }
 
-// Obtener todos los resultados paginados
-// Graph devuelve { value: [...], '@odata.nextLink': '...' }
 async function getPaginado(endpoint, params = {}) {
   const token = await obtenerToken();
   let url = `${GRAPH_BASE}${endpoint}`;
@@ -38,7 +32,6 @@ async function getPaginado(endpoint, params = {}) {
       timeout: TIMEOUT_MS
     };
 
-    // En la primera página se pasan params, en las siguientes van en la URL
     if (paginas === 0) {
       config.params = params;
     }
@@ -57,7 +50,6 @@ async function getPaginado(endpoint, params = {}) {
   return resultados;
 }
 
-// Realizar petición POST a Graph API
 async function post(endpoint, body, params = {}) {
   const token = await obtenerToken();
 
@@ -75,7 +67,6 @@ async function post(endpoint, body, params = {}) {
   return respuesta.data;
 }
 
-// Realizar petición PATCH a Graph API
 async function patch(endpoint, body, headers = {}) {
   const token = await obtenerToken();
 
@@ -93,7 +84,6 @@ async function patch(endpoint, body, headers = {}) {
   return respuesta.data;
 }
 
-// Realizar petición DELETE a Graph API
 async function del(endpoint, headers = {}) {
   const token = await obtenerToken();
 
@@ -106,8 +96,6 @@ async function del(endpoint, headers = {}) {
   await axios.delete(url, config);
 }
 
-// Subir contenido binario (PUT). Usado para "simple upload" de archivos
-// pequeños (< 4MB, límite de Graph para este endpoint).
 async function putBinario(endpoint, buffer, contentType) {
   const token = await obtenerToken();
 

@@ -113,7 +113,6 @@ function normalizarRespuesta(data) {
   };
 }
 
-// Fuente: api.apis.net.pe/v1/ruc (gratis, sin token)
 async function consultarApisNetPe(ruc) {
   const url = `https://api.apis.net.pe/v1/ruc?numero=${ruc}`;
   const resp = await httpRequest(url, {
@@ -143,7 +142,6 @@ async function consultarApisNetPe(ruc) {
   });
 }
 
-// Lee del cache de Firestore. CACHE_TTL_MS = 0 significa cache permanente.
 async function leerCache(ruc) {
   try {
     const db = getDb();
@@ -151,7 +149,6 @@ async function leerCache(ruc) {
     if (!docSnap.exists) return null;
     const data = docSnap.data();
     if (!data || !data.cachedAt) return null;
-    // Si TTL es 0, el cache es permanente
     if (CACHE_TTL_MS > 0) {
       const edad = Date.now() - data.cachedAt;
       if (edad > CACHE_TTL_MS) return null;
@@ -180,9 +177,7 @@ async function escribirCache(datos) {
   }
 }
 
-// Orquesta la consulta: cache permanente -> apis.net.pe.
 async function consultarRucCompleto(ruc) {
-  // 1. Intentar cache permanente primero
   const cacheado = await leerCache(ruc);
   if (cacheado) {
     console.log('[consultarRuc] cache HIT para', ruc);
@@ -190,7 +185,6 @@ async function consultarRucCompleto(ruc) {
   }
   console.log('[consultarRuc] cache MISS para', ruc, '— consultando apis.net.pe');
 
-  // 2. Consultar apis.net.pe (única fuente externa)
   try {
     const resultado = await consultarApisNetPe(ruc);
     await escribirCache(resultado);

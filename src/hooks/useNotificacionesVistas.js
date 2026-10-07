@@ -42,7 +42,7 @@ export default function useNotificacionesVistas(uid, notificaciones, abiertas) {
       ...(Array.isArray(anteriores) ? anteriores : []), ...JSON.parse(actuales)
     ])]);
     memoria.set(clave, valor);
-    try { localStorage.setItem(clave, valor); } catch { /* Conserva las vistas durante esta sesión. */ }
+    try { localStorage.setItem(clave, valor); } catch { }
     window.dispatchEvent(new Event(evento));
   }, [uid, abiertas, nuevas, actuales, guardadas, clave]);
 

@@ -86,7 +86,6 @@ export default function Usuarios({ embebido = false }) {
     setTimeout(() => setMensaje(null), 5000);
   }
 
-  // ── Crear usuario ──
   const [mostrarModalNuevo, setMostrarModalNuevo] = useState(false);
   const [creando, setCreando] = useState(false);
 
@@ -132,7 +131,6 @@ export default function Usuarios({ embebido = false }) {
     }
   }
 
-  // ── Editar datos ──
   const [usuarioEditar, setUsuarioEditar] = useState(null);
   const [guardandoDatos, setGuardandoDatos] = useState(false);
 
@@ -180,7 +178,6 @@ export default function Usuarios({ embebido = false }) {
     }
   }
 
-  // ── Cambiar rol ──
   async function alCambiarRol(usuario, nuevoRol) {
     const normalizado = normalizarRol(nuevoRol);
 
@@ -209,7 +206,6 @@ export default function Usuarios({ embebido = false }) {
     }
   }
 
-  // ── Activar / desactivar ──
   const [usuarioEstado, setUsuarioEstado] = useState(null);
 
   async function confirmarCambioEstado() {
@@ -238,7 +234,6 @@ export default function Usuarios({ embebido = false }) {
     }
   }
 
-  // ── Resetear contraseña ──
   const [usuarioPassword, setUsuarioPassword] = useState(null);
   const [nuevaPassword, setNuevaPassword] = useState('');
   const [reseteando, setReseteando] = useState(false);
@@ -484,7 +479,6 @@ export default function Usuarios({ embebido = false }) {
         )}
       </div>
 
-      {/* Modal: nuevo usuario */}
       <Modal
         isOpen={mostrarModalNuevo}
         onClose={() => setMostrarModalNuevo(false)}
@@ -600,7 +594,6 @@ export default function Usuarios({ embebido = false }) {
         </form>
       </Modal>
 
-      {/* Modal: editar datos */}
       <Modal
         isOpen={!!usuarioEditar}
         onClose={() => setUsuarioEditar(null)}
@@ -661,7 +654,6 @@ export default function Usuarios({ embebido = false }) {
         </form>
       </Modal>
 
-      {/* Modal: resetear contraseña */}
       <Modal
         isOpen={!!usuarioPassword}
         onClose={() => setUsuarioPassword(null)}

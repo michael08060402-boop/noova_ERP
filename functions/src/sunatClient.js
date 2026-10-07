@@ -95,14 +95,11 @@ async function enviarASunat(zipBuffer, nombreArchivo, rucEmisor, esBeta = true, 
     }
 
     return { estado: 'ERROR', mensaje: 'SUNAT no devolvió applicationResponse.', codigo: null };
-
   } catch (err) {
     if (err.message.startsWith('SUNAT')) throw err;
     throw new Error(`Error de conexión con SUNAT: ${err.message}`);
   }
 }
-
-// HELPERS
 
 function basicAuth({ usuario, password }) {
   return 'Basic ' + Buffer.from(`${usuario}:${password}`).toString('base64');

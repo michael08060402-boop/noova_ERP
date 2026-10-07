@@ -4,11 +4,6 @@ import {
   query, orderBy, where
 } from 'firebase/firestore';
 
-// Catálogo de Servicios PROPIOS de Noova (ventilación minera, bombeo,
-// drenaje, monitoreo, mediciones, ingeniería, consultoría, montaje,
-// mantenimiento, capacitación técnica). NO incluye envío, flete, courier,
-// transporte ni cargos logísticos: esos se registran como filas libres
-// dentro de la cotización, nunca como ítems de este catálogo.
 const COLLECTION_NAME = 'servicios';
 
 export async function getServicios() {

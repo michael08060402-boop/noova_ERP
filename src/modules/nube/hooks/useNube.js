@@ -7,30 +7,20 @@ import {
   eliminarItem as eliminarItemServicio
 } from '../services/nubeService';
 
-// Hook principal del modulo Nube
-// Maneja navegacion, breadcrumb, busqueda, CRUD y restriccion por area/rol.
-//
-// Si el usuario tiene un rol restringido (ej. Marketing, Sistemas), el
-// backend le asigna una carpeta de area como "raiz forzada": toda la
-// navegacion (incluido el boton "Inicio" del breadcrumb) ocurre dentro de
-// esa carpeta, sin exponer el resto del drive.
-
 export default function useNube() {
   const [items, setItems] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState(null);
-  const [ruta, setRuta] = useState([]); // [{ id, nombre }, ...] (relativo a la raiz forzada, si aplica)
+  const [ruta, setRuta] = useState([]);
   const [buscando, setBuscando] = useState(false);
   const [terminoBusqueda, setTerminoBusqueda] = useState('');
-  const [resultadosBusqueda, setResultadosBusqueda] = useState(null); // null = no buscando
-  const [carpetaArea, setCarpetaArea] = useState(null); // nombre del area si el rol esta restringido
+  const [resultadosBusqueda, setResultadosBusqueda] = useState(null);
+  const [carpetaArea, setCarpetaArea] = useState(null);
   const [procesando, setProcesando] = useState(false);
 
-  const raizForzadaId = useRef(null); // id de carpeta que actua como "raiz" para roles restringidos
+  const raizForzadaId = useRef(null);
   const contextoListo = useRef(false);
 
-  // Resuelve el contexto de rol (una sola vez) y devuelve el id a usar
-  // cuando se pide la raiz (carpetaId === null)
   const resolverRaiz = useCallback(async (carpetaId) => {
     if (carpetaId) return carpetaId;
     if (!contextoListo.current) {
@@ -50,7 +40,6 @@ export default function useNube() {
     return raizForzadaId.current;
   }, []);
 
-  // Cargar contenido de una carpeta
   const cargarCarpeta = useCallback(async (carpetaId = null, nombreCarpeta = null) => {
     setCargando(true);
     setError(null);
@@ -62,7 +51,6 @@ export default function useNube() {
       const resultado = await listarCarpeta(idEfectivo);
       setItems(resultado);
 
-      // Actualizar breadcrumb
       if (carpetaId && nombreCarpeta) {
         setRuta(prev => [...prev, { id: carpetaId, nombre: nombreCarpeta }]);
       } else if (!carpetaId) {
@@ -76,7 +64,6 @@ export default function useNube() {
     }
   }, [resolverRaiz]);
 
-  // Navegar a una carpeta del breadcrumb (ir hacia atras)
   const navegarA = useCallback(async (indiceRuta) => {
     if (indiceRuta < 0) {
       await cargarCarpeta(null);
@@ -103,8 +90,6 @@ export default function useNube() {
     }
   }, [ruta, cargarCarpeta]);
 
-  // Abrir un archivo — redirige al enlace de SharePoint/OneDrive
-  // El usuario vera el documento en el navegador con sus permisos de Microsoft 365
   const abrirArchivo = useCallback((urlWeb) => {
     if (!urlWeb) {
       setError('OneDrive no devolvió un enlace web para este documento. Revisa la configuración de Microsoft Graph y los permisos del sitio.');
@@ -113,7 +98,6 @@ export default function useNube() {
     window.open(urlWeb, '_blank', 'noopener');
   }, []);
 
-  // Buscar documentos
   const buscar = useCallback(async (termino) => {
     const terminoLimpio = termino.trim();
 
@@ -138,21 +122,17 @@ export default function useNube() {
     }
   }, []);
 
-  // Limpiar busqueda y volver a la carpeta actual
   const limpiarBusqueda = useCallback(() => {
     setResultadosBusqueda(null);
     setTerminoBusqueda('');
   }, []);
 
-  // Carpeta actualmente abierta (para crear/subir dentro de ella)
   const carpetaActualId = useCallback(() => {
     return ruta.length > 0 ? ruta[ruta.length - 1].id : (raizForzadaId.current || null);
   }, [ruta]);
 
-  // Refrescar la carpeta actual
   const refrescar = useCallback(async () => {
     if (resultadosBusqueda !== null) {
-      // Si estabamos viendo resultados de busqueda, re-ejecutar
       setBuscando(true);
       try {
         const resultados = await buscarDocumentos(terminoBusqueda);
@@ -177,8 +157,6 @@ export default function useNube() {
       setCargando(false);
     }
   }, [carpetaActualId, resultadosBusqueda, terminoBusqueda]);
-
-  // ── CRUD ──
 
   const crearCarpeta = useCallback(async (nombre) => {
     setProcesando(true);
@@ -236,7 +214,6 @@ export default function useNube() {
     }
   }, [refrescar]);
 
-  // Items visibles: resultados de busqueda o contenido de carpeta
   const itemsVisibles = resultadosBusqueda !== null ? resultadosBusqueda : items;
 
   return {

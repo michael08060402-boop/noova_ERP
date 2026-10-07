@@ -23,6 +23,7 @@ export default defineConfig([
       'react-hooks/incompatible-library': 'off',
       'react-refresh/only-export-components': 'off',
       'preserve-caught-error': 'off',
+      'no-empty': ['error', { allowEmptyCatch: true }],
     },
   },
   {

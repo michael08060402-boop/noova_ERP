@@ -34,14 +34,12 @@ export default function Perfil({ embebido = false }) {
   const [mensaje, setMensaje] = useState(null);
   const [errorCampo, setErrorCampo] = useState({});
 
-  // Cambio de correo.
   const [editandoEmail, setEditandoEmail] = useState(false);
   const [nuevoEmail, setNuevoEmail] = useState('');
   const [passwordActual, setPasswordActual] = useState('');
   const [guardandoEmail, setGuardandoEmail] = useState(false);
   const [errorEmail, setErrorEmail] = useState('');
 
-  // Cambio de contraseña.
   const [editandoPassword, setEditandoPassword] = useState(false);
   const [passwordActualCambio, setPasswordActualCambio] = useState('');
   const [passwordNueva, setPasswordNueva] = useState('');

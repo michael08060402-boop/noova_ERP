@@ -21,9 +21,6 @@ const authPersistenceReady = setPersistence(auth, browserLocalPersistence).catch
 const db = getFirestore(app);
 const functions = getFunctions(app);
 
-// Emuladores locales (opt-in): solo se activan si en .env.local existe
-// VITE_USE_EMULATORS=true. En caso contrario el frontend habla directo con
-// Firebase de producción.
 const USE_EMULATORS = import.meta.env.VITE_USE_EMULATORS === 'true';
 
 if (USE_EMULATORS) {

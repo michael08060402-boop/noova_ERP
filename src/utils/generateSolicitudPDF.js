@@ -1,14 +1,13 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatDate } from './formatDate';
-import { etiquetaCategoria } from './solicitudCotizacion';
+import { bloquesDeSolicitud, valorAutomatico, valorCampo } from './plantillasSolicitud';
 import noovaLogo from '../assets/noova-logo.png';
 
 const NOOVA_FALLBACK = {
   razonSocial: 'CONTRATISTAS GENERALES NOOVA S.A.C.',
   ruc: '20550622930',
   direccion: 'Av. Cristóbal de Peralta Norte Nro. 110 Int. 702, Urb. Valle Hermoso de Monterrico, Santiago de Surco, Lima - Lima',
-  establecimiento: '',
   celular: '',
   email: '',
   web: ''
@@ -19,57 +18,66 @@ const COLOR_ACCENT = [244, 122, 0];
 const COLOR_LINE_SOFT = [205, 205, 205];
 const COLOR_TXT = [30, 30, 30];
 const COLOR_TXT_SOFT = [95, 95, 95];
+const CARD_BG = [246, 247, 248];
+const CARD_BORDER = [224, 228, 231];
 
-function etiquetaMoneda(codigo) {
-  const c = String(codigo || '').toUpperCase();
-  if (c === 'S/' || c === 'PEN' || c === 'SOLES') return 'S/';
-  if (c === 'US$' || c === 'USD' || c === '$' || c === 'DÓLARES' || c === 'DOLARES') return 'US$';
-  return 'S/';
+const MARGEN = 12;
+const HEADER_H = 38;
+const INICIO_Y = 8 + HEADER_H;
+const SEPARACION = 5;
+const GAP_COLUMNAS = 5;
+
+function textoCelda(valor, tipo) {
+  if (valor === null || valor === undefined) return '';
+  if (tipo === 'numero') {
+    const n = Number(valor);
+    if (String(valor).trim() === '' || Number.isNaN(n)) return String(valor);
+    return Number.isInteger(n) ? String(n) : n.toFixed(2);
+  }
+  return String(valor);
 }
 
-function nombreMoneda(codigo) {
-  return etiquetaMoneda(codigo) === 'S/' ? 'SOLES' : 'DÓLARES AMERICANOS';
+function filaConContenido(fila, columnas) {
+  return columnas.some((c) => {
+    const v = String(fila.valores?.[c.id] ?? '').trim();
+    return v && !(c.tipo === 'unidad');
+  });
 }
 
-function generateSolicitudPDF(cotizacion, config = {}) {
+function generarPDFSolicitud(solicitud, config = {}) {
   const doc = new jsPDF({ format: 'a4', unit: 'mm', compress: true });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-  const margin = 12;
-  const contentW = pageW - 2 * margin;
+  const contentW = pageW - 2 * MARGEN;
+  const limiteY = pageH - 18;
 
   const empresa = { ...NOOVA_FALLBACK, ...(config?.empresa || {}) };
   const emp = {
     razonSocial: empresa.razonSocial || NOOVA_FALLBACK.razonSocial,
     ruc: empresa.ruc || NOOVA_FALLBACK.ruc,
     direccion: empresa.direccion || NOOVA_FALLBACK.direccion,
-    establecimiento: empresa.establecimiento || empresa.direccion || NOOVA_FALLBACK.direccion,
     celular: empresa.celular || empresa.telefono || '',
     email: empresa.email || '',
     web: empresa.web || ''
   };
-
-  const solicitante = cotizacion.responsable || cotizacion.creadoPor || '-';
-
-  const items = cotizacion.items || [];
-  const monedaCod = cotizacion.moneda;
-  const fechaEmision = cotizacion.fechaEmision || cotizacion.fecha || cotizacion.createdAt;
-  const observacion = cotizacion.observacion || '';
-  const esSolicitud = cotizacion.esSolicitudCotizacion === true;
-  const HEADER_H = 38;
+  const contexto = {
+    fecha: formatDate(solicitud.fechaEmision || solicitud.fecha || solicitud.createdAt),
+    solicitante: solicitud.responsable || solicitud.creadoPor || '-',
+    empresa: emp,
+    moneda: solicitud.moneda || 'S/'
+  };
 
   function drawHeader(compacta = false) {
     const top = 8;
-
     const logoH = compacta ? 14 : 20;
     const logoW = logoH * (305 / 216);
     try {
-      doc.addImage(noovaLogo, 'PNG', margin, top, logoW, logoH);
+      doc.addImage(noovaLogo, 'PNG', MARGEN, top, logoW, logoH);
     } catch { }
 
     const boxW = 66;
-    const boxX = pageW - margin - boxW;
-    const infoX = margin + logoW + 4;
+    const boxX = pageW - MARGEN - boxW;
+    const infoX = MARGEN + logoW + 4;
     const infoW = boxX - infoX - 4;
 
     doc.setFont('helvetica', 'bold');
@@ -86,20 +94,15 @@ function generateSolicitudPDF(cotizacion, config = {}) {
       const dirLines = doc.splitTextToSize(emp.direccion, infoW);
       doc.text(dirLines, infoX, yInfo);
       yInfo += dirLines.length * 3.2 + 0.5;
-
       const contactoLinea = [
         emp.celular ? `Cel.: ${emp.celular}` : '',
         emp.email ? `Email: ${emp.email}` : '',
         emp.web || ''
       ].filter(Boolean).join('   ');
-
-      if (contactoLinea) {
-        doc.text(doc.splitTextToSize(contactoLinea, infoW), infoX, yInfo);
-      }
+      if (contactoLinea) doc.text(doc.splitTextToSize(contactoLinea, infoW), infoX, yInfo);
     }
 
     const boxH = compacta ? 14 : 20;
-
     doc.setFillColor(...COLOR_ACCENT);
     doc.rect(boxX, top, boxW, compacta ? 7 : 10, 'F');
     doc.setFont('helvetica', 'bold');
@@ -114,170 +117,197 @@ function generateSolicitudPDF(cotizacion, config = {}) {
     doc.setDrawColor(...COLOR_DARK);
     doc.setLineWidth(0.5);
     doc.rect(boxX, top, boxW, boxH);
-
-    doc.setDrawColor(...COLOR_DARK);
     doc.setLineWidth(0.4);
-    doc.line(margin, top + HEADER_H - 3, pageW - margin, top + HEADER_H - 3);
+    doc.line(MARGEN, top + HEADER_H - 3, pageW - MARGEN, top + HEADER_H - 3);
   }
 
-  function drawMetaBox(y) {
-    const labelW = 40;
-    const rows = [
-      ['Fecha de Emisión', formatDate(fechaEmision)],
-      ['Solicitante', solicitante],
-      ['Empresa', emp.razonSocial],
-      ['RUC', emp.ruc],
-      ['Dirección', emp.direccion]
-    ];
-    if (esSolicitud) rows.push(['Tipo de Solicitud', etiquetaCategoria(cotizacion.categoria)]);
-    if (cotizacion.asunto) rows.push(['Asunto', cotizacion.asunto]);
-    if (cotizacion.lugarEntrega) rows.push(['Lugar de Entrega', cotizacion.lugarEntrega]);
-    if (cotizacion.fechaRequerida) rows.push(['Fecha Requerida', formatDate(cotizacion.fechaRequerida)]);
-    rows.push(['Tipo de Moneda', nombreMoneda(monedaCod)]);
-    if (observacion) rows.push(['Observación', observacion]);
+  let y = INICIO_Y;
 
+  function nuevaPagina() {
+    doc.addPage();
+    drawHeader(true);
+    y = INICIO_Y;
+  }
+
+  function asegurar(alto) {
+    if (y + alto > limiteY && y > INICIO_Y) nuevaPagina();
+  }
+
+  function altoTitulo(bloque) {
+    return bloque.mostrarTitulo && bloque.titulo && bloque.estilo !== 'tarjeta' ? 7 : 0;
+  }
+
+  function dibujarTitulo(bloque, x, yPos) {
+    if (!altoTitulo(bloque)) return yPos;
+    doc.setFillColor(...COLOR_ACCENT);
+    doc.rect(x, yPos + 0.6, 1.1, 4.2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.3);
+    doc.setTextColor(...COLOR_DARK);
+    doc.text(String(bloque.titulo).toUpperCase(), x + 3, yPos + 4);
+    return yPos + 7;
+  }
+
+  function filasDeCampos(bloque) {
+    const visibles = (bloque.campos || [])
+      .map((c) => {
+        let valor = c.auto ? valorAutomatico(c.auto, contexto) : c.valor;
+        if (c.tipo === 'fecha' && valor) valor = formatDate(valor);
+        return { ...c, valor: String(valor ?? '').trim() };
+      })
+      .filter((c) => c.auto || c.valor);
+    const filas = [];
+    for (let i = 0; i < visibles.length; i += 1) {
+      const c = visibles[i];
+      const sig = visibles[i + 1];
+      if (c.ancho === 'mitad' && sig && sig.ancho === 'mitad') {
+        filas.push([c, sig]);
+        i += 1;
+      } else {
+        filas.push([c]);
+      }
+    }
+    return filas;
+  }
+
+  function altoFilaCampos(fila, ancho) {
+    doc.setFontSize(8.5);
+    const celdas = fila.length;
+    const labelW = 40;
+    const valorW = ancho / celdas - labelW - 6;
+    return Math.max(...fila.map((c) => {
+      const lines = doc.splitTextToSize(c.valor || '-', valorW);
+      const linesLabel = doc.splitTextToSize(`${c.etiqueta}:`, labelW - 4);
+      return Math.max(6, Math.max(lines.length, linesLabel.length) * 4.2 + 1.8);
+    }));
+  }
+
+  function dibujarFilaCampos(fila, x, yPos, ancho, alto, primera) {
+    const celdas = fila.length;
+    const anchoCelda = ancho / celdas;
+    const labelW = 40;
     doc.setDrawColor(...COLOR_LINE_SOFT);
     doc.setLineWidth(0.3);
-
-    let yy = y;
-    doc.setFontSize(8.5);
-    const rowHeights = rows.map(([, value]) => {
-      const lines = doc.splitTextToSize(String(value || '-'), contentW - labelW - 6);
-      return Math.max(6, lines.length * 4.2 + 1.8);
-    });
-    const totalH = rowHeights.reduce((a, b) => a + b, 0);
-
-    doc.rect(margin, y, contentW, totalH);
-    doc.line(margin + labelW, y, margin + labelW, y + totalH);
-
-    rows.forEach(([label, value], i) => {
-      const h = rowHeights[i];
-      if (i > 0) doc.line(margin, yy, margin + contentW, yy);
-
+    if (!primera) doc.line(x, yPos, x + ancho, yPos);
+    fila.forEach((c, i) => {
+      const cx = x + i * anchoCelda;
+      if (i > 0) doc.line(cx, yPos, cx, yPos + alto);
+      doc.line(cx + labelW, yPos, cx + labelW, yPos + alto);
       doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
       doc.setTextColor(...COLOR_DARK);
-      doc.text(`${label}:`, margin + 2.5, yy + 4.4);
-
+      doc.text(doc.splitTextToSize(`${c.etiqueta}:`, labelW - 4), cx + 2.5, yPos + 4.4);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(...COLOR_TXT);
-      const lines = doc.splitTextToSize(String(value || '-'), contentW - labelW - 6);
-      doc.text(lines, margin + labelW + 3, yy + 4.4);
-      yy += h;
+      doc.text(doc.splitTextToSize(c.valor || '-', anchoCelda - labelW - 6), cx + labelW + 3, yPos + 4.4);
+    });
+  }
+
+  function altoCampos(bloque, ancho) {
+    return altoTitulo(bloque) + filasDeCampos(bloque).reduce((t, f) => t + altoFilaCampos(f, ancho), 0);
+  }
+
+  function dibujarCampos(bloque, x, ancho) {
+    const filas = filasDeCampos(bloque);
+    if (!filas.length) return;
+    asegurar(altoTitulo(bloque) + (filas[0] ? altoFilaCampos(filas[0], ancho) : 0));
+    y = dibujarTitulo(bloque, x, y);
+    let inicioCaja = y;
+    let primera = true;
+    for (const fila of filas) {
+      const alto = altoFilaCampos(fila, ancho);
+      if (y + alto > limiteY) {
+        doc.setDrawColor(...COLOR_LINE_SOFT);
+        doc.rect(x, inicioCaja, ancho, y - inicioCaja);
+        nuevaPagina();
+        inicioCaja = y;
+        primera = true;
+      }
+      dibujarFilaCampos(fila, x, y, ancho, alto, primera);
+      primera = false;
+      y += alto;
+    }
+    doc.setDrawColor(...COLOR_LINE_SOFT);
+    doc.setLineWidth(0.3);
+    doc.rect(x, inicioCaja, ancho, y - inicioCaja);
+  }
+
+  function dibujarTabla(bloque) {
+    const columnas = bloque.columnas || [];
+    if (!columnas.length) return;
+    const filas = (bloque.filas || []).filter((f) => filaConContenido(f, columnas));
+    if (!filas.length) return;
+    asegurar(altoTitulo(bloque) + 16);
+    y = dibujarTitulo(bloque, MARGEN, y);
+
+    const numerar = bloque.numerar !== false;
+    const anchoNum = numerar ? 14 : 0;
+    const totalPesos = columnas.reduce((t, c) => t + (Number(c.ancho) || 1), 0);
+    const disponible = contentW - anchoNum;
+
+    const head = [[...(numerar ? ['Ítem'] : []), ...columnas.map((c) => c.etiqueta || '')]];
+    const body = filas.map((f, i) => [
+      ...(numerar ? [String(i + 1).padStart(2, '0')] : []),
+      ...columnas.map((c) => textoCelda(f.valores?.[c.id], c.tipo))
+    ]);
+    const columnStyles = {};
+    if (numerar) columnStyles[0] = { halign: 'center', cellWidth: anchoNum };
+    columnas.forEach((c, i) => {
+      const centrado = c.tipo !== 'texto' || c.rol === 'codigo';
+      columnStyles[i + (numerar ? 1 : 0)] = {
+        cellWidth: (disponible * (Number(c.ancho) || 1)) / totalPesos,
+        halign: centrado ? 'center' : 'left',
+        ...(c.tipo === 'numero' ? { fontStyle: 'bold' } : {})
+      };
     });
 
-    return y + totalH;
-  }
-
-  drawHeader(false);
-  let y = 8 + HEADER_H;
-  y = drawMetaBox(y) + 4;
-
-  const conCodigo = items.some((item) => String(item.codigo || '').trim());
-
-  const head = [[
-    'Ítem',
-    ...(conCodigo ? ['Código'] : []),
-    'Descripción',
-    'Unidad',
-    'Cantidad'
-  ]];
-
-  const body = items.map((item, index) => {
-    const cant = Number(item.cantidad) || 0;
-    const detalleExtra = [item.marca, item.modelo].filter(Boolean).join(' · ');
-    const descripcion = [item.descripcion, item.especificaciones, detalleExtra]
-      .map((texto) => String(texto || '').trim())
-      .filter(Boolean)
-      .join('\n');
-
-    return [
-      String(index + 1).padStart(2, '0'),
-      ...(conCodigo ? [item.codigo || ''] : []),
-      descripcion,
-      item.unidadMedida || 'UNIDAD',
-      cant ? (Number.isInteger(cant) ? String(cant) : cant.toFixed(2)) : ''
-    ];
-  });
-
-  autoTable(doc, {
-    head,
-    body,
-    startY: y,
-    margin: { left: margin, right: margin, top: 8 + HEADER_H },
-    tableWidth: contentW,
-    styles: {
-      fontSize: 7.7,
-      cellPadding: 2.1,
-      lineColor: COLOR_LINE_SOFT,
-      lineWidth: 0.25,
-      textColor: COLOR_TXT,
-      valign: 'middle'
-    },
-    headStyles: {
-      fillColor: COLOR_DARK,
-      textColor: [255, 255, 255],
-      fontStyle: 'bold',
-      halign: 'center',
-      fontSize: 7.4,
-      valign: 'middle'
-    },
-    columnStyles: conCodigo
-      ? {
-        0: { halign: 'center', cellWidth: 14 },
-        1: { halign: 'center', cellWidth: 24 },
-        2: { cellWidth: 'auto' },
-        3: { halign: 'center', cellWidth: 28 },
-        4: { halign: 'center', cellWidth: 28, fontStyle: 'bold' }
+    autoTable(doc, {
+      head,
+      body,
+      startY: y,
+      margin: { left: MARGEN, right: MARGEN, top: INICIO_Y, bottom: pageH - limiteY },
+      tableWidth: contentW,
+      styles: { fontSize: 7.7, cellPadding: 2.1, lineColor: COLOR_LINE_SOFT, lineWidth: 0.25, textColor: COLOR_TXT, valign: 'middle' },
+      headStyles: { fillColor: COLOR_DARK, textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center', fontSize: 7.4, valign: 'middle' },
+      columnStyles,
+      didDrawPage: (data) => {
+        if (data.pageNumber > 1) drawHeader(true);
       }
-      : {
-        0: { halign: 'center', cellWidth: 14 },
-        1: { cellWidth: 'auto' },
-        2: { halign: 'center', cellWidth: 28 },
-        3: { halign: 'center', cellWidth: 28, fontStyle: 'bold' }
-      },
-    didDrawPage: (data) => {
-      if (data.pageNumber > 1) drawHeader(true);
-    }
-  });
-
-  y = (doc.lastAutoTable?.finalY || y) + 5;
-
-  const CARD_BG = [246, 247, 248];
-  const CARD_BORDER = [224, 228, 231];
-  const CARD_GAP = 5;
-  const CARD_W = (contentW - CARD_GAP) / 2;
-  const CARD_H = 40;
-
-  function asegurarEspacioTarjetas() {
-    if (y + CARD_H > pageH - 18) {
-      doc.addPage();
-      drawHeader(true);
-      y = 8 + HEADER_H;
-    }
+    });
+    y = doc.lastAutoTable?.finalY || y;
   }
 
-  function drawBloqueInformativo(x, yPos, ancho, titulo, lineas) {
+  function lineasLista(bloque) {
+    return (bloque.elementos || []).map((t) => String(t || '').trim()).filter(Boolean);
+  }
+
+  function altoTarjeta(bloque, ancho) {
+    doc.setFontSize(6.45);
+    const contenido = lineasLista(bloque).reduce((t, texto) => {
+      const wrapped = doc.splitTextToSize(texto, ancho - 11);
+      return t + Math.max(5.15, wrapped.length * 3.1 + 1.9);
+    }, 0);
+    return Math.max(18, 12.8 + contenido + 1.5);
+  }
+
+  function dibujarTarjeta(bloque, x, yPos, ancho, alto) {
     doc.setFillColor(...CARD_BG);
     doc.setDrawColor(...CARD_BORDER);
     doc.setLineWidth(0.25);
-    doc.roundedRect(x, yPos, ancho, CARD_H, 1.6, 1.6, 'FD');
-
+    doc.roundedRect(x, yPos, ancho, alto, 1.6, 1.6, 'FD');
     doc.setFillColor(...COLOR_ACCENT);
     doc.rect(x, yPos, ancho, 1.1, 'F');
-
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.6);
     doc.setTextColor(...COLOR_DARK);
-    doc.text(titulo, x + 5.5, yPos + 6.7);
-
+    doc.text(String(bloque.titulo || '').toUpperCase(), x + 5.5, yPos + 6.7);
     let yy = yPos + 12.8;
-    lineas.forEach((texto, index) => {
+    lineasLista(bloque).forEach((texto, index) => {
       if (index > 0) {
         doc.setDrawColor(...CARD_BORDER);
         doc.setLineWidth(0.18);
         doc.line(x + 5.5, yy - 2.35, x + ancho - 5.5, yy - 2.35);
       }
-
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6.45);
       doc.setTextColor(...COLOR_TXT);
@@ -287,72 +317,122 @@ function generateSolicitudPDF(cotizacion, config = {}) {
     });
   }
 
-  asegurarEspacioTarjetas();
+  function lineasDeTexto(bloque, ancho) {
+    doc.setFontSize(8);
+    if (bloque.tipo === 'texto') return doc.splitTextToSize(String(bloque.contenido || '').trim(), ancho);
+    return lineasLista(bloque).flatMap((t) => doc.splitTextToSize(`•  ${t}`, ancho - 2));
+  }
 
-  const cardsY = y;
-  const leftX = margin;
-  const rightX = margin + CARD_W + CARD_GAP;
+  function altoTexto(bloque, ancho) {
+    return altoTitulo(bloque) + lineasDeTexto(bloque, ancho).length * 4 + 1;
+  }
 
-  drawBloqueInformativo(
-    leftX,
-    cardsY,
-    CARD_W,
-    'CONDICIONES DE LA OFERTA',
-    [
-      'Indicar validez de la oferta.',
-      'Indicar tiempo de entrega.',
-      'Indicar condiciones de pago.',
-      'Indicar si los precios incluyen IGV.',
-      'Indicar si el envío está incluido o se cotiza como servicio adicional.'
-    ]
-  );
+  function dibujarTexto(bloque, x, ancho) {
+    const lineas = lineasDeTexto(bloque, ancho);
+    if (!lineas.length) return;
+    asegurar(altoTitulo(bloque) + 8);
+    y = dibujarTitulo(bloque, x, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...COLOR_TXT);
+    for (const linea of lineas) {
+      if (y + 4 > limiteY) nuevaPagina();
+      doc.text(linea, x + (bloque.tipo === 'lista' ? 1 : 0), y + 3.2);
+      y += 4;
+    }
+    y += 1;
+  }
 
-  drawBloqueInformativo(
-    rightX,
-    cardsY,
-    CARD_W,
-    'DATOS BANCARIOS PARA PAGO',
-    [
-      'Indicar entidad bancaria.',
-      'Indicar tipo de cuenta.',
-      'Indicar moneda de la cuenta.',
-      'Indicar N.° de cuenta.',
-      'Indicar CCI.'
-    ]
-  );
+  function esVacio(bloque) {
+    if (bloque.tipo === 'campos') return !filasDeCampos(bloque).length;
+    if (bloque.tipo === 'tabla') return !(bloque.filas || []).some((f) => filaConContenido(f, bloque.columnas || []));
+    if (bloque.tipo === 'lista') return !lineasLista(bloque).length;
+    return !String(bloque.contenido || '').trim();
+  }
 
-  y = cardsY + CARD_H;
+  function altoBloque(bloque, ancho) {
+    if (bloque.tipo === 'campos') return altoCampos(bloque, ancho);
+    if (bloque.tipo === 'lista' && bloque.estilo === 'tarjeta') return altoTarjeta(bloque, ancho);
+    return altoTexto(bloque, ancho);
+  }
+
+  function dibujarBloque(bloque, x, ancho) {
+    if (bloque.tipo === 'campos') return dibujarCampos(bloque, x, ancho);
+    if (bloque.tipo === 'tabla') return dibujarTabla(bloque);
+    if (bloque.tipo === 'lista' && bloque.estilo === 'tarjeta') {
+      const alto = altoTarjeta(bloque, ancho);
+      asegurar(alto);
+      dibujarTarjeta(bloque, x, y, ancho, alto);
+      y += alto;
+      return undefined;
+    }
+    return dibujarTexto(bloque, x, ancho);
+  }
+
+  drawHeader(false);
+  const bloques = bloquesDeSolicitud(solicitud).filter((b) => !esVacio(b));
+
+  for (let i = 0; i < bloques.length; i += 1) {
+    const bloque = bloques[i];
+    const sig = bloques[i + 1];
+    if (i > 0) y += SEPARACION;
+    const emparejable = (b) => b && b.ancho === 'mitad' && b.tipo !== 'tabla';
+    if (emparejable(bloque) && emparejable(sig)) {
+      const anchoMitad = (contentW - GAP_COLUMNAS) / 2;
+      const alto = Math.max(altoBloque(bloque, anchoMitad), altoBloque(sig, anchoMitad));
+      if (alto <= limiteY - INICIO_Y) {
+        asegurar(alto);
+        const yInicio = y;
+        [bloque, sig].forEach((b, k) => {
+          y = yInicio;
+          const x = MARGEN + k * (anchoMitad + GAP_COLUMNAS);
+          if (b.tipo === 'lista' && b.estilo === 'tarjeta') dibujarTarjeta(b, x, yInicio, anchoMitad, alto);
+          else dibujarBloque(b, x, anchoMitad);
+        });
+        y = yInicio + alto;
+        i += 1;
+        continue;
+      }
+    }
+    dibujarBloque(bloque, MARGEN, contentW);
+  }
 
   const totalPages = doc.internal.getNumberOfPages();
   for (let i = 1; i <= totalPages; i += 1) {
     doc.setPage(i);
     doc.setDrawColor(...COLOR_LINE_SOFT);
     doc.setLineWidth(0.25);
-    doc.line(margin, pageH - 12, pageW - margin, pageH - 12);
-
+    doc.line(MARGEN, pageH - 12, pageW - MARGEN, pageH - 12);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.8);
     doc.setTextColor(...COLOR_TXT_SOFT);
-    doc.text(`Página ${i} de ${totalPages}`, pageW - margin, pageH - 7.8, { align: 'right' });
+    doc.text(`Página ${i} de ${totalPages}`, pageW - MARGEN, pageH - 7.8, { align: 'right' });
   }
 
   return doc;
 }
 
-export function downloadSolicitudPDF(cotizacion, config) {
-  const doc = generateSolicitudPDF(cotizacion, config);
-  const fechaArchivo = (() => {
-    const d = new Date(cotizacion?.fechaEmision || cotizacion?.fecha || cotizacion?.createdAt || Date.now());
-    if (Number.isNaN(d.getTime())) return new Date().toISOString().slice(0, 10);
-    return d.toISOString().slice(0, 10);
+export function pdfSolicitudBytes(solicitud, config) {
+  return generarPDFSolicitud(solicitud, config).output('arraybuffer');
+}
+
+function nombreArchivoSolicitud(solicitud = {}) {
+  const fecha = (() => {
+    const d = new Date(solicitud.fechaEmision || solicitud.fecha || solicitud.createdAt || Date.now());
+    return Number.isNaN(d.getTime()) ? new Date().toISOString().slice(0, 10) : d.toISOString().slice(0, 10);
   })();
-  const referencia = String(cotizacion?.asunto || (cotizacion?.esSolicitudCotizacion ? etiquetaCategoria(cotizacion?.categoria) : ''))
+  const referencia = String(valorCampo(bloquesDeSolicitud(solicitud), 'asunto') || solicitud.asunto || solicitud.plantillaNombre || '')
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
-    .slice(0, 40)
-    .replace(/-+$/, '');
-  doc.save(`solicitud-cotizacion-${referencia ? `${referencia}-` : ''}${fechaArchivo}.pdf`);
+    .split('-')
+    .reduce((acc, parte) => (`${acc}-${parte}`.length <= 41 ? `${acc}-${parte}` : acc), '')
+    .slice(1);
+  return `solicitud-cotizacion-${referencia ? `${referencia}-` : ''}${fecha}.pdf`;
+}
+
+export function downloadSolicitudPDF(solicitud, config) {
+  generarPDFSolicitud(solicitud, config).save(nombreArchivoSolicitud(solicitud));
 }

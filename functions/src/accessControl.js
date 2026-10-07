@@ -8,7 +8,6 @@ const PERMISOS_TOTALES = {
   equipos: TODO,
   mangas: TODO,
   servicios: TODO,
-  epp: TODO,
   cotizaciones: TODO,
   solicitudes: TODO,
   calibraciones: ['read'],
@@ -43,7 +42,7 @@ const ROLES = {
     label: 'Administrador',
     areaPredeterminada: 'administracion',
     permissions: { ...PERMISOS_TOTALES },
-    configuracion: ['correlativo'],
+    configuracion: ['correlativo', 'plantillas'],
     nubeCarpeta: 'NOOVA SAC'
   },
 
@@ -79,7 +78,6 @@ const ROLES = {
     areaPredeterminada: 'minas',
     permissions: {
       solicitudes: ['read', 'create', 'update'],
-      epp: ['read'],
       nube: TODO,
       perfil: ['read', 'update']
     },
@@ -118,10 +116,6 @@ function normalizarArea(area) {
   return Object.prototype.hasOwnProperty.call(AREAS, normalizada)
     ? normalizada
     : '';
-}
-
-function esAreaValida(area) {
-  return Boolean(normalizarArea(area));
 }
 
 function getAreaPredeterminada(role) {
@@ -197,31 +191,6 @@ function crearAccessControl(db) {
     return perfil;
   }
 
-  async function exigirAlgunoPermisos(uid, permisosRequeridos) {
-    const perfil = await obtenerPerfilActivo(uid);
-
-    const autorizado = permisosRequeridos.some((permiso) => {
-      if (typeof permiso === 'string') {
-        return puedePerfil(perfil, permiso, 'read');
-      }
-
-      return puedePerfil(
-        perfil,
-        permiso.modulo,
-        permiso.accion || 'read'
-      );
-    });
-
-    if (!autorizado) {
-      throw new HttpsError(
-        'permission-denied',
-        'No tienes ninguno de los permisos requeridos'
-      );
-    }
-
-    return perfil;
-  }
-
   async function exigirSeccionConfiguracion(uid, seccion) {
     const perfil = await obtenerPerfilActivo(uid);
 
@@ -235,26 +204,10 @@ function crearAccessControl(db) {
     return perfil;
   }
 
-  async function obtenerCarpetaAreaDeUsuario(uid) {
-    const perfil = await obtenerPerfilActivo(uid);
-    const carpeta = getCarpetaNubePerfil(perfil);
-
-    if (carpeta === undefined) {
-      throw new HttpsError(
-        'permission-denied',
-        'Tu rol no tiene acceso al módulo Nube'
-      );
-    }
-
-    return carpeta;
-  }
-
   return {
     obtenerPerfilActivo,
     exigirPermiso,
-    exigirAlgunoPermisos,
-    exigirSeccionConfiguracion,
-    obtenerCarpetaAreaDeUsuario
+    exigirSeccionConfiguracion
   };
 }
 
@@ -264,7 +217,6 @@ module.exports = {
   normalizarRol,
   esRolValido,
   normalizarArea,
-  esAreaValida,
   getAreaPredeterminada,
   getNombreArea,
   puedePerfil,

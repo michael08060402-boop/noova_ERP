@@ -1,7 +1,3 @@
-// Formatea cualquier entrada de fecha a DD/MM/YYYY en hora local.
-// Soporta: Date, ISO string, "YYYY-MM-DD", Firestore Timestamp {_seconds,_nanoseconds}.
-// Para fechas tipo "YYYY-MM-DD" (sin hora), se interpreta como fecha local
-// para evitar el desfase de un día en zonas horarias negativas (Perú = UTC-5).
 export function formatDate(date) {
   if (!date) return '';
 
@@ -30,8 +26,6 @@ export function formatDate(date) {
   return `${day}/${month}/${year}`;
 }
 
-// Devuelve la fecha de HOY en formato "YYYY-MM-DD" usando la zona horaria
-// local del navegador (evita el bug de toISOString() que devuelve UTC).
 export function formatDateISO() {
   const d = new Date();
   const day = String(d.getDate()).padStart(2, '0');
@@ -40,8 +34,6 @@ export function formatDateISO() {
   return `${year}-${month}-${day}`;
 }
 
-// Convierte cualquier entrada de fecha en un objeto Date interpretado en
-// hora local. Útil para comparar fechas sin sufrir el desfase de zona horaria.
 export function parseFechaLocal(date) {
   if (!date) return new Date(NaN);
 

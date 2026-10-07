@@ -1,6 +1,5 @@
 import { FiFolder, FiFile, FiFileText, FiImage, FiFilePlus, FiExternalLink, FiEdit2, FiTrash2 } from 'react-icons/fi';
 
-// Mapeo de extensiones a iconos
 const ICONOS_ARCHIVO = {
   pdf: FiFileText,
   doc: FiFileText,
@@ -19,26 +18,24 @@ const ICONOS_ARCHIVO = {
   '7z': FiFilePlus,
 };
 
-// Paleta de colores para carpetas — consistente por nombre (hash)
 const COLORES_CARPETA = [
-  '#3B82F6', // azul
-  '#10B981', // verde
-  '#F59E0B', // ambar
-  '#8B5CF6', // purpura
-  '#EC4899', // rosa
-  '#14B8A6', // teal
-  '#EF4444', // rojo
-  '#6366F1', // indigo
-  '#D97706', // naranja
-  '#059669', // esmeralda
+  '#3B82F6',
+  '#10B981',
+  '#F59E0B',
+  '#8B5CF6',
+  '#EC4899',
+  '#14B8A6',
+  '#EF4444',
+  '#6366F1',
+  '#D97706',
+  '#059669',
 ];
 
-// Hash simple para asignar color consistente por nombre de carpeta
 function colorCarpeta(nombre) {
   let hash = 0;
   for (let i = 0; i < nombre.length; i++) {
     hash = nombre.charCodeAt(i) + ((hash << 5) - hash);
-    hash = hash & hash; // Convertir a 32 bits
+    hash = hash & hash;
   }
   return COLORES_CARPETA[Math.abs(hash) % COLORES_CARPETA.length];
 }
@@ -49,7 +46,6 @@ function obtenerIcono(item) {
   return ICONOS_ARCHIVO[ext] || FiFile;
 }
 
-// Formatear tamano de archivo
 function formatearTamano(bytes) {
   if (!bytes || bytes === 0) return '—';
   const unidades = ['B', 'KB', 'MB', 'GB'];
@@ -62,7 +58,6 @@ function formatearTamano(bytes) {
   return `${tamano.toFixed(i === 0 ? 0 : 1)} ${unidades[i]}`;
 }
 
-// Formatear fecha
 function formatearFecha(fechaIso) {
   if (!fechaIso) return '—';
   const fecha = new Date(fechaIso);
@@ -73,16 +68,13 @@ function formatearFecha(fechaIso) {
   });
 }
 
-// Extraer la carpeta padre desde la ruta completa
 function obtenerRutaPadre(rutaCompleta) {
   if (!rutaCompleta) return '';
   const partes = rutaCompleta.split('/');
-  // Mostrar la ruta sin el nombre del item (solo el camino)
   if (partes.length <= 1) return '';
   return partes.slice(0, -1).join(' / ');
 }
 
-// Lista de archivos y carpetas
 export default function ListaArchivos({ items, onAbrirCarpeta, onAbrirArchivo, enBusqueda = false, onRenombrar, onEliminar, puedeEditar = false }) {
   if (items.length === 0) {
     return (
@@ -93,7 +85,6 @@ export default function ListaArchivos({ items, onAbrirCarpeta, onAbrirArchivo, e
     );
   }
 
-  // Ordenar: carpetas primero, luego por nombre
   const ordenados = [...items].sort((a, b) => {
     if (a.tipo === 'carpeta' && b.tipo !== 'carpeta') return -1;
     if (a.tipo !== 'carpeta' && b.tipo === 'carpeta') return 1;
@@ -102,7 +93,6 @@ export default function ListaArchivos({ items, onAbrirCarpeta, onAbrirArchivo, e
 
   return (
     <div className="nube-lista">
-      {/* Encabezado de la lista */}
       <div className="nube-lista-header">
         <span className="nube-col nube-col-nombre">Nombre</span>
         <span className="nube-col nube-col-tamano">Tamano</span>
@@ -110,7 +100,6 @@ export default function ListaArchivos({ items, onAbrirCarpeta, onAbrirArchivo, e
         <span className="nube-col nube-col-accion">Accion</span>
       </div>
 
-      {/* Filas */}
       {ordenados.map(item => {
         const Icono = obtenerIcono(item);
         const esCarpeta = item.tipo === 'carpeta';
@@ -139,13 +128,11 @@ export default function ListaArchivos({ items, onAbrirCarpeta, onAbrirArchivo, e
               />
               <span className="nube-nombre-contenedor">
                 <span className="nube-nombre-texto" title={item.nombre}>{item.nombre}</span>
-                {/* En modo busqueda, mostrar la ruta completa */}
                 {enBusqueda && rutaPadre && (
                   <span className="nube-ruta-busqueda" title={item.ruta}>
                     {rutaPadre}
                   </span>
                 )}
-                {/* En modo busqueda, mostrar la extension como pista para archivos */}
                 {enBusqueda && !esCarpeta && item.extension && (
                   <span className="nube-nombre-pista">.{item.extension}</span>
                 )}

@@ -29,7 +29,7 @@ test('Gerencia tiene acceso completo a los módulos', () => {
   const user = perfil('gerencia');
 
   for (const modulo of [
-    'dashboard', 'clientes', 'equipos', 'mangas', 'servicios', 'epp',
+    'dashboard', 'clientes', 'equipos', 'mangas', 'servicios',
     'cotizaciones', 'solicitudes', 'calibraciones', 'mensajeria',
     'proveedores', 'compras', 'facturacion', 'nube', 'perfil', 'configuracion'
   ]) {
@@ -38,12 +38,11 @@ test('Gerencia tiene acceso completo a los módulos', () => {
 
   assert.equal(puede(user, 'clientes', 'delete'), true);
   assert.equal(puede(user, 'servicios', 'delete'), true);
-  assert.equal(puede(user, 'epp', 'delete'), true);
   assert.equal(puedeConfiguracion(user, 'usuarios'), true);
   assert.equal(puedeConfiguracion(user, 'logs'), true);
 });
 
-test('Administrador ve todos los módulos pero Configuración solo Correlativos', () => {
+test('Administrador ve todos los módulos pero Configuración solo Correlativos y Plantillas', () => {
   const user = perfil('administrador');
 
   assert.equal(tienePermiso(user, 'clientes'), true);
@@ -51,6 +50,7 @@ test('Administrador ve todos los módulos pero Configuración solo Correlativos'
   assert.equal(tienePermiso(user, 'calibraciones'), true);
   assert.equal(tienePermiso(user, 'configuracion'), true);
   assert.equal(puedeConfiguracion(user, 'correlativo'), true);
+  assert.equal(puedeConfiguracion(user, 'plantillas'), true);
 
   for (const seccion of ['empresa', 'pagos', 'usuarios', 'logs']) {
     assert.equal(puedeConfiguracion(user, seccion), false, `Administrador no debe acceder a Configuración/${seccion}`);
@@ -94,7 +94,7 @@ test('Marketing tiene lectura en Dashboard, Clientes y Perfil', () => {
   assert.equal(getRutaInicial(user), '/dashboard');
 });
 
-test('Jefe de Proyecto de Mina ve solo Solicitudes EPP, EPP, Nube y Perfil', () => {
+test('Jefe de Proyecto de Mina ve solo Solicitud de cotización, Nube y Perfil', () => {
   const user = perfil('jefe_proyecto_mina');
 
   assert.equal(tienePermiso(user, 'nube'), true);
@@ -103,9 +103,6 @@ test('Jefe de Proyecto de Mina ve solo Solicitudes EPP, EPP, Nube y Perfil', () 
   assert.equal(puede(user, 'solicitudes', 'create'), true);
   assert.equal(puede(user, 'solicitudes', 'update'), true);
   assert.equal(puede(user, 'solicitudes', 'delete'), false);
-  assert.equal(tienePermiso(user, 'epp'), true);
-  assert.equal(puede(user, 'epp', 'create'), false);
-  assert.equal(puede(user, 'epp', 'delete'), false);
 
   for (const modulo of [
     'dashboard', 'clientes', 'cotizaciones', 'calibraciones', 'equipos',

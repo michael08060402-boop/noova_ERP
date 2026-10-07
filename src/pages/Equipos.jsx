@@ -8,9 +8,8 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import Paginacion from '../components/Paginacion';
 import Loading from '../components/Loading';
 import '../styles/shared.css';
-import './Equipos.css';
+import '../styles/catalogo.css';
 
-// Lista de tipos predefinidos
 const TIPOS_EQUIPO = [
   'Termómetro',
   'Data Logger - °C',

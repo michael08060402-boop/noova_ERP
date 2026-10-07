@@ -87,7 +87,6 @@ body {
   min-height: 100vh;
 }
 
-/* Esquinas compartidas por todos los módulos, incluidos los de carga diferida. */
 #root :is(button, select, textarea, .nav-item,
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"])) {
   border-radius: var(--radius-md);
@@ -98,9 +97,9 @@ body {
 }
 
 #root :is(.form-card, .tarjeta-tabla, .chart-card, .dashboard-kpi,
-  .actividad-reciente, .config-seccion, .perfil-card, .venta-card,
+  .actividad-reciente, .config-seccion, .perfil-card,
   .modal, .modal-container, .confirm-dialog, .login-form-container,
-  .notifications-panel, .user-dropdown) {
+  .notifications-panel) {
   border-radius: var(--radius-xl);
 }
 
@@ -133,16 +132,23 @@ button, input, select, textarea {
   color: var(--color-gray-900);
 }
 
-/* Prevent browser autocomplete from changing input background/text color */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active,
 textarea:-webkit-autofill,
 select:-webkit-autofill {
-  -webkit-text-fill-color: #1f2937 !important;
-  -webkit-box-shadow: 0 0 0 1000px #fff inset !important;
   transition: background-color 9999s ease-in-out 0s;
+}
+
+#root input:-webkit-autofill,
+#root input:-webkit-autofill:hover,
+#root input:-webkit-autofill:focus,
+#root input:-webkit-autofill:active,
+#root textarea:-webkit-autofill,
+#root select:-webkit-autofill {
+  -webkit-text-fill-color: #1f2937;
+  -webkit-box-shadow: 0 0 0 1000px #fff inset;
 }
 
 input::placeholder,
@@ -166,29 +172,15 @@ table {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  #root *,
+  #root *::before,
+  #root *::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
   }
 }
 
-@media print {
-  .sidebar,
-  .topbar,
-  .action-buttons,
-  .btn-primary,
-  .btn-secondary {
-    display: none !important;
-  }
-  .main-wrapper {
-    margin-left: 0 !important;
-  }
-}
-
-/* GLOBAL: ensure all inputs always show dark text regardless of background */
 input[type="text"],
 input[type="email"],
 input[type="password"],

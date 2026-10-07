@@ -1,13 +1,5 @@
 const graphClient = require('./graphClient');
 
-// Proveedor de almacenamiento para OneDrive/SharePoint
-// Este módulo abstrae las llamadas a Graph API para operaciones sobre drives.
-// En el futuro se pueden agregar otros providers (Google Drive, S3, etc.)
-// sin tocar la UI ni el servicio del frontend.
-
-// Determinar el prefijo del drive según la configuración
-// GRAPH_DRIVE_TYPE: "user" | "site" | "group"
-// GRAPH_DRIVE_ID: email del usuario, ID del sitio, o ID del grupo
 function obtenerPrefijoDrive() {
   const tipo = process.env.GRAPH_DRIVE_TYPE || 'site';
   const driveId = process.env.GRAPH_DRIVE_ID;
@@ -47,8 +39,6 @@ function codificarRuta(ruta) {
   return segmentos.map(encodeURIComponent).join('/');
 }
 
-// Resuelve una carpeta lógica existente sin listar ni crear nada en la raíz
-// real del drive.
 async function obtenerCarpetaPorRuta(rutaCarpeta) {
   const prefijo = obtenerPrefijoDrive();
   const data = await graphClient.get(
@@ -74,8 +64,6 @@ async function obtenerItem(itemId) {
   });
 }
 
-// Listar contenido de una carpeta lógica ya autorizada. El provider nunca
-// interpreta null como permiso para exponer la raíz física del drive.
 async function listarCarpeta(carpetaId) {
   const prefijo = obtenerPrefijoDrive();
   const endpoint = `${prefijo}/items/${codificarItemId(carpetaId)}/children`;
@@ -88,7 +76,6 @@ async function listarCarpeta(carpetaId) {
 
   const items = await graphClient.getPaginado(endpoint, params);
 
-  // Mapear a formato estándar del módulo Nube
   return items.map(item => ({
     id: item.id,
     nombre: item.name,
@@ -101,28 +88,6 @@ async function listarCarpeta(carpetaId) {
   }));
 }
 
-// Obtener link de descarga de un archivo
-// Graph devuelve @microsoft.graph.downloadUrl con URL temporal
-async function obtenerLinkDescarga(itemId, eTag) {
-  const prefijo = obtenerPrefijoDrive();
-  const endpoint = `${prefijo}/items/${codificarItemId(itemId)}`;
-
-  const data = await graphClient.get(
-    endpoint,
-    { $select: 'id,name,@microsoft.graph.downloadUrl,size,file' },
-    eTag ? { 'If-Match': eTag } : {}
-  );
-
-  return {
-    id: data.id,
-    nombre: data.name,
-    urlDescarga: data['@microsoft.graph.downloadUrl'] || null,
-    tamaño: data.size || 0,
-    mimeType: data.file?.mimeType || null
-  };
-}
-
-// Buscar únicamente dentro de una carpeta lógica ya autorizada.
 async function buscarDocumentos(termino, carpetaRaizId) {
   const prefijo = obtenerPrefijoDrive();
   const terminoCodificado = encodeURIComponent(termino).replace(/'/g, '%27');
@@ -154,15 +119,6 @@ async function buscarDocumentos(termino, carpetaRaizId) {
   });
 }
 
-// Listar contenido de una carpeta dada por RUTA (path-based addressing).
-// Se usa para llevar a un usuario de rol restringido directo a la carpeta
-// de su área (ej. "Marketing") sin tener que listar la raíz primero.
-async function listarCarpetaPorRuta(rutaCarpeta) {
-  const carpeta = await obtenerCarpetaPorRuta(rutaCarpeta);
-  return listarCarpeta(carpeta.id);
-}
-
-// Crear una carpeta nueva dentro de un padre lógico ya autorizado.
 async function crearCarpeta(carpetaPadreId, nombre) {
   const prefijo = obtenerPrefijoDrive();
   const endpoint = `${prefijo}/items/${codificarItemId(carpetaPadreId)}/children`;
@@ -183,8 +139,6 @@ async function crearCarpeta(carpetaPadreId, nombre) {
   };
 }
 
-// Subir un archivo pequeño (< 4MB) directamente con su contenido en base64.
-// Para archivos más grandes, Graph requiere upload sessions (no soportado aún).
 const LIMITE_SUBIDA_BYTES = 4 * 1024 * 1024;
 
 async function subirArchivo(carpetaPadreId, nombre, contenidoBase64, mimeType) {
@@ -212,7 +166,6 @@ async function subirArchivo(carpetaPadreId, nombre, contenidoBase64, mimeType) {
   };
 }
 
-// Renombrar un archivo o carpeta existente
 async function renombrarItem(itemId, nuevoNombre, eTag) {
   const prefijo = obtenerPrefijoDrive();
   const data = await graphClient.patch(
@@ -223,7 +176,6 @@ async function renombrarItem(itemId, nuevoNombre, eTag) {
   return { id: data.id, nombre: data.name };
 }
 
-// Eliminar un archivo o carpeta (va a la papelera de reciclaje de OneDrive/SharePoint)
 async function eliminarItem(itemId, eTag) {
   const prefijo = obtenerPrefijoDrive();
   await graphClient.del(
@@ -233,15 +185,6 @@ async function eliminarItem(itemId, eTag) {
   return { eliminado: true };
 }
 
-// Verifica que un item (carpeta o archivo) esté dentro de la carpeta raíz
-// de un área (o sea esa misma carpeta). Se usa para que roles restringidos
-// no puedan crear, subir, renombrar ni eliminar fuera de su propia área,
-// incluso si alguien intenta llamar a la función directamente con otro ID.
-//
-// Compara por ID de carpeta, subiendo por la cadena de padres, en vez de
-// comparar el nombre/ruta como texto — el formato de `parentReference.path`
-// que devuelve Graph varía según el tipo de drive (sitio, usuario, grupo) y
-// una comparación de texto puede fallar aunque el item sí esté en el área.
 async function estaDentroDeCarpeta(itemId, carpetaRaizId) {
   const raizId = String(carpetaRaizId || '').trim();
   let actualId = String(itemId || '').trim();
@@ -265,9 +208,7 @@ async function estaDentroDeCarpeta(itemId, carpetaRaizId) {
 
 module.exports = {
   listarCarpeta,
-  obtenerLinkDescarga,
   buscarDocumentos,
-  listarCarpetaPorRuta,
   obtenerCarpetaPorRuta,
   obtenerItem,
   crearCarpeta,

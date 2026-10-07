@@ -13,12 +13,11 @@ import DashboardLayout from './layouts/DashboardLayout';
 import Dashboard from './pages/Dashboard';
 import Clientes from './pages/Clientes';
 import Cotizaciones from './pages/Cotizaciones';
-import Solicitudes from './pages/SolicitudesEPP';
+import SolicitudesCotizacion from './pages/SolicitudesCotizacion';
 import Calibraciones from './pages/Calibraciones';
 import Equipos from './pages/Equipos';
 import Mangas from './pages/Mangas';
 import Servicios from './pages/Servicios';
-import EPP from './pages/EPP';
 import Configuracion from './pages/Configuracion';
 import Perfil from './pages/Perfil';
 import Facturacion from './pages/Facturacion';
@@ -230,14 +229,9 @@ function App() {
             path="solicitudes"
             element={
               <RutaConPermiso modulo="solicitudes">
-                <Solicitudes />
+                <SolicitudesCotizacion />
               </RutaConPermiso>
             }
-          />
-
-          <Route
-            path="solicitudes-epp"
-            element={<Navigate to="/solicitudes" replace />}
           />
 
           <Route
@@ -272,15 +266,6 @@ function App() {
             element={
               <RutaConPermiso modulo="servicios">
                 <Servicios />
-              </RutaConPermiso>
-            }
-          />
-
-          <Route
-            path="epp"
-            element={
-              <RutaConPermiso modulo="epp">
-                <EPP />
               </RutaConPermiso>
             }
           />

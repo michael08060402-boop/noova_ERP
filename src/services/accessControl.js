@@ -1,7 +1,3 @@
-// Fuente única de permisos para el frontend del ERP.
-// Los permisos se derivan exclusivamente del rol. Los campos legacy
-// `permissions` y `sector` de usuarios antiguos se ignoran para autorización.
-
 export const AREAS = {
   gerencia: { label: 'Gerencia' },
   administracion: { label: 'Administración' },
@@ -13,17 +9,12 @@ export const AREAS = {
 
 const TODO = ['read', 'create', 'update', 'delete'];
 
-// Familias de COTIZACIÓN COMERCIAL. EPP se gestiona en un flujo separado
-// de Solicitudes para no mezclar cliente/precios/IGV con una solicitud
-// que NOOVA envía a proveedores.
 export const FAMILIAS_COTIZACION = [
   { key: 'equipo', label: 'Equipos' },
   { key: 'manga', label: 'Mangas' },
   { key: 'servicio', label: 'Servicios' }
 ];
 
-// Compatibilidad con registros y reglas existentes de solicitudes EPP.
-export const FAMILIA_COTIZACION_MINAS = 'epp';
 
 const PERMISOS_TOTALES = {
   dashboard: ['read'],
@@ -31,7 +22,6 @@ const PERMISOS_TOTALES = {
   equipos: TODO,
   mangas: TODO,
   servicios: TODO,
-  epp: TODO,
   cotizaciones: TODO,
   solicitudes: TODO,
   calibraciones: ['read'],
@@ -43,14 +33,6 @@ const PERMISOS_TOTALES = {
   perfil: TODO,
   configuracion: ['read', 'update']
 };
-
-export const SECCIONES_CONFIGURACION = [
-  { key: 'empresa', label: 'Empresa' },
-  { key: 'pagos', label: 'Condiciones' },
-  { key: 'correlativo', label: 'Correlativos' },
-  { key: 'usuarios', label: 'Usuarios y Roles' },
-  { key: 'logs', label: 'Auditoría' }
-];
 
 export const ROLES = {
   gerencia: {
@@ -66,7 +48,7 @@ export const ROLES = {
     label: 'Administrador',
     areaPredeterminada: 'administracion',
     permissions: { ...PERMISOS_TOTALES },
-    configuracion: ['correlativo'],
+    configuracion: ['correlativo', 'plantillas'],
     nubeCarpeta: 'NOOVA SAC',
     rutaInicial: '/dashboard'
   },
@@ -100,14 +82,11 @@ export const ROLES = {
     rutaInicial: '/dashboard'
   },
 
-  // Minas trabaja con una pantalla específica de Solicitudes.
-  // Puede leer, crear y editar; no eliminar. El catálogo EPP sigue en solo lectura.
   jefe_proyecto_mina: {
     label: 'Jefe de Proyecto de Mina',
     areaPredeterminada: 'minas',
     permissions: {
       solicitudes: ['read', 'create', 'update'],
-      epp: ['read'],
       nube: TODO,
       perfil: ['read', 'update']
     },
@@ -117,15 +96,14 @@ export const ROLES = {
   }
 };
 
-export const MODULOS = [
+const MODULOS = [
   { key: 'dashboard', label: 'Dashboard' },
   { key: 'clientes', label: 'Clientes' },
   { key: 'equipos', label: 'Equipos' },
   { key: 'mangas', label: 'Mangas' },
   { key: 'servicios', label: 'Servicios' },
-  { key: 'epp', label: 'EPP' },
   { key: 'cotizaciones', label: 'Cotizaciones' },
-  { key: 'solicitudes', label: 'Solicitudes EPP' },
+  { key: 'solicitudes', label: 'Solicitud de cotización' },
   { key: 'calibraciones', label: 'Calibraciones' },
   { key: 'mensajeria', label: 'Mensajería' },
   { key: 'proveedores', label: 'Proveedores' },
@@ -168,7 +146,7 @@ export function normalizarArea(area) {
     : '';
 }
 
-export function getDefinicionRol(profileOrRole) {
+function getDefinicionRol(profileOrRole) {
   const role = typeof profileOrRole === 'string'
     ? normalizarRol(profileOrRole)
     : normalizarRol(profileOrRole?.role);
@@ -176,7 +154,7 @@ export function getDefinicionRol(profileOrRole) {
   return ROLES[role] || null;
 }
 
-export function esUsuarioActivo(profile) {
+function esUsuarioActivo(profile) {
   return Boolean(
     profile &&
     profile.activo !== false &&
@@ -198,14 +176,6 @@ export function tienePermiso(profile, modulo) {
   return puede(profile, modulo, 'read');
 }
 
-export function getPermisosUsuario(profile) {
-  if (!esUsuarioActivo(profile)) return [];
-
-  return MODULOS
-    .map((modulo) => modulo.key)
-    .filter((modulo) => puede(profile, modulo, 'read'));
-}
-
 export function puedeConfiguracion(profile, seccion) {
   if (!puede(profile, 'configuracion', 'read')) return false;
 
@@ -218,10 +188,6 @@ export function puedeConfiguracion(profile, seccion) {
 export function puedeEditarConfiguracion(profile, seccion) {
   return puede(profile, 'configuracion', 'update')
     && puedeConfiguracion(profile, seccion);
-}
-
-export function puedeGestionarUsuarios(profile) {
-  return puedeConfiguracion(profile, 'usuarios');
 }
 
 export function getRutaInicial(profile) {
@@ -241,15 +207,6 @@ export function esRolMinas(profileOrRole) {
     ? normalizarRol(profileOrRole)
     : normalizarRol(profileOrRole?.role);
   return role === 'jefe_proyecto_mina';
-}
-
-// Se conserva por compatibilidad con componentes antiguos. En la interfaz
-// nueva, Minas crea EPP desde /solicitudes y no desde Cotizaciones.
-export function getFamiliasCotizables(profile) {
-  if (esRolMinas(profile)) {
-    return [{ key: FAMILIA_COTIZACION_MINAS, label: 'EPP' }];
-  }
-  return FAMILIAS_COTIZACION;
 }
 
 export function getCarpetaNube(profile) {

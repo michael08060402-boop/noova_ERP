@@ -4,7 +4,7 @@ import {
   FiBarChart2, FiUsers, FiFileText, FiSettings,
   FiMenu, FiLogOut, FiX, FiChevronDown, FiDollarSign, FiBell, FiTool,
   FiWind, FiMessageCircle, FiCloud, FiShoppingCart, FiTruck, FiSearch,
-  FiShield, FiBriefcase, FiClipboard, FiTarget
+  FiBriefcase, FiClipboard, FiTarget
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useCotizaciones } from '../hooks/useCotizaciones';
@@ -15,19 +15,16 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import logoBlanco from '../assets/logo-blanco.png';
 import '../styles/shared.css';
 import './DashboardLayout.css';
-import '../styles/paleta-preview.css';
-import '../styles/erp-theme.css';
 
 const ITEMS_MENU = [
   { path: '/dashboard', label: 'Dashboard', icon: <FiBarChart2 />, key: 'dashboard' },
   { path: '/clientes', label: 'Clientes', icon: <FiUsers />, key: 'clientes' },
   { path: '/cotizaciones', label: 'Cotizaciones', icon: <FiFileText />, key: 'cotizaciones' },
-  { path: '/solicitudes', label: 'Solicitudes EPP', icon: <FiClipboard />, key: 'solicitudes' },
+  { path: '/solicitudes', label: 'Solicitud de cotización', icon: <FiClipboard />, key: 'solicitudes' },
   { path: '/facturacion', label: 'Boletas / Facturas', icon: <FiDollarSign />, key: 'facturacion' },
   { path: '/equipos', label: 'Equipos', icon: <FiTool />, key: 'equipos' },
   { path: '/mangas', label: 'Mangas', icon: <FiWind />, key: 'mangas' },
   { path: '/servicios', label: 'Servicios', icon: <FiBriefcase />, key: 'servicios' },
-  { path: '/epp', label: 'EPP', icon: <FiShield />, key: 'epp' },
   { path: '/calibraciones', label: 'Calibraciones', icon: <FiTarget />, key: 'calibraciones' },
   { path: '/mensajeria', label: 'Mensajería', icon: <FiMessageCircle />, key: 'mensajeria' },
   { path: '/nube', label: 'Nube', icon: <FiCloud />, key: 'nube' },
@@ -39,15 +36,12 @@ const ITEMS_MENU = [
 const GRUPOS_MENU = [
   { id: 'comercial', label: 'COMERCIAL', keys: ['dashboard', 'clientes', 'cotizaciones', 'facturacion'] },
   { id: 'compras', label: 'COMPRAS', keys: ['solicitudes', 'proveedores', 'compras'] },
-  { id: 'catalogo', label: 'CATÁLOGO', keys: ['equipos', 'mangas', 'servicios', 'epp'] },
+  { id: 'catalogo', label: 'CATÁLOGO', keys: ['equipos', 'mangas', 'servicios'] },
   { id: 'postventa', label: 'POSTVENTA', keys: ['calibraciones'] }
 ];
 
-// Vista compacta para Minas. Nube se muestra también en el sidebar para que
-// el acceso al repositorio del proyecto sea explícito y no dependa solo del
-// icono del topbar. El atajo superior se conserva para mantener consistencia.
 const GRUPOS_MENU_MINAS = [
-  { id: 'minas', label: 'MINAS', keys: ['solicitudes', 'epp', 'nube'] }
+  { id: 'minas', label: 'MINAS', keys: ['solicitudes', 'nube'] }
 ];
 
 function useEsMobile() {
@@ -71,13 +65,8 @@ export default function DashboardLayout() {
   const puedeVerPerfil = puede(userProfile, 'perfil', 'read');
   const puedeVerConfiguracion = puede(userProfile, 'configuracion', 'read');
 
-  // Minas solo puede leer EPP por reglas de Firestore. Los demás roles
-  // generales reciben únicamente cotizaciones comerciales en este resumen.
-  const soloEppNotificaciones = esMinas || (!puedeVerCotizaciones && puedeVerSolicitudes);
-  const { cotizaciones, fetchCotizaciones } = useCotizaciones(
-    puedeVerDocumentos,
-    { soloEpp: soloEppNotificaciones, excluirEpp: !soloEppNotificaciones }
-  );
+  const soloSolicitudes = esMinas || (!puedeVerCotizaciones && puedeVerSolicitudes);
+  const { cotizaciones, fetchCotizaciones } = useCotizaciones(puedeVerDocumentos, { soloSolicitudes });
 
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -128,8 +117,6 @@ export default function DashboardLayout() {
     ? 'Área de Minas'
     : (ROLES[normalizarRol(userProfile?.role)]?.label || 'Sin rol asignado');
 
-  // La calibración próxima aplica únicamente a cotizaciones de Equipos;
-  // Minas solo ve EPP, por lo que no se calcula para ese rol.
   const calibracionesProximas = (puedeVerCotizaciones && !esMinas)
     ? obtenerCalibracionesProximas(cotizaciones)
     : [];

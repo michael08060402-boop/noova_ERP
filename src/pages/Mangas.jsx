@@ -8,12 +8,10 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import Paginacion from '../components/Paginacion';
 import Loading from '../components/Loading';
 import '../styles/shared.css';
+import '../styles/catalogo.css';
 import './Mangas.css';
 
-// Lista de tipos predefinidos de mangas de ventilación y accesorios
-// (basado en el catálogo oficial NOOVA / NOOVADUCT)
 const TIPOS_MANGA = [
-  // Mangas de ventilación
   'Manga de ventilación (Inyección)',
   'Manga de ventilación (Extracción)',
   'Espiralado',
@@ -21,15 +19,12 @@ const TIPOS_MANGA = [
   'Manga lateral derecho',
   'Codo',
   'Conector tipo Y',
-  // Accesorios
   'Accesorio de reducción',
   'Accesorio T',
-  // Materiales
   'Lona PVC 500 gr/m²',
   'Lona PVC 600 gr/m²'
 ];
 
-// Tipos de acople disponibles (según catálogo)
 const TIPOS_ACOPLAMIENTO = ['Cierre', 'Velcro'];
 
 const CATEGORIA_OTRO = '__OTRO__';
@@ -47,7 +42,6 @@ const FORMULARIO_VACIO = {
   precio: ''
 };
 
-// Unidades de medida para mangas: PZA (pieza), ML (metros lineales), Pulgadas
 const UNIDADES_MEDIDA = ['PZA.', 'ML', 'Pulgadas'];
 
 export default function Mangas() {
@@ -61,7 +55,6 @@ export default function Mangas() {
 
   function mostrarMensaje(tipo, texto) {
     setMensaje({ tipo, texto });
-    // Limpiar cualquier timeout previo para evitar que se cancele antes de tiempo
     if (window._mangaMsgTimeout) clearTimeout(window._mangaMsgTimeout);
     window._mangaMsgTimeout = setTimeout(() => setMensaje(null), 5000);
   }

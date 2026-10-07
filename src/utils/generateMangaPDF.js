@@ -24,9 +24,9 @@ const COLOR_WHITE     = [255, 255, 255];
 const COLOR_BORDER    = [222, 228, 229];
 const COLOR_LIGHT_BG  = [237, 245, 246];
 const COLOR_CARD_BG   = [242, 244, 245];
-const COLOR_DIVIDER   = [190, 205, 208]; // color del separador "|"
-const COLOR_ORANGE    = [244, 122, 0];   // color del footer
-const COLOR_LIGHT_BLUE = [70, 150, 230]; // color del correo
+const COLOR_DIVIDER   = [190, 205, 208];
+const COLOR_ORANGE    = [244, 122, 0];
+const COLOR_LIGHT_BLUE = [70, 150, 230];
 
 function etiquetaMoneda(codigo) {
   if (!codigo) return 'US$';
@@ -45,9 +45,6 @@ function formatoMonto(monto, codigoMoneda) {
   return `${etiqueta} ${numero}`;
 }
 
-// Igual que formatoMonto pero SIN el prefijo de moneda (US$ / S/), para
-// usar dentro de tablas cuyo encabezado de columna ya indica la moneda
-// — evita mostrarla duplicada (una vez en el header, otra en cada celda).
 function formatoNumero(monto, codigoMoneda) {
   const etiqueta = etiquetaMoneda(codigoMoneda);
   const locale = etiqueta === 'S/' ? 'es-PE' : 'en-US';
@@ -140,14 +137,13 @@ function drawIconBubble(doc, base64, cx, cy, r, bubbleColor = COLOR_ACCENT, icon
   drawIcon(doc, base64, cx, cy, r * iconScale);
 }
 
-// Separador vertical "|" — línea corta centrada verticalmente en su zona
 function drawDivider(doc, x, yCenter, height) {
   doc.setDrawColor(...COLOR_DIVIDER);
   doc.setLineWidth(0.4);
   doc.line(x, yCenter - height / 2, x, yCenter + height / 2);
 }
 
-export async function generateMangaPDF(cotizacion, config = {}) {
+async function generateMangaPDF(cotizacion, config = {}) {
   const doc = new jsPDF({ format: 'a4', unit: 'mm' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -193,9 +189,6 @@ export async function generateMangaPDF(cotizacion, config = {}) {
 
   const items = cotizacion.items || [];
 
-  // ============================================================
-  // 1. HEADER
-  // ============================================================
   const headerH = 26;
   const logoW = 30;
   const logoH = logoW / logoRatio;
@@ -212,7 +205,6 @@ export async function generateMangaPDF(cotizacion, config = {}) {
     doc.text('CONSULTING', margin, y + 13);
   }
 
-  // Separador "|" entre el logo y el tagline
   const dividerLogoX = margin + logoW + 5;
   drawDivider(doc, dividerLogoX, y + logoH / 2, logoH * 0.75);
 
@@ -220,8 +212,7 @@ export async function generateMangaPDF(cotizacion, config = {}) {
   doc.setFontSize(8);
   doc.setTextColor(...COLOR_MUTED);
   const taglineX = dividerLogoX + 5;
-  const taglineW = 42; // acortado
-  // Salto de línea fijo (no auto-wrap): "Ingeniería en ventilación" / resto
+  const taglineW = 42;
   const taglineLines = ['Ingeniería en ventilación', 'y bombeo con resultados reales'];
   doc.text(taglineLines, taglineX, y + logoH / 2 - (taglineLines.length - 1) * 1.8);
 
@@ -243,9 +234,6 @@ export async function generateMangaPDF(cotizacion, config = {}) {
 
   y += headerH + 3;
 
-  // ============================================================
-  // 2. TÍTULO
-  // ============================================================
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(19);
   doc.setTextColor(...COLOR_PRIMARY);
@@ -268,14 +256,6 @@ export async function generateMangaPDF(cotizacion, config = {}) {
   doc.line(margin, y, pageWidth - margin, y);
   y += 4;
 
-  // ============================================================
-  // 3. CLIENTE + COTIZACIÓN N° — CORRECCIÓN: una sola caja gris
-  // continua para ambos, separadas por una línea vertical "|"
-  // en el centro (igual que la referencia)
-  // ============================================================
-  // Alto dinámico: antes era fijo (41) y si la Dirección u otro campo se
-  // envolvía en varias líneas, el texto se salía del fondo celeste de la
-  // tarjeta. Ahora se mide el contenido real antes de dibujar el fondo.
   const colPad = 9;
   const colW = contentW / 2 - colPad - 4;
   const labelW = 22;
@@ -348,9 +328,6 @@ export async function generateMangaPDF(cotizacion, config = {}) {
 
   y = Math.max(yCli, yRight, infoBoxY + infoBoxH) + 4;
 
-  // ============================================================
-  // 4. SALUDO
-  // ============================================================
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(...COLOR_PRIMARY);
@@ -367,9 +344,6 @@ export async function generateMangaPDF(cotizacion, config = {}) {
   doc.text(saludoLines, margin, y);
   y += saludoLines.length * 3.6 + 3;
 
-  // ============================================================
-  // 5. TABLA
-  // ============================================================
   const tableHeaders = [[
     'ÍTEM',
     'CÓDIGO',
@@ -380,17 +354,12 @@ export async function generateMangaPDF(cotizacion, config = {}) {
     `TOTAL (${moneda})`,
   ]];
 
-  // Los accesorios de conexión (Codo, Conector tipo Y) se venden por pieza,
-  // no por metro lineal; el transporte es un servicio. Todos comparten la
-  // misma tabla, pero diámetro/longitud solo aplican a mangas.
   const esAccesorio = (item) => item.tipo === 'accesorio' || item.esAccesorio === true || /codo|conector\s*tipo\s*y/i.test(item.descripcion || item.nombre || '');
   const esTransporte = (item) => item.tipo === 'transporte' || /^transporte/i.test(item.descripcion || item.nombre || '');
 
   function longitudConEtiqueta(item) {
     const valor = Number(item.longitud ?? item.longitudMetros ?? item.longitud_m);
     if (isNaN(valor)) return { texto: item.longitud ? `Longitud\n${item.longitud}` : '—' };
-    // Solo 15 m y 20 m (los valores del desplegable) se consideran
-    // "longitud estándar"; el título va primero, el valor debajo.
     const esEstandar = valor === 15 || valor === 20;
     const titulo = esEstandar ? 'Longitud estándar' : 'Longitud';
     return { texto: `${titulo}\n${valor} m` };
@@ -408,7 +377,6 @@ export async function generateMangaPDF(cotizacion, config = {}) {
     }
 
     let descripcion = item.descripcion || item.nombre || (esTrans ? 'Transporte' : '');
-    // La descripción debe identificar si corresponde a Raffia o Lona PVC (solo mangas).
     if (!esAcc && !esTrans) {
       const materialRaw = String(item.material || '').toLowerCase();
       const materialLabel = materialRaw.includes('lona') ? 'Lona PVC'
@@ -478,9 +446,6 @@ export async function generateMangaPDF(cotizacion, config = {}) {
 
   y = (doc.lastAutoTable?.finalY || y) + 2.5;
 
-  // ============================================================
-  // 6. TOTALES
-  // ============================================================
   const subtotal = calcularSubtotal(items);
   const sinIGV = !!cotizacion.sinIGV;
   const igv = sinIGV ? 0 : calcularIGV(subtotal);
@@ -522,9 +487,6 @@ export async function generateMangaPDF(cotizacion, config = {}) {
   }
   y += 5;
 
-  // ============================================================
-  // 7. NOTAS
-  // ============================================================
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
   doc.setTextColor(...COLOR_PRIMARY);
@@ -545,11 +507,6 @@ export async function generateMangaPDF(cotizacion, config = {}) {
   });
   y += 3;
 
-  // ============================================================
-  // 8. CONDICIONES COMERCIALES (apartado propio, ancho completo, con
-  // icono) + CALIDAD GARANTIZADA y ENTREGA debajo, alineados a la
-  // izquierda.
-  // ============================================================
   const condicionesComerciales = [
     'Pago: Contado',
     'La cotización es válida por 5 días, pudiendo variar el precio después de la fecha estipulada',
@@ -593,7 +550,6 @@ export async function generateMangaPDF(cotizacion, config = {}) {
 
   y = condCardY + condCardH + 4;
 
-  // CALIDAD GARANTIZADA y ENTREGA — alineados a la izquierda, en fila.
   const infoCardsH = 20;
   if (y > pageHeight - infoCardsH - 40) {
     doc.addPage();
@@ -634,8 +590,6 @@ export async function generateMangaPDF(cotizacion, config = {}) {
     'Nuestras mangas cumplen con estándares internacionales y aseguran un óptimo rendimiento en condiciones exigentes.'
   );
 
-  // Si varios ítems tienen el mismo tiempo de entrega, se muestra solo uno;
-  // si difieren, se listan por ítem.
   const tiempoEntregaDefault = cotizacion.tiempoEntrega
     || (cotizacion.tiempoEntregaNumero && cotizacion.tiempoEntregaUnidad
       ? `${cotizacion.tiempoEntregaNumero} ${cotizacion.tiempoEntregaUnidad} recibida la OC`
@@ -660,9 +614,6 @@ export async function generateMangaPDF(cotizacion, config = {}) {
 
   y = infoCardsY + infoCardsH + 5;
 
-  // ============================================================
-  // 8b. CUENTA BANCARIA (Interbank)
-  // ============================================================
   {
     let interbankBase64 = null;
     try {
@@ -709,9 +660,6 @@ export async function generateMangaPDF(cotizacion, config = {}) {
     y = (doc.lastAutoTable?.finalY || y) + 5;
   }
 
-  // ============================================================
-  // 9. CIERRE
-  // ============================================================
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(...COLOR_MUTED);
@@ -722,9 +670,6 @@ export async function generateMangaPDF(cotizacion, config = {}) {
   doc.text(cierreLines, margin, y);
   y += cierreLines.length * 3.4 + 3;
 
-  // ============================================================
-  // 10. FOOTER — color naranja
-  // ============================================================
   const footerH = 20;
   const footerY = pageHeight - footerH;
 
@@ -755,7 +700,6 @@ export async function generateMangaPDF(cotizacion, config = {}) {
     const iconCx = groupX + iconR;
 
     if (i > 0) {
-      // separador "|" en color claro sobre el fondo navy, antes de cada grupo
       doc.setDrawColor(255, 255, 255);
       doc.setLineWidth(0.3);
       doc.line(groupX - 4, socialY - 4, groupX - 4, socialY + 4);

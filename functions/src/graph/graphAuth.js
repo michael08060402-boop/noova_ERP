@@ -1,16 +1,11 @@
 const axios = require('axios');
 
-// Token cacheado para evitar pedirlo en cada llamada
 let tokenCacheado = null;
 let tokenExpiracion = 0;
 
-// Obtener token de acceso con client credentials (app-only)
-// Requiere variables de entorno:
-//   GRAPH_TENANT_ID, GRAPH_CLIENT_ID, GRAPH_CLIENT_SECRET
 async function obtenerToken() {
   const ahora = Date.now();
 
-  // Reusar token si aún es válido (margen de 60 segundos)
   if (tokenCacheado && ahora < tokenExpiracion - 60000) {
     return tokenCacheado;
   }
@@ -43,7 +38,6 @@ async function obtenerToken() {
   return tokenCacheado;
 }
 
-// Limpiar caché (útil para tests o rotación de secretos)
 function limpiarCache() {
   tokenCacheado = null;
   tokenExpiracion = 0;

@@ -1,6 +1,5 @@
 import { FiChevronRight, FiHome } from 'react-icons/fi';
 
-// Breadcrumb de navegación del explorador de archivos
 export default function Breadcrumb({ ruta, onNavegar }) {
   return (
     <nav className="nube-breadcrumb">

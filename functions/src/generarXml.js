@@ -1,6 +1,5 @@
 const { create } = require('xmlbuilder2');
 
-// Códigos oficiales de SUNAT (Catálogos)
 const TIPO_DOC = { Factura: '01', Boleta: '03', 'Nota de Crédito': '07' };
 const TIPO_IGV = '10';
 const TIPO_OPERACION_POR_DEFECTO = '0101';
@@ -9,7 +8,6 @@ const COD_LOCAL_ANEXO = '0000';
 const COD_IGV = '1000';
 const MEDIO_PAGO_POR_DEFECTO = '001';
 
-// Identificador de la firma — debe coincidir con el usado en firmarXml.js
 const SIG_ID = 'IDSignNOOVA';
 
 function generarXmlUBL(factura, empresa) {
@@ -30,7 +28,6 @@ function generarXmlUBL(factura, empresa) {
         ? String(factura.cliente.razonSocial).trim() : factura.cliente?.ruc || 'CLIENTE';
     const tipoDocCliente = factura.tipo === 'Factura' ? '6' : '1';
 
-    // Parsing robusto de fecha y hora (maneja timezone y milisegundos)
     const partesFecha = String(factura.fechaEmision).split('T');
     const fechaSolo = partesFecha[0];
     const horaCruda = partesFecha[1] || '00:00:00';
@@ -50,14 +47,11 @@ function generarXmlUBL(factura, empresa) {
             'xmlns:xsi': 'http://www.w3.org/2001/XMLSchema-instance',
         });
 
-    // 0. UBLExtensions (contenedor de la firma)
     doc.ele('ext:UBLExtensions').ele('ext:UBLExtension').ele('ext:ExtensionContent').up().up().up();
 
-    // 1. Encabezado
     doc.ele('cbc:UBLVersionID').txt('2.1').up();
     doc.ele('cbc:CustomizationID').txt('2.0').up();
 
-    // ProfileID — Tipo de Operación (Catálogo 51)
     doc.ele('cbc:ProfileID', {
         schemeName: 'SUNAT:Identificador de Tipo de Operación',
         schemeAgencyName: 'PE:SUNAT',
@@ -68,7 +62,6 @@ function generarXmlUBL(factura, empresa) {
     doc.ele('cbc:IssueDate').txt(fechaSolo).up();
     doc.ele('cbc:IssueTime').txt(horaSolo).up();
 
-    // InvoiceTypeCode — Tipo de Documento (Catálogo 01)
     doc.ele('cbc:InvoiceTypeCode', {
         listID: tipoOperacion,
         name: 'Tipo de Operacion',
@@ -78,12 +71,10 @@ function generarXmlUBL(factura, empresa) {
         listURI: 'urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01'
     }).txt(tipoDocCod).up();
 
-    // Note — Leyenda con monto en letras (languageLocaleID=1000 indica "leyenda")
     const nombreMoneda = moneda === 'USD' ? 'DOLARES AMERICANOS' : 'SOLES';
     doc.ele('cbc:Note', { languageLocaleID: '1000' })
         .txt(`SON ${numeroALetras(total)} ${nombreMoneda}`).up();
 
-    // DocumentCurrencyCode — Tipo de Moneda (Catálogo 04 = ISO 4217)
     doc.ele('cbc:DocumentCurrencyCode', {
         listID: 'ISO 4217 Alpha',
         listName: 'Currency',
@@ -92,7 +83,6 @@ function generarXmlUBL(factura, empresa) {
 
     doc.ele('cbc:LineCountNumeric').txt(factura.items.length).up();
 
-    // 2. Firma (referencia al bloque Signature que se incrusta en UBLExtensions)
     doc.ele('cac:Signature')
         .ele('cbc:ID').txt(SIG_ID).up()
         .ele('cac:SignatoryParty')
@@ -104,7 +94,6 @@ function generarXmlUBL(factura, empresa) {
         .up()
     .up();
 
-    // 3. Emisor (AccountingSupplierParty)
     doc.ele('cac:AccountingSupplierParty')
         .ele('cac:Party')
             .ele('cac:PartyIdentification').ele('cbc:ID', { schemeID: '6' }).txt(empresa.ruc).up().up()
@@ -151,7 +140,6 @@ function generarXmlUBL(factura, empresa) {
         .up()
     .up();
 
-    // 4. Receptor (AccountingCustomerParty)
     doc.ele('cac:AccountingCustomerParty')
         .ele('cac:Party')
             .ele('cac:PartyIdentification').ele('cbc:ID', { schemeID: tipoDocCliente }).txt(factura.cliente.ruc).up().up()
@@ -191,7 +179,6 @@ function generarXmlUBL(factura, empresa) {
         .up()
     .up();
 
-    // 5. PaymentMeans — Medio de Pago (Catálogo 59)
     doc.ele('cac:PaymentMeans')
         .ele('cbc:PaymentMeansCode', {
             listID: 'SUNAT:Codigo de tipo de medio de pago',
@@ -201,20 +188,17 @@ function generarXmlUBL(factura, empresa) {
         }).txt(medioPago).up()
     .up();
 
-    // 5b. PaymentTerms — Forma de Pago (Contado / Credito)
     const formaPago = factura.formaPago || 'Contado';
     doc.ele('cac:PaymentTerms')
         .ele('cbc:ID').txt('FormaPago').up()
         .ele('cbc:PaymentMeansID').txt(formaPago).up();
 
-    // Si la forma de pago es a crédito, añadir monto pendiente
     if (formaPago === 'Credito') {
         const montoPendiente = parseFloat(factura.montoCredito || total).toFixed(2);
         doc.ele('cbc:Amount', { currencyID: moneda }).txt(montoPendiente).up();
     }
     doc.up();
 
-    // 6. TaxTotal (cabecera)
     doc.ele('cac:TaxTotal')
         .ele('cbc:TaxAmount', { currencyID: moneda }).txt(igv).up()
         .ele('cac:TaxSubtotal')
@@ -239,14 +223,12 @@ function generarXmlUBL(factura, empresa) {
         .up()
     .up();
 
-    // 7. LegalMonetaryTotal
     doc.ele('cac:LegalMonetaryTotal')
         .ele('cbc:LineExtensionAmount', { currencyID: moneda }).txt(subtotalSinIgv).up()
         .ele('cbc:TaxInclusiveAmount', { currencyID: moneda }).txt(total).up()
         .ele('cbc:PayableAmount', { currencyID: moneda }).txt(total).up()
     .up();
 
-    // 8. InvoiceLine
     factura.items.forEach((item, idx) => {
         const importeItem = parseFloat(item.importe || item.cantidad * item.precioUnitario).toFixed(2);
         const igvItem = (parseFloat(importeItem) * 0.18).toFixed(2);

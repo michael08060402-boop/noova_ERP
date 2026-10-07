@@ -37,7 +37,6 @@
   border: 2px solid #e5edf1;
 }
 
-/* Arc Sweep: continuo e independiente de la construcción del logo. */
 .initial-loading-arc {
   background:
     conic-gradient(
@@ -105,13 +104,9 @@
   animation-name: noova-initial-consulting;
 }
 
-/*
-  Si la carga termina cuando el loop está a mitad,
-  el fade final fuerza primero el logo ensamblado.
-*/
-.initial-loading-host-leaving .initial-loading-logo,
-.initial-loading-host-leaving .initial-loading-layer {
-  animation: none !important;
+#root .initial-loading-host-leaving .initial-loading-logo,
+#root .initial-loading-host-leaving .initial-loading-layer {
+  animation: none;
 }
 
 .initial-loading-host-leaving .initial-loading-logo {
@@ -139,14 +134,6 @@
   }
 }
 
-/*
-  UNA sola secuencia:
-  1) isotipo
-  2) NOOVA
-  3) CONSULTING
-  4) logo ensamblado
-  5) salida conjunta
-*/
 @keyframes noova-initial-logo-cycle {
   0%, 2% {
     opacity: 0;
@@ -220,20 +207,6 @@
   .initial-loading-layer {
     animation-duration: 2.4s;
   }
-}
-
-/*
-  Se conserva porque otros botones del ERP usan spinner-small.
-  Esto NO es el loader de navegación.
-*/
-.spinner-small {
-  display: inline-block;
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
 }
 
 @keyframes spin {

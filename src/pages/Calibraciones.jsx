@@ -8,10 +8,11 @@ import { calcularCalibracionAnual, diasHasta } from '../utils/calibracion';
 import { formatDate } from '../utils/formatDate';
 import Paginacion from '../components/Paginacion';
 import Modal from '../components/Modal';
+import '../styles/shared.css';
 import './Calibraciones.css';
 
 const ESTADOS = { vigente: 'Al día', proxima: 'Por vencer', vencida: 'Vencida' };
-const TIPOS_EXCLUIDOS = new Set(['servicio', 'epp', 'manga']);
+const TIPOS_EXCLUIDOS = new Set(['servicio', 'manga']);
 
 export default function Calibraciones() {
   const { cotizaciones, loading, error, fetchCotizaciones } = useCotizaciones();

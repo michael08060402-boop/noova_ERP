@@ -4,6 +4,7 @@ import {
   FiHome,
   FiCreditCard,
   FiHash,
+  FiLayers,
   FiShield,
   FiUsers,
   FiX,
@@ -23,6 +24,7 @@ import {
 } from '../services/userService';
 import Usuarios from './Usuarios';
 import Perfil from './Perfil';
+import PlantillasSolicitud from './PlantillasSolicitud';
 import Modal from '../components/Modal';
 import Loading from '../components/Loading';
 import Paginacion from '../components/Paginacion';
@@ -56,12 +58,14 @@ export default function Configuracion() {
   const puedeCorrelativo = puedeConfiguracion(userProfile, 'correlativo');
   const puedeUsuarios = puedeConfiguracion(userProfile, 'usuarios');
   const puedeLogs = puedeConfiguracion(userProfile, 'logs');
+  const puedePlantillas = puedeConfiguracion(userProfile, 'plantillas');
   const puedePerfil = puede(userProfile, 'perfil', 'read');
   const tieneSeccionesConfiguracion = puedeEmpresa
     || puedePagos
     || puedeCorrelativo
     || puedeUsuarios
-    || puedeLogs;
+    || puedeLogs
+    || puedePlantillas;
 
   const puedeEditarEmpresa = puedeEditarConfiguracion(userProfile, 'empresa');
   const puedeEditarPagos = puedeEditarConfiguracion(userProfile, 'pagos');
@@ -78,7 +82,7 @@ export default function Configuracion() {
     const tab = searchParams.get('tab');
     if (
       tab
-      && ['empresa', 'pagos', 'correlativo', 'usuarios', 'logs', 'perfil'].includes(tab)
+      && ['empresa', 'pagos', 'correlativo', 'plantillas', 'usuarios', 'logs', 'perfil'].includes(tab)
     ) {
       setPestanaActiva(tab);
     }
@@ -150,8 +154,6 @@ export default function Configuracion() {
     setMensaje(null);
 
     try {
-      // Se guarda únicamente la sección visible. Esto permite que Firestore
-      // compruebe de verdad que Administrador solo modifica correlativos.
       await updateConfig(payload);
 
       setMensaje({
@@ -297,12 +299,13 @@ export default function Configuracion() {
     if (puedeEmpresa) disponibles.push({ id: 'empresa', label: 'Empresa', icon: <FiHome /> });
     if (puedePagos) disponibles.push({ id: 'pagos', label: 'Condiciones', icon: <FiCreditCard /> });
     if (puedeCorrelativo) disponibles.push({ id: 'correlativo', label: 'Correlativos', icon: <FiHash /> });
+    if (puedePlantillas) disponibles.push({ id: 'plantillas', label: 'Plantillas', icon: <FiLayers /> });
     if (puedeUsuarios) disponibles.push({ id: 'usuarios', label: 'Usuarios y Roles', icon: <FiUsers /> });
     if (puedeLogs) disponibles.push({ id: 'logs', label: 'Auditoría', icon: <FiShield /> });
     if (puedePerfil) disponibles.push({ id: 'perfil', label: 'Mi Perfil', icon: <FiUser /> });
 
     return disponibles;
-  }, [puedeEmpresa, puedePagos, puedeCorrelativo, puedeUsuarios, puedeLogs, puedePerfil]);
+  }, [puedeEmpresa, puedePagos, puedeCorrelativo, puedePlantillas, puedeUsuarios, puedeLogs, puedePerfil]);
 
   useEffect(() => {
     if (
@@ -867,6 +870,12 @@ export default function Configuracion() {
                 </>
               )}
 
+            </div>
+          )}
+
+          {pestanaActiva === 'plantillas' && puedePlantillas && (
+            <div className="config-seccion">
+              <PlantillasSolicitud puedeEditar={puedeEditarConfiguracion(userProfile, 'plantillas')} />
             </div>
           )}
 

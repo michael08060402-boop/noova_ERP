@@ -1,53 +1,38 @@
 import { db } from '../firebase/config';
-import { deleteField, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { deleteField, doc, getDoc, updateDoc } from 'firebase/firestore';
 import {
   AREAS,
   ROLES,
-  MODULOS,
-  SECCIONES_CONFIGURACION,
   FAMILIAS_COTIZACION,
-  FAMILIA_COTIZACION_MINAS,
   normalizarRol,
   normalizarArea,
   esRolValido,
-  esUsuarioActivo,
   puede,
   tienePermiso,
-  getPermisosUsuario,
   puedeConfiguracion,
   puedeEditarConfiguracion,
-  puedeGestionarUsuarios,
   getRutaInicial,
   getCarpetaNube,
   getAreaPredeterminada,
   getNombreArea,
-  esRolMinas,
-  getFamiliasCotizables
+  esRolMinas
 } from './accessControl';
 
 export {
   AREAS,
   ROLES,
-  MODULOS,
-  SECCIONES_CONFIGURACION,
   FAMILIAS_COTIZACION,
-  FAMILIA_COTIZACION_MINAS,
   normalizarRol,
   normalizarArea,
   esRolValido,
-  esUsuarioActivo,
   puede,
   tienePermiso,
-  getPermisosUsuario,
   puedeConfiguracion,
   puedeEditarConfiguracion,
-  puedeGestionarUsuarios,
   getRutaInicial,
   getCarpetaNube,
   getAreaPredeterminada,
-  getNombreArea,
-  esRolMinas,
-  getFamiliasCotizables
+  esRolMinas
 };
 
 const COLECCION = 'users';
@@ -83,34 +68,10 @@ export async function getUserProfile(uid) {
   };
 }
 
-export async function createUserProfile(uid, data = {}) {
-  const role = normalizarRol(data.role);
-  if (!esRolValido(role)) throw new Error('El rol seleccionado no es válido');
-  const area = getAreaPredeterminada(role);
-
-  const perfil = {
-    ...PERFIL_DEFECTO,
-    ...data,
-    role,
-    area,
-    sector: getNombreArea(area),
-    email: data.email || '',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-
-  // `permissions` ya no se persiste como fuente de autorización.
-  delete perfil.permissions;
-
-  await setDoc(doc(db, COLECCION, uid), perfil);
-  return { uid, ...perfil };
-}
-
 export async function updateUserProfile(uid, data) {
   const docRef = doc(db, COLECCION, uid);
   const payload = { ...data, updatedAt: new Date().toISOString() };
 
-  // Evita volver a introducir permisos planos legacy desde formularios viejos.
   delete payload.permissions;
 
   if ('role' in payload) payload.role = normalizarRol(payload.role);

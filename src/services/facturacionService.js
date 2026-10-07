@@ -18,16 +18,6 @@ export async function getFacturas() {
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 }
 
-export async function getFacturaById(id) {
-  const docRef = doc(db, COLECCION, id);
-  const snapshot = await getDoc(docRef);
-  if (snapshot.exists()) return { id: snapshot.id, ...snapshot.data() };
-  return null;
-}
-
-// Crea la factura en Firestore, la envía a SUNAT vía Cloud Function y retorna
-// el resultado (aceptado, rechazado o error). Si SUNAT rechaza, el documento
-// queda guardado con estado ERROR para permitir reintentos.
 export async function crearFacturaDesdeCotizacion(cotizacion, facturaData, datosEmpresa) {
   if (!datosEmpresa || !datosEmpresa.ruc) {
     throw new Error('Faltan datos de la empresa (ruc). Verifica que ConfigContext tenga el campo "empresa".');
@@ -68,8 +58,6 @@ export async function crearFacturaDesdeCotizacion(cotizacion, facturaData, datos
   } catch (err) {
     console.error('Error en el proceso de facturación:', err);
 
-    // Si el documento se creó pero falló el envío a SUNAT, marcarlo como ERROR
-    // para que el frontend pueda mostrar el motivo y permitir reintentar.
     if (docRef) {
       try {
         await updateDoc(doc(db, COLECCION, docRef.id), {

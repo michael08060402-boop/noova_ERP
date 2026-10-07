@@ -1,14 +1,14 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { initializeApp, getApps } = require('firebase-admin/app');
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getFirestore } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
 const { generarXmlUBL, SIG_ID } = require('./src/generarXml');
 const { firmarXml } = require('./src/firmarXml');
 const { enviarASunat } = require('./src/sunatClient');
 const { validarRuc, consultarRucCompleto } = require('./src/consultarRuc');
 const {
-  listarCarpeta, obtenerLinkDescarga,
+  listarCarpeta,
   obtenerCarpetaPorRuta, obtenerItem, crearCarpeta, subirArchivo,
   renombrarItem, eliminarItem, estaDentroDeCarpeta, buscarDocumentos
 } = require('./src/graph/graphDriveProvider');
@@ -20,7 +20,6 @@ const {
   getCarpetaNubePerfil,
   crearAccessControl
 } = require('./src/accessControl');
-const { enviarCorreo } = require('./src/graph/graphMailProvider');
 const AdmZip = require('adm-zip');
 
 const TIPO_DOC_COD = { 'Factura': '01', 'Boleta': '03', 'Nota de Crédito': '07' };
@@ -33,7 +32,6 @@ const db = getFirestore();
 const {
   obtenerPerfilActivo,
   exigirPermiso,
-  exigirAlgunoPermisos,
   exigirSeccionConfiguracion
 } = crearAccessControl(db);
 
@@ -79,368 +77,6 @@ exports.logsCrear = onCall(
   }
 );
 
-function normalizarItemsCompra(items) {
-  if (!Array.isArray(items) || items.length < 1 || items.length > 100) {
-    throw new HttpsError('invalid-argument', 'La orden debe contener entre 1 y 100 ítems');
-  }
-  return items.map((item, index) => {
-    const cantidad = Number(item.cantidad);
-    const precioUnitario = Number(item.precioUnitario);
-    const descripcion = textoSeguro(item.descripcion, 500);
-    if (!descripcion || !Number.isFinite(cantidad) || cantidad <= 0 || !Number.isFinite(precioUnitario) || precioUnitario < 0) {
-      throw new HttpsError('invalid-argument', `El ítem ${index + 1} tiene datos inválidos`);
-    }
-    return {
-      codigo: textoSeguro(item.codigo, 60),
-      descripcion,
-      unidadMedida: textoSeguro(item.unidadMedida || 'UND.', 20),
-      cantidad,
-      precioUnitario,
-      total: Math.round((cantidad * precioUnitario + Number.EPSILON) * 100) / 100
-    };
-  });
-}
-
-function construirCodigo(prefijo, numero, longitud) {
-  const limpio = textoSeguro(prefijo || '', 8).toUpperCase().replace(/[^A-Z0-9-]/g, '');
-  return `${limpio}${String(numero).padStart(longitud, '0')}`;
-}
-
-async function crearDocumentoCorrelativo({ request, coleccion, campoConfig, permiso, defaults, prepararDatos }) {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
-  const perfil = await exigirPermiso(request.auth.uid, permiso);
-  const configRef = db.collection('configuracion').doc('general');
-
-  return db.runTransaction(async (transaction) => {
-    const configSnapshot = await transaction.get(configRef);
-    const configGeneral = configSnapshot.exists ? configSnapshot.data() : {};
-    const correlativo = { ...defaults, ...(configGeneral[campoConfig] || {}) };
-    const prefijo = textoSeguro(correlativo.prefijo || defaults.prefijo, 8).toUpperCase();
-    const longitud = Math.min(12, Math.max(1, Number(correlativo.longitud || defaults.longitud)));
-    let numero = Math.max(1, Math.trunc(Number(correlativo.proximoNumero || defaults.proximoNumero)));
-    let codigo;
-    let documentoRef;
-
-    for (let intentos = 0; intentos < 100; intentos += 1) {
-      codigo = construirCodigo(prefijo, numero, longitud);
-      documentoRef = db.collection(coleccion).doc(codigo);
-      const existente = await transaction.get(documentoRef);
-      const codigoExistente = await transaction.get(db.collection(coleccion).where('codigo', '==', codigo).limit(1));
-      if (!existente.exists && codigoExistente.empty) break;
-      numero += 1;
-      documentoRef = null;
-    }
-    if (!documentoRef) throw new HttpsError('resource-exhausted', 'No se pudo reservar un correlativo único');
-
-    const ahora = new Date().toISOString();
-    const datos = await prepararDatos({ data: request.data || {}, transaction, db, perfil });
-    transaction.create(documentoRef, {
-      ...datos,
-      codigo,
-      creadoPorUid: request.auth.uid,
-      creadoPorNombre: perfil.nombre || request.auth.token?.email || request.auth.uid,
-      createdAt: ahora,
-      updatedAt: ahora
-    });
-    transaction.set(configRef, {
-      [campoConfig]: {
-        ...correlativo,
-        prefijo,
-        longitud,
-        ultimoCorrelativo: codigo,
-        proximoNumero: numero + 1
-      },
-      updatedAt: ahora
-    }, { merge: true });
-    return { id: documentoRef.id, codigo };
-  });
-}
-
-exports.cotizacionCrear = onCall(
-  { region: 'us-central1', timeoutSeconds: 30, memory: '256MiB' },
-  async (request) => crearDocumentoCorrelativo({
-    request,
-    coleccion: 'cotizaciones',
-    campoConfig: 'cotizacion',
-    permiso: 'cotizaciones',
-    defaults: { prefijo: 'NV', longitud: 7, proximoNumero: 1000001 },
-    prepararDatos: async ({ data, perfil }) => {
-      if (!Array.isArray(data.items) || !data.items.length) {
-        throw new HttpsError('invalid-argument', 'La cotización debe contener al menos un ítem');
-      }
-      // El rol Jefe de Proyecto de Mina solo puede crear cotizaciones de la
-      // familia EPP. Se valida en backend además de en las reglas de Firestore.
-      if (normalizarRol(perfil?.role) === 'jefe_proyecto_mina' && data.tipoItem !== 'epp') {
-        throw new HttpsError(
-          'permission-denied',
-          'Tu rol solo puede crear cotizaciones de la familia EPP'
-        );
-      }
-      return data;
-    }
-  })
-);
-
-exports.ordenCompraCrear = onCall(
-  { region: 'us-central1', timeoutSeconds: 30, memory: '256MiB' },
-  async (request) => crearDocumentoCorrelativo({
-    request,
-    coleccion: 'ordenesCompra',
-    campoConfig: 'ordenCompra',
-    permiso: 'compras',
-    defaults: { prefijo: 'OC', longitud: 6, proximoNumero: 100111 },
-    prepararDatos: async ({ data, transaction, db }) => {
-      const proveedorId = textoSeguro(data.proveedorId, 150);
-      if (!proveedorId) {
-        throw new HttpsError('invalid-argument', 'Selecciona un proveedor registrado');
-      }
-      const proveedorSnapshot = await transaction.get(db.collection('proveedores').doc(proveedorId));
-      if (!proveedorSnapshot.exists) {
-        throw new HttpsError('not-found', 'El proveedor seleccionado ya no existe');
-      }
-      const proveedor = proveedorSnapshot.data();
-      if (proveedor.activo === false) {
-        throw new HttpsError('failed-precondition', 'El proveedor seleccionado está inactivo');
-      }
-      if (!data.fecha || !textoSeguro(data.formaPago, 120) || !textoSeguro(data.lugarEntrega, 300)) {
-        throw new HttpsError('invalid-argument', 'Fecha, forma de pago y lugar de entrega son requeridos');
-      }
-      if (data.origenCotizacionId) {
-        const cotizacion = await transaction.get(db.collection('cotizaciones').doc(data.origenCotizacionId));
-        if (!cotizacion.exists) throw new HttpsError('not-found', 'La cotización de origen no existe');
-        const ordenExistente = await transaction.get(
-          db.collection('ordenesCompra').where('origenCotizacionId', '==', data.origenCotizacionId).limit(1)
-        );
-        if (!ordenExistente.empty) {
-          throw new HttpsError('already-exists', 'Esta cotización ya tiene una orden de compra vinculada');
-        }
-      }
-      const items = normalizarItemsCompra(data.items);
-      const subtotal = Math.round(items.reduce((suma, item) => suma + item.total, 0) * 100) / 100;
-      const aplicaIgv = data.aplicaIgv !== false;
-      const igv = aplicaIgv ? Math.round(subtotal * 18) / 100 : 0;
-      const total = Math.round((subtotal + igv) * 100) / 100;
-      return {
-        fecha: textoSeguro(data.fecha, 10),
-        proveedorId,
-        proveedor: {
-          razonSocial: textoSeguro(proveedor.razonSocial, 180),
-          ruc: textoSeguro(proveedor.ruc, 20),
-          contacto: textoSeguro(proveedor.contacto, 120),
-          direccion: textoSeguro(proveedor.direccion, 300),
-          telefono: textoSeguro(proveedor.telefono, 30),
-          email: textoSeguro(proveedor.email, 160)
-        },
-        moneda: data.moneda === 'S/' ? 'S/' : 'US$',
-        formaPago: textoSeguro(data.formaPago, 120),
-        lugarEntrega: textoSeguro(data.lugarEntrega, 300),
-        referencia: textoSeguro(data.referencia, 160),
-        observaciones: textoSeguro(data.observaciones, 500),
-        aplicaIgv,
-        estado: data.estado === 'Borrador' ? 'Borrador' : 'Emitida',
-        items,
-        subtotal,
-        igv,
-        total,
-        origenCotizacionId: data.origenCotizacionId || null,
-        origenCotizacionCodigo: textoSeguro(data.origenCotizacionCodigo, 40) || null,
-        elaboradoPor: textoSeguro(data.elaboradoPor, 140),
-        cargoElaborador: textoSeguro(data.cargoElaborador, 100),
-        autorizadoPor: textoSeguro(data.autorizadoPor, 140),
-        cargoAutorizador: textoSeguro(data.cargoAutorizador, 100)
-      };
-    }
-  })
-);
-
-
-function normalizarProveedorCompra(proveedor = {}) {
-  const razonSocial = textoSeguro(proveedor.razonSocial, 180);
-  if (!razonSocial) throw new HttpsError('invalid-argument', 'El proveedor es requerido');
-  return {
-    razonSocial,
-    ruc: textoSeguro(proveedor.ruc, 20),
-    contacto: textoSeguro(proveedor.contacto, 120),
-    direccion: textoSeguro(proveedor.direccion, 300),
-    telefono: textoSeguro(proveedor.telefono || proveedor.celular, 30),
-    email: textoSeguro(proveedor.email, 160)
-  };
-}
-
-function normalizarOrdenCompraEditable(data = {}) {
-  if (!data.fecha || !textoSeguro(data.formaPago, 120) || !textoSeguro(data.lugarEntrega, 300)) {
-    throw new HttpsError('invalid-argument', 'Fecha, forma de pago y lugar de entrega son requeridos');
-  }
-  const proveedor = normalizarProveedorCompra(data.proveedor || {});
-  const items = normalizarItemsCompra(data.items);
-  const subtotal = Math.round(items.reduce((suma, item) => suma + item.total, 0) * 100) / 100;
-  const aplicaIgv = data.aplicaIgv !== false;
-  const igv = aplicaIgv ? Math.round(subtotal * 18) / 100 : 0;
-  const total = Math.round((subtotal + igv) * 100) / 100;
-  return {
-    fecha: textoSeguro(data.fecha, 10),
-    proveedorId: textoSeguro(data.proveedorId, 150),
-    proveedor,
-    moneda: data.moneda === 'S/' ? 'S/' : 'US$',
-    formaPago: textoSeguro(data.formaPago, 120),
-    lugarEntrega: textoSeguro(data.lugarEntrega, 300),
-    referencia: textoSeguro(data.referencia, 160),
-    observaciones: textoSeguro(data.observaciones, 500),
-    aplicaIgv,
-    estado: data.estado === 'Borrador' ? 'Borrador' : 'Emitida',
-    items,
-    subtotal,
-    igv,
-    total,
-    elaboradoPor: textoSeguro(data.elaboradoPor, 140),
-    cargoElaborador: textoSeguro(data.cargoElaborador, 100),
-    autorizadoPor: textoSeguro(data.autorizadoPor, 140),
-    cargoAutorizador: textoSeguro(data.cargoAutorizador, 100)
-  };
-}
-
-// Las lecturas y mutaciones de Compras pasan por Functions para que la UX no
-// dependa de que unas reglas Firestore antiguas sigan desplegadas. La Function
-// vuelve a validar el permiso con el perfil real del usuario antes de usar Admin SDK.
-exports.ordenesCompraListar = onCall(
-  { region: 'us-central1', timeoutSeconds: 20, memory: '256MiB' },
-  async (request) => {
-    if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
-    await exigirPermiso(request.auth.uid, 'compras');
-    const snap = await db.collection('ordenesCompra').orderBy('createdAt', 'desc').get();
-    return { ordenes: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) };
-  }
-);
-
-exports.ordenCompraActualizar = onCall(
-  { region: 'us-central1', timeoutSeconds: 20, memory: '256MiB' },
-  async (request) => {
-    if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
-    await exigirPermiso(request.auth.uid, 'compras');
-    const { id, orden } = request.data || {};
-    if (!id || !orden) throw new HttpsError('invalid-argument', 'id y orden son requeridos');
-    const ref = db.collection('ordenesCompra').doc(String(id));
-    const actual = await ref.get();
-    if (!actual.exists) throw new HttpsError('not-found', 'La orden de compra no existe');
-    const proveedorId = textoSeguro(orden.proveedorId, 150);
-    if (!proveedorId) throw new HttpsError('invalid-argument', 'Selecciona un proveedor registrado');
-    const proveedorSnapshot = await db.collection('proveedores').doc(proveedorId).get();
-    if (!proveedorSnapshot.exists) throw new HttpsError('not-found', 'El proveedor seleccionado ya no existe');
-    const proveedor = proveedorSnapshot.data();
-    if (proveedor.activo === false && actual.data().proveedorId !== proveedorId) {
-      throw new HttpsError('failed-precondition', 'No puedes cambiar la orden a un proveedor inactivo');
-    }
-    const editable = normalizarOrdenCompraEditable({ ...orden, proveedorId, proveedor });
-    await ref.update({ ...editable, updatedAt: new Date().toISOString() });
-    return { actualizado: true };
-  }
-);
-
-exports.ordenCompraEliminar = onCall(
-  { region: 'us-central1', timeoutSeconds: 20, memory: '256MiB' },
-  async (request) => {
-    if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
-    await exigirPermiso(request.auth.uid, 'compras');
-    const { id } = request.data || {};
-    if (!id) throw new HttpsError('invalid-argument', 'id es requerido');
-    const ref = db.collection('ordenesCompra').doc(String(id));
-    const actual = await ref.get();
-    if (!actual.exists) throw new HttpsError('not-found', 'La orden de compra no existe');
-    if (actual.data().estado !== 'Borrador') {
-      throw new HttpsError('failed-precondition', 'Solo se pueden eliminar órdenes en borrador');
-    }
-    await ref.delete();
-    return { eliminado: true };
-  }
-);
-
-const PROVEEDOR_DEMO_ID = 'instruments-labs-testo-demo';
-const PROVEEDOR_DEMO = {
-  razonSocial: 'INSTRUMENTS LABS / TESTO (DEMO)',
-  ruc: '',
-  contacto: 'Completar datos reales',
-  direccion: '',
-  telefono: '',
-  email: '',
-  activo: true,
-  esDemo: true,
-  notaInterna: 'Proveedor inicial de prueba. Editar con los datos comerciales reales antes de emitir una OC definitiva.'
-};
-
-async function asegurarProveedorDemo(db) {
-  const ref = db.collection('proveedores').doc(PROVEEDOR_DEMO_ID);
-  const existente = await ref.get();
-  if (existente.exists) return;
-  const ahora = new Date().toISOString();
-  await ref.set({ ...PROVEEDOR_DEMO, createdAt: ahora, updatedAt: ahora });
-}
-
-function normalizarProveedorMaestro(data = {}) {
-  const proveedor = normalizarProveedorCompra(data);
-  return {
-    ...proveedor,
-    activo: data.activo !== false,
-    notaInterna: textoSeguro(data.notaInterna, 500),
-    esDemo: data.esDemo === true
-  };
-}
-
-exports.proveedoresListar = onCall(
-  { region: 'us-central1', timeoutSeconds: 20, memory: '256MiB' },
-  async (request) => {
-    if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
-    await exigirAlgunoPermisos(request.auth.uid, ['proveedores', 'compras']);
-      await asegurarProveedorDemo(db);
-    const snap = await db.collection('proveedores').orderBy('razonSocial', 'asc').get();
-    return { proveedores: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) };
-  }
-);
-
-exports.proveedorCrear = onCall(
-  { region: 'us-central1', timeoutSeconds: 20, memory: '256MiB' },
-  async (request) => {
-    if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
-    await exigirPermiso(request.auth.uid, 'proveedores');
-    const proveedor = normalizarProveedorMaestro(request.data?.proveedor || {});
-    const ahora = new Date().toISOString();
-    const ref = await db.collection('proveedores').add({ ...proveedor, esDemo: false, createdAt: ahora, updatedAt: ahora });
-    return { id: ref.id };
-  }
-);
-
-exports.proveedorActualizar = onCall(
-  { region: 'us-central1', timeoutSeconds: 20, memory: '256MiB' },
-  async (request) => {
-    if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
-    await exigirPermiso(request.auth.uid, 'proveedores');
-    const { id, proveedor: proveedorEntrada } = request.data || {};
-    if (!id) throw new HttpsError('invalid-argument', 'id es requerido');
-    const proveedor = normalizarProveedorMaestro(proveedorEntrada || {});
-    const ref = db.collection('proveedores').doc(String(id));
-    const snap = await ref.get();
-    if (!snap.exists) throw new HttpsError('not-found', 'El proveedor no existe');
-    await ref.update({ ...proveedor, esDemo: false, updatedAt: new Date().toISOString() });
-    return { actualizado: true };
-  }
-);
-
-exports.proveedorEliminar = onCall(
-  { region: 'us-central1', timeoutSeconds: 20, memory: '256MiB' },
-  async (request) => {
-    if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
-    await exigirPermiso(request.auth.uid, 'proveedores');
-    const { id } = request.data || {};
-    if (!id) throw new HttpsError('invalid-argument', 'id es requerido');
-      const usado = await db.collection('ordenesCompra').where('proveedorId', '==', String(id)).limit(1).get();
-    if (!usado.empty) throw new HttpsError('failed-precondition', 'No se puede eliminar un proveedor que ya está asociado a una orden de compra');
-    await db.collection('proveedores').doc(String(id)).delete();
-    return { eliminado: true };
-  }
-);
-
-// Genera un comprobante electrónico: crea el XML UBL 2.1, lo firma con el
-// certificado digital, lo empaqueta en ZIP y lo envía a SUNAT. El resultado
-// (aceptado, rechazado o error) se guarda en Firestore.
 exports.emitirComprobante = onCall(
   {
     region: 'us-central1',
@@ -481,7 +117,6 @@ exports.emitirComprobante = onCall(
     });
 
       try {
-      // 1. Generar XML UBL 2.1
       console.log('Generando XML...');
       const facturaConOperacion = {
         ...facturaData,
@@ -490,7 +125,6 @@ exports.emitirComprobante = onCall(
       const xmlString = generarXmlUBL(facturaConOperacion, empresaData);
       console.log('XML generado (longitud):', xmlString.length);
 
-      // 2. Firmar XML con el certificado digital (o simular en modo pruebas)
       const simulate = process.env.SUNAT_SIMULATE === 'true';
       let xmlFirmado;
       if (simulate) {
@@ -508,23 +142,19 @@ exports.emitirComprobante = onCall(
         console.log('XML firmado (longitud):', xmlFirmado.length);
       }
 
-      // 3. Construir nombre de archivo SUNAT: RUC-TIPODOC-SERIE-NUMERO
       const tipoDocCod = TIPO_DOC_COD[facturaData.tipo] || '01';
       const esFactura = tipoDocCod === '01';
       const nombreArchivo = `${empresaData.ruc}-${tipoDocCod}-${facturaData.serie}-${facturaData.numero}`;
       console.log('Nombre archivo:', nombreArchivo);
 
-      // 4. Crear ZIP (SUNAT exige un único XML dentro del ZIP)
       const zipBuffer = crearZip(xmlFirmado, `${nombreArchivo}.xml`);
       console.log('ZIP creado (tamaño en bytes):', zipBuffer.length);
 
-      // 5. Enviar a SUNAT (beta o producción)
       const esBeta = process.env.SUNAT_ENV !== 'produccion';
       console.log(`${simulate ? 'SIMULANDO envío a' : 'Enviando a'} SUNAT ${esBeta ? 'BETA' : 'PRODUCCIÓN'}...`);
       const respuestaSunat = await enviarASunat(zipBuffer, nombreArchivo, empresaData.ruc, esBeta, esFactura, simulate);
       console.log('Respuesta SUNAT:', JSON.stringify(respuestaSunat));
 
-      // 6. Guardar resultado en Firestore
       await db.collection('facturacion').doc(facturaId).set({
         ...facturaData,
         estadoSunat: respuestaSunat.estado,
@@ -542,7 +172,6 @@ exports.emitirComprobante = onCall(
         mensaje: respuestaSunat.mensaje,
         codigo: respuestaSunat.codigo,
       };
-
     } catch (err) {
       console.error('Error en emitirComprobante:', err);
 
@@ -566,9 +195,6 @@ function crearZip(xmlFirmado, nombreArchivoXml) {
   return zip.toBuffer();
 }
 
-// Consulta de RUC con cache permanente en Firestore + api.apis.net.pe.
-// Si la API cae y el RUC no está en cache, el frontend muestra mensaje de
-// "servicios fuera de línea" y el usuario ingresa datos manualmente.
 exports.consultarRuc = onCall(
   {
     region: 'us-central1',
@@ -637,13 +263,6 @@ function convertirErrorGraph(err, fallback) {
   return new HttpsError('internal', `${fallback}: ${detalle}`);
 }
 
-// ── MÓDULO NUBE ──
-// Funciones para acceder a OneDrive/SharePoint via Microsoft Graph API.
-// Usan client credentials (app-only) — no requieren que el usuario
-// tenga sesión Microsoft, solo Firebase Auth.
-
-// Listar carpetas y archivos. null siempre significa la raíz lógica asignada
-// por rol; nunca la raíz física del drive.
 exports.nubeListarCarpeta = onCall(
   {
     region: 'us-central1',
@@ -675,39 +294,6 @@ exports.nubeListarCarpeta = onCall(
   }
 );
 
-// Obtener link de descarga temporal de un archivo
-exports.nubeObtenerLinkDescarga = onCall(
-  {
-    region: 'us-central1',
-    timeoutSeconds: 15,
-    memory: '128MiB',
-    secrets: ['GRAPH_TENANT_ID', 'GRAPH_CLIENT_ID', 'GRAPH_CLIENT_SECRET', 'GRAPH_DRIVE_TYPE', 'GRAPH_DRIVE_ID'],
-  },
-  async (request) => {
-    if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'No autenticado');
-    }
-    const { itemId } = request.data || {};
-
-    if (!itemId) {
-      throw new HttpsError('invalid-argument', 'itemId es requerido');
-    }
-
-    try {
-      const contexto = await obtenerContextoNube(request.auth.uid);
-      await verificarAccesoNube(contexto, itemId);
-      const itemActual = await obtenerItem(itemId);
-      await verificarAccesoNube(contexto, itemActual.id);
-      const resultado = await obtenerLinkDescarga(itemActual.id, itemActual.eTag);
-      return resultado;
-    } catch (err) {
-      console.error('Error en nubeObtenerLinkDescarga:', err.message);
-      throw convertirErrorGraph(err, 'Error obteniendo link de descarga');
-    }
-  }
-);
-
-// ── Nube: control de acceso por rol ──
 const GRAPH_SECRETS_NUBE = ['GRAPH_TENANT_ID', 'GRAPH_CLIENT_ID', 'GRAPH_CLIENT_SECRET', 'GRAPH_DRIVE_TYPE', 'GRAPH_DRIVE_ID'];
 const RUTA_CONFIDENCIAL = 'NOOVA SAC/09. CONFIDENCIAL';
 const ROLES_NUBE_RESTRINGIDA = new Set([
@@ -827,7 +413,6 @@ async function asegurarResultadoAutorizado(contexto, item) {
   }
 }
 
-// Buscar documentos dentro de la raíz lógica asignada al rol.
 exports.nubeBuscarDocumentos = onCall(
   { region: 'us-central1', timeoutSeconds: 60, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
   async (request) => {
@@ -873,7 +458,6 @@ exports.nubeObtenerContexto = onCall(
   }
 );
 
-// Crear carpeta
 exports.nubeCrearCarpeta = onCall(
   { region: 'us-central1', timeoutSeconds: 20, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
   async (request) => {
@@ -895,7 +479,6 @@ exports.nubeCrearCarpeta = onCall(
   }
 );
 
-// Subir archivo (< 4MB, subida directa en base64)
 exports.nubeSubirArchivo = onCall(
   { region: 'us-central1', timeoutSeconds: 60, memory: '512MiB', secrets: GRAPH_SECRETS_NUBE },
   async (request) => {
@@ -918,7 +501,6 @@ exports.nubeSubirArchivo = onCall(
   }
 );
 
-// Renombrar carpeta o archivo
 exports.nubeRenombrarItem = onCall(
   { region: 'us-central1', timeoutSeconds: 20, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
   async (request) => {
@@ -947,7 +529,6 @@ exports.nubeRenombrarItem = onCall(
   }
 );
 
-// Eliminar carpeta o archivo
 exports.nubeEliminarItem = onCall(
   { region: 'us-central1', timeoutSeconds: 20, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
   async (request) => {
@@ -968,161 +549,11 @@ exports.nubeEliminarItem = onCall(
   }
 );
 
-// ── Solicitudes de cotización a proveedores: CRUD ──
-// Todas las operaciones pasan por Admin SDK para no exigir cambios de reglas
-// Firestore en el ERP productivo anterior.
-function normalizarSolicitudProveedor(data = {}) {
-  const tipo = textoSeguro(data.tipo || 'Otro', 80);
-  const proveedorId = textoSeguro(data.proveedorId, 150);
-  const proveedorNombre = textoSeguro(data.proveedorNombre, 250);
-  const proveedorEmail = textoSeguro(data.proveedorEmail, 250).toLowerCase();
-  const fechaLimite = textoSeguro(data.fechaLimite, 30);
-  const detalle = textoSeguro(data.detalle, 5000);
-  if (!proveedorEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(proveedorEmail)) {
-    throw new HttpsError('invalid-argument', 'El correo del proveedor no es válido');
-  }
-  if (!detalle) throw new HttpsError('invalid-argument', 'El detalle de la solicitud es obligatorio');
-  return { tipo, proveedorId, proveedorNombre, proveedorEmail, fechaLimite, detalle };
-}
-
-exports.solicitudesCotizacionListar = onCall(
-  { region: 'us-central1', timeoutSeconds: 20, memory: '256MiB' },
-  async (request) => {
-    if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
-    await exigirPermiso(request.auth.uid, 'compras');
-    const snap = await db.collection('solicitudesCotizacion').orderBy('createdAt', 'desc').get();
-    return { solicitudes: snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })) };
-  }
-);
-
-exports.solicitudCotizacionCrear = onCall(
-  { region: 'us-central1', timeoutSeconds: 30, memory: '256MiB' },
-  async (request) => {
-    if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
-    const perfil = await exigirPermiso(request.auth.uid, 'compras');
-    const solicitud = normalizarSolicitudProveedor(request.data?.solicitud || {});
-      const contadorRef = db.collection('contadores').doc('solicitudesCotizacion');
-    const ref = db.collection('solicitudesCotizacion').doc();
-    const anio = new Date().getFullYear();
-    return db.runTransaction(async (tx) => {
-      const contadorSnap = await tx.get(contadorRef);
-      const contador = contadorSnap.exists ? contadorSnap.data() : {};
-      const actual = contador.anio === anio ? (Number(contador.ultimo) || 0) : 0;
-      const siguiente = actual + 1;
-      const codigo = `SC-${anio}-${String(siguiente).padStart(4, '0')}`;
-      const ahora = new Date().toISOString();
-      tx.set(contadorRef, { anio, ultimo: siguiente, updatedAt: ahora }, { merge: true });
-      tx.create(ref, {
-        ...solicitud,
-        codigo,
-        estado: 'Borrador',
-        historialEnvios: [],
-        creadoPorUid: request.auth.uid,
-        creadoPorNombre: perfil.nombre || request.auth.token?.email || request.auth.uid,
-        createdAt: ahora,
-        updatedAt: ahora
-      });
-      return { id: ref.id, codigo };
-    });
-  }
-);
-
-exports.solicitudCotizacionActualizar = onCall(
-  { region: 'us-central1', timeoutSeconds: 20, memory: '256MiB' },
-  async (request) => {
-    if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
-    await exigirPermiso(request.auth.uid, 'compras');
-    const { id, solicitud: entrada } = request.data || {};
-    if (!id) throw new HttpsError('invalid-argument', 'id es requerido');
-    const solicitud = normalizarSolicitudProveedor(entrada || {});
-    const ref = db.collection('solicitudesCotizacion').doc(String(id));
-    const snap = await ref.get();
-    if (!snap.exists) throw new HttpsError('not-found', 'La solicitud no existe');
-    await ref.update({ ...solicitud, updatedAt: new Date().toISOString() });
-    return { actualizado: true };
-  }
-);
-
-exports.solicitudCotizacionEliminar = onCall(
-  { region: 'us-central1', timeoutSeconds: 20, memory: '256MiB' },
-  async (request) => {
-    if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
-    await exigirPermiso(request.auth.uid, 'compras');
-    const { id } = request.data || {};
-    if (!id) throw new HttpsError('invalid-argument', 'id es requerido');
-    const ref = db.collection('solicitudesCotizacion').doc(String(id));
-    const snap = await ref.get();
-    if (!snap.exists) return { eliminado: true };
-    await ref.delete();
-    return { eliminado: true };
-  }
-);
-
-// ── Solicitudes de cotización a proveedores ──
-// Enviamos NOSOTROS una solicitud de cotización (OC / pedido de precios) a
-// un proveedor externo por correo, vía Microsoft Graph. Gratuito: usa el
-// buzón de Microsoft 365 ya configurado (GRAPH_MAIL_SENDER), sin límites
-// propios ni servicios de pago de terceros.
-exports.solicitudCotizacionEnviarCorreo = onCall(
-  {
-    region: 'us-central1',
-    timeoutSeconds: 30,
-    memory: '256MiB',
-    secrets: ['GRAPH_TENANT_ID', 'GRAPH_CLIENT_ID', 'GRAPH_CLIENT_SECRET', 'GRAPH_MAIL_SENDER'],
-  },
-  async (request) => {
-    if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'No autenticado');
-    }
-    await exigirPermiso(request.auth.uid, 'compras');
-
-    const { solicitudId, destinatarios, cc, asunto, cuerpoHtml } = request.data || {};
-
-    if (!solicitudId) {
-      throw new HttpsError('invalid-argument', 'solicitudId es requerido');
-    }
-    if (!destinatarios || (Array.isArray(destinatarios) && destinatarios.length === 0)) {
-      throw new HttpsError('invalid-argument', 'destinatarios es requerido');
-    }
-    if (!asunto || !cuerpoHtml) {
-      throw new HttpsError('invalid-argument', 'asunto y cuerpoHtml son requeridos');
-    }
-
-      const docRef = db.collection('solicitudesCotizacion').doc(solicitudId);
-
-    try {
-      const resultado = await enviarCorreo({ destinatarios, cc, asunto, cuerpoHtml });
-
-      const ahora = new Date().toISOString();
-      await docRef.update({
-        estado: 'Enviada',
-        updatedAt: ahora,
-        historialEnvios: FieldValue.arrayUnion({
-          fecha: ahora,
-          destinatarios: Array.isArray(destinatarios) ? destinatarios : [destinatarios],
-          cc: cc || [],
-          asunto,
-          enviadoPor: request.auth.token?.email || request.auth.uid
-        })
-      });
-
-      return resultado;
-    } catch (err) {
-      console.error('Error en solicitudCotizacionEnviarCorreo:', err.message);
-      throw new HttpsError('internal', err.message || 'Error enviando el correo');
-    }
-  }
-);
-
 async function esGestorUsuarios(uid) {
   await exigirSeccionConfiguracion(uid, 'usuarios');
   return true;
 }
 
-// Crea el usuario en Firebase Auth + su perfil en Firestore.
-// Requiere Admin SDK: por eso va como Cloud Function y no como escritura
-// directa desde el cliente (crear un usuario de Auth desde el navegador
-// además obligaría a iniciar sesión con esa cuenta nueva).
 exports.usuariosCrear = onCall(
   { region: 'us-central1', timeoutSeconds: 20, memory: '256MiB' },
   async (request) => {
@@ -1178,8 +609,6 @@ exports.usuariosCrear = onCall(
   }
 );
 
-// Restablece la contraseña de un usuario existente (evita que Gerencia/
-// Sistemas tenga que saber la contraseña anterior o usar la consola de Firebase).
 exports.usuariosResetearPassword = onCall(
   { region: 'us-central1', timeoutSeconds: 20, memory: '256MiB' },
   async (request) => {
@@ -1201,9 +630,6 @@ exports.usuariosResetearPassword = onCall(
   }
 );
 
-// Desactiva o reactiva un usuario (bloquea/permite su acceso al ERP sin
-// borrar su cuenta ni su historial). AuthContext ya cierra la sesión
-// automáticamente si detecta activo:false en el perfil.
 exports.usuariosCambiarEstado = onCall(
   { region: 'us-central1', timeoutSeconds: 20, memory: '256MiB' },
   async (request) => {
@@ -1226,11 +652,6 @@ exports.usuariosCambiarEstado = onCall(
   }
 );
 
-// ── Limpieza automática de auditoría ──
-// Cada domingo vacía el historial existente al iniciar la ejecución,
-// incluidos los registros recientes. Las acciones posteriores se conservan
-// para la siguiente semana. Usa Admin SDK para realizar el borrado.
-// Se conserva el nombre desplegado para actualizar la tarea existente.
 exports.limpiarLogsAntiguos = onSchedule(
   { schedule: '0 3 * * 0', timeZone: 'America/Lima', region: 'us-central1', memory: '256MiB' },
   async () => {
@@ -1259,12 +680,6 @@ exports.limpiarLogsAntiguos = onSchedule(
   }
 );
 
-// ── Backup diario de la base de datos ──
-// Corre sola todos los días y exporta toda Firestore a un bucket de Cloud
-// Storage. Es una operación asíncrona administrada por Google (el export
-// real sigue corriendo aunque esta función ya haya terminado).
-// Requiere la variable de entorno BACKUP_BUCKET (ver ONEDRIVE_SETUP.md /
-// documentación de despliegue para cómo configurarla).
 const { v1: FirestoreAdminV1 } = require('@google-cloud/firestore');
 
 exports.backupFirestoreDiario = onSchedule(

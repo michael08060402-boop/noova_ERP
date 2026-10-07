@@ -60,11 +60,6 @@ export function AuthProvider({ children }) {
     const profile = await loadUserProfile(credential.user);
 
     if (profile) {
-      /*
-        La SPA no se recarga al pasar de /login al ERP.
-        Rearmamos el ÚNICO loader inicial para cubrir:
-        perfil -> config -> dashboard/datos iniciales.
-      */
       startInitialLoadingCycle('Preparando ERP...');
 
       try {

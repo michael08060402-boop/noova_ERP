@@ -91,11 +91,8 @@ function dibujarFooter(doc) {
   const celesteTop = barY - 4;
   const azulTop = barY + 3;
 
-  // Celeste: bloque principal, más alto y más ancho que el azul
   poligono(doc, [[8, celesteTop], [120, celesteTop], [108, yb], [8, yb]], CELESTE);
-  // Pieza separadora azul: pegada al celeste en toda su altura (mismo ángulo)
   poligono(doc, [[116, azulTop], [126, azulTop], [120, yb], [110, yb]], AZUL);
-  // Azul: bloque final, ancho, llega hasta el margen derecho
   poligono(doc, [[128, azulTop], [202, azulTop], [202, yb], [122, yb]], AZUL);
 
   const iconSize = 7;
@@ -104,7 +101,6 @@ function dibujarFooter(doc) {
   const iconY = celesteTop + (yb - celesteTop - iconSize) / 2 + r;
   let cx = 14 + r;
 
-  // Facebook: cuadrado blanco con esquinas redondeadas + "f" transparente
   doc.setFillColor(255, 255, 255);
   doc.roundedRect(cx - r, iconY - r, r * 2, r * 2, r * 0.45, r * 0.45, 'F');
   doc.setFont('helvetica', 'bold');
@@ -113,7 +109,6 @@ function dibujarFooter(doc) {
   doc.text('f', cx - r * 0.05, iconY + r * 0.72, { align: 'center' });
   cx += iconGap;
 
-  // Instagram: cuadrado blanco con esquinas redondeadas + cámara transparente
   doc.setFillColor(255, 255, 255);
   doc.roundedRect(cx - r, iconY - r, r * 2, r * 2, r * 0.45, r * 0.45, 'F');
   doc.setDrawColor(...CELESTE);
@@ -124,14 +119,12 @@ function dibujarFooter(doc) {
   doc.circle(cx + r * 0.5, iconY - r * 0.5, r * 0.11, 'F');
   cx += iconGap;
 
-  // YouTube: cuadrado blanco con esquinas redondeadas + play transparente
   doc.setFillColor(255, 255, 255);
   doc.roundedRect(cx - r, iconY - r, r * 2, r * 2, r * 0.45, r * 0.45, 'F');
   doc.setFillColor(...CELESTE);
   doc.triangle(cx - r * 0.4, iconY - r * 0.65, cx - r * 0.4, iconY + r * 0.65, cx + r * 0.7, iconY, 'F');
   cx += iconGap;
 
-  // LinkedIn: cuadrado blanco con esquinas redondeadas + "in" transparente
   doc.setFillColor(255, 255, 255);
   doc.roundedRect(cx - r, iconY - r, r * 2, r * 2, r * 0.45, r * 0.45, 'F');
   doc.setFont('helvetica', 'bold');
@@ -140,7 +133,7 @@ function dibujarFooter(doc) {
   doc.text('in', cx + r * 0.06, iconY + r * 0.66, { align: 'center' });
 }
 
-export async function generateOrdenCompraPDF(orden, config = {}) {
+async function generateOrdenCompraPDF(orden, config = {}) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const empresa = config.empresa || {};
   const proveedor = orden.proveedor || {};

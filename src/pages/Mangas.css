@@ -1,24 +1,14 @@
-/* ====================================================
-   MANGAS DE VENTILACIÓN - Estilos específicos
-   Lo general está en styles/shared.css
-   ==================================================== */
-
-/* ── BADGE DE CATEGORÍA (variante manga, color teal/ámbar) ── */
 .badge-categoria.badge-categoria-manga {
   background: #fef3c7;
   color: #92400e;
   border: 1px solid #fde68a;
 }
 
-/* ── TABLA DE MANGAS ── */
 .tabla-mangas th,
 .tabla-mangas td {
   font-size: 0.85rem;
 }
 
-/* ── INPUT CATEGORÍA PERSONALIZADA (reutiliza el estilo de Equipos) ── */
-/* Si ya existe .input-categoria-custom en Equipos.css, no es necesario duplicarlo,
-   pero dejamos una regla local por si esta página se carga antes que Equipos */
 .mangas .input-categoria-custom,
 .input-categoria-custom {
   width: 100%;

@@ -16,6 +16,7 @@ import Paginacion from '../components/Paginacion';
 import Loading from '../components/Loading';
 import { TIPOS_COMPROBANTE } from '../services/facturacionService';
 import '../styles/shared.css';
+import '../styles/documentos.css';
 import './Facturacion.css';
 
 const ICONO_ESTADO = {
@@ -25,35 +26,22 @@ const ICONO_ESTADO = {
   ERROR: <FiAlertCircle />
 };
 
-// Unidades de medida permitidas por SUNAT, mostradas como dropdown
-// tanto en el formulario de generación de comprobantes como en
-// cualquier lugar donde se edite un item.
-export const UNIDADES_MEDIDA = [
+const UNIDADES_MEDIDA = [
   'UNIDAD', 'LT.', 'KG.', 'DOC.', 'PZ.', 'EQ.', 'M.', 'KIT.', '%.', 'MILL.'
 ];
 
-// Porcentaje de detracción por defecto (servicios gravados con IGV, ítem 037).
 const PORCENTAJE_DETRACCION_DEFAULT = 12;
 
-// Estado inicial del formulario complementario que se llena al generar
-// el comprobante. Solo los datos operativos que se ingresan manualmente:
-// guía de remisión, orden de compra, contenido y detracción.
 const FORM_COMPROBANTE_VACIO = {
   guiaRemision: '',
   ordenCompra: '',
   observaciones: '',
-  // Detracción
   aplicarDetraccion: true,
   porcentajeDetraccion: PORCENTAJE_DETRACCION_DEFAULT,
   montoDetraccion: 0,
   cuentaDetraccion: '00076048290',
 };
 
-// Normaliza la forma de pago a los únicos dos valores que acepta SUNAT:
-// "Contado" o "Credito" (sin tilde). Cualquier condición de pago que
-// contenga "credito" (con o sin tilde) se mapea a "Credito"; el resto
-// a "Contado". Esto evita el error 3246 de SUNAT cuando la cotización
-// trae condiciones como "Crédito 7 días" o "15 días".
 function normalizarFormaPagoSUNAT(valor) {
   if (!valor) return 'Contado';
   const v = String(valor).toLowerCase().trim();
@@ -61,7 +49,6 @@ function normalizarFormaPagoSUNAT(valor) {
   return 'Contado';
 }
 
-// Recibe empresaData como prop desde App.jsx (vía ConfigContext).
 export default function Facturacion({ empresaData }) {
   const { cotizaciones, loading: cargandoCotizaciones } = useCotizaciones();
   const {
@@ -89,14 +76,8 @@ export default function Facturacion({ empresaData }) {
   const [cotizacionSeleccionada, setCotizacionSeleccionada] = useState(null);
   const [tipoComprobante, setTipoComprobante] = useState(TIPOS_COMPROBANTE.FACTURA);
 
-  // Formulario complementario para datos que se ingresan al momento de
-  // generar el comprobante: guía de remisión, orden de compra, detracción,
-  // anticipos, descuentos, observaciones, etc.
   const [formComprobante, setFormComprobante] = useState({ ...FORM_COMPROBANTE_VACIO });
 
-  // Items editables de la cotización seleccionada. Se clonan para poder
-  // ajustar cantidad, precio, unidad de medida y códigos antes de emitir
-  // el comprobante sin alterar la cotización original.
   const [itemsEditables, setItemsEditables] = useState([]);
 
   function cambiarCampoComprobante(campo, valor) {
@@ -108,7 +89,6 @@ export default function Facturacion({ empresaData }) {
       const copia = [...prev];
       let valorFinal = valor;
       if (campo === 'precioUnitario' && valor !== '') {
-        // Redondeo a 2 decimales para evitar desvíos de punto flotante.
         const num = Number(valor);
         valorFinal = Number.isFinite(num) ? Math.round(num * 100) / 100 : valor;
       }
@@ -117,8 +97,6 @@ export default function Facturacion({ empresaData }) {
     });
   }
 
-  // Calcula el monto de detracción automáticamente cuando cambia el total
-  // o el porcentaje, salvo que el usuario lo haya editado manualmente.
   useEffect(() => {
     if (!formComprobante.aplicarDetraccion) {
       if (formComprobante.montoDetraccion !== 0) {
@@ -138,8 +116,6 @@ export default function Facturacion({ empresaData }) {
     formComprobante.aplicarDetraccion
   ]);
 
-  // Cotizaciones listas para facturar: solo las que están en estado "Generada"
-  // (o estados legacy Borrador/Enviada) y no tienen factura asociada.
   const cotizacionesAprobadas = useMemo(() => {
     const cotConFactura = new Set(facturas.map(f => f.cotizacionId).filter(Boolean));
     const estadosFacturables = ['Generada', 'Borrador', 'Enviada'];
@@ -189,9 +165,6 @@ export default function Facturacion({ empresaData }) {
     const esPersonaNatural = ruc.length === 8 && !ruc.startsWith('10') && !ruc.startsWith('20');
     setTipoComprobante(esPersonaNatural ? TIPOS_COMPROBANTE.BOLETA : TIPOS_COMPROBANTE.FACTURA);
 
-    // Clonar los items para edición inline sin mutar la cotización original.
-    // Se normalizan los campos clave (codigo, unidadMedida)
-    // para garantizar que el PDF siempre reciba datos válidos.
     setItemsEditables(
       (cot.items || []).map((it) => ({
         descripcion: it.descripcion || '',
@@ -204,15 +177,12 @@ export default function Facturacion({ empresaData }) {
       }))
     );
 
-    // Resetear el formulario complementario con los valores por defecto,
-    // preservando observaciones si la cotización las trae.
     setFormComprobante({
       ...FORM_COMPROBANTE_VACIO,
       observaciones: cot.observaciones || '',
     });
   };
 
-  // Recalcula importes de items editables cuando cambian cantidad o precio.
   const itemsConImporte = useMemo(() => {
     return itemsEditables.map((it) => ({
       ...it,
@@ -220,8 +190,6 @@ export default function Facturacion({ empresaData }) {
     }));
   }, [itemsEditables]);
 
-  // Subtotal / IGV / total recalculados a partir de los items editables,
-  // de modo que los ajustes al vuelo se reflejen en el comprobante.
   const subtotalEditable = useMemo(
     () => itemsConImporte.reduce((acc, it) => acc + (Number(it.importe) || 0), 0),
     [itemsConImporte]
@@ -240,8 +208,6 @@ export default function Facturacion({ empresaData }) {
       const { serie, numero } = generarNumeroComprobante(tipoComprobante);
       const moneda = cotizacionSeleccionada.moneda || 'US$';
 
-      // Items finales: se filtran filas vacías y se normalizan los campos.
-      // Se preserva codigo para que llegue al PDF y al XML.
       const itemsFinal = itemsConImporte
         .filter((it) => it.descripcion && Number(it.cantidad) > 0)
         .map((item) => ({
@@ -258,15 +224,10 @@ export default function Facturacion({ empresaData }) {
         throw new Error('El comprobante debe tener al menos un item con cantidad mayor a 0.');
       }
 
-      // Totales recalculados a partir de los items finales.
       const subtotal = Number(itemsFinal.reduce((a, i) => a + i.importe, 0).toFixed(2));
       const igv = Number((subtotal * 0.18).toFixed(2));
       const total = Number((subtotal + igv).toFixed(2));
 
-      // ===== FIX ERROR 3246 SUNAT =====
-      // SUNAT solo acepta "Contado" o "Credito" en cac:PaymentTerms/cbc:PaymentMeansID.
-      // La cotización trae la condición de pago ("Crédito 7 días", "15 días", etc.)
-      // que NO es válida para SUNAT. Se normaliza aquí antes de enviar.
       const formaPagoNormalizada = normalizarFormaPagoSUNAT(
         cotizacionSeleccionada.condicionPago || 'Contado'
       );
@@ -288,16 +249,11 @@ export default function Facturacion({ empresaData }) {
         igv,
         total,
         moneda,
-        // Forma de pago normalizada para SUNAT (Contado/Credito únicamente).
-        // La condición original ("Crédito 7 días", etc.) se conserva en
-        // condicionPago para mostrarla en el PDF si se necesita.
         formaPago: formaPagoNormalizada,
         condicionPago: cotizacionSeleccionada.condicionPago || 'Contado',
-        // Datos operativos ingresados manualmente en el modal
         guiaRemision: formComprobante.guiaRemision?.trim() || '',
         ordenCompra: formComprobante.ordenCompra?.trim() || '',
         observaciones: formComprobante.observaciones?.trim() || '',
-        // Detracción
         detraccion: {
           aplicar: !!formComprobante.aplicarDetraccion,
           cuenta: formComprobante.cuentaDetraccion || '00076048290',
@@ -317,8 +273,6 @@ export default function Facturacion({ empresaData }) {
 
       const resultado = await addFacturaDesdeCotizacion(cotizacionSeleccionada, facturaData, empresaData);
 
-      // Propagar el resultado de SUNAT al estado de la cotización:
-      // ACEPTADA -> cotización en "Aceptada"; RECHAZADA/ERROR -> "Error" con motivo.
       let nuevoEstadoCotizacion = null;
       if (resultado.estadoSunat === 'ACEPTADA') {
         nuevoEstadoCotizacion = 'Aceptada';
@@ -360,8 +314,6 @@ export default function Facturacion({ empresaData }) {
     }
   }
 
-  // Solo se permite eliminar comprobantes que NO estén ACEPTADOS por SUNAT
-  // (eliminar un comprobante aceptado es ilegal según la normativa SUNAT).
   function solicitarEliminar(factura) {
     if (factura.estadoSunat === 'ACEPTADA') {
       setMensaje({
@@ -403,7 +355,6 @@ export default function Facturacion({ empresaData }) {
     URL.revokeObjectURL(url);
   }
 
-  // Reintenta el envío a SUNAT para comprobantes en ERROR o RECHAZADA.
   async function reintentarEnvioSunat(factura) {
     setProcesando(true);
     try {
@@ -641,7 +592,6 @@ export default function Facturacion({ empresaData }) {
                             <FiFileText size={16} />
                           </button>
 
-                          {/* Reintento solo para ERROR y RECHAZADA */}
                           {(f.estadoSunat === 'ERROR' || f.estadoSunat === 'RECHAZADA') && (
                             <button
                               className="btn-accion"
@@ -654,7 +604,6 @@ export default function Facturacion({ empresaData }) {
                             </button>
                           )}
 
-                          {/* Solo se permite eliminar comprobantes NO ACEPTADOS por SUNAT */}
                           {f.estadoSunat !== 'ACEPTADA' && (
                             <button
                               className="btn-accion btn-eliminar"
@@ -722,7 +671,6 @@ export default function Facturacion({ empresaData }) {
                 <div className="modal-preview">
                   <h4>Comprobante a emitir — Cotización {cotizacionSeleccionada.codigo}</h4>
 
-                  {/* ====== Items editables ====== */}
                   <div className="items-comprobante-seccion">
                     <h5 className="subtitulo-seccion">Items del comprobante</h5>
                     <div className="items-tabla-wrapper">
@@ -805,7 +753,6 @@ export default function Facturacion({ empresaData }) {
                     </div>
                   </div>
 
-                  {/* ====== Datos operativos ====== */}
                   <div className="datos-operativos-seccion">
                     <h5 className="subtitulo-seccion">Datos operativos del comprobante</h5>
                     <div className="fila-form fila-form-2">
@@ -866,7 +813,6 @@ export default function Facturacion({ empresaData }) {
                     </div>
                   </div>
 
-                  {/* ====== Detracción ====== */}
                   <div className="detraccion-seccion">
                     <div className="detraccion-header">
                       <label className="detraccion-toggle">

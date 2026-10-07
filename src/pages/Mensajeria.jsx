@@ -78,7 +78,6 @@ export default function Mensajeria() {
   const responsable = userProfile?.nombre || currentUser?.email || '';
   const puedeLimpiar = puede(userProfile, 'mensajeria', 'delete');
 
-  // Carga historial
   const cargarHistorial = useCallback(async () => {
     try {
       setCargandoHistorial(true);
@@ -120,7 +119,6 @@ export default function Mensajeria() {
     const contactosValidos = obtenerContactosDeCliente(cliente)
       .filter(contacto => (contacto.celular && !validarCelular(contacto.celular))
         || (contacto.email && !validarEmail(contacto.email)));
-    // Solo elegir automáticamente si no hay ambigüedad de destinatario.
     setContactoSeleccionado(contactosValidos.length === 1 ? contactosValidos[0] : null);
     setMostrarListaClientes(false);
     setErrorForm(null);
@@ -183,7 +181,6 @@ export default function Mensajeria() {
       const esCorreo = canal === 'correo';
       const destino = esCorreo ? contactoSeleccionado.email.trim() : normalizarCelularPE(contactoSeleccionado.celular);
 
-      // Abrir el editor dentro del gesto de usuario, antes de guardar el registro.
       if (esCorreo) {
         const link = document.createElement('a');
         const asuntoSeguro = asunto.replace(/[\r\n]/g, ' ').trim();
@@ -199,7 +196,6 @@ export default function Mensajeria() {
         }
       }
 
-      // Registrar en Firestore
       try {
         await registrarEnvioMensaje({
           usuarioId: currentUser.uid,
@@ -308,7 +304,6 @@ export default function Mensajeria() {
         </div>
       )}
         <div className="mensajeria-layout">
-          {/* Panel izquierdo: lista de clientes */}
           <aside className={`mensajeria-sidebar ${!mostrarListaClientes ? 'oculto-en-mobile' : ''}`}>
             <div className="sidebar-busqueda">
               <FiSearch className="icono-busqueda" size={16} />
@@ -353,7 +348,6 @@ export default function Mensajeria() {
             </div>
           </aside>
 
-          {/* Panel central: composer */}
           <section className={`mensajeria-composer ${mostrarListaClientes ? 'oculto-en-mobile' : ''}`}>
             {!clienteSeleccionado ? (
               <div className="composer-vacio">
@@ -516,7 +510,6 @@ export default function Mensajeria() {
             )}
           </section>
 
-          {/* Panel derecho: historial */}
           <aside className="mensajeria-historial">
             <div className="historial-header">
               <FiClock size={14} />

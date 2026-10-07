@@ -16,6 +16,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import Loading from '../components/Loading';
 import CompraProductoSelector from '../components/CompraProductoSelector';
 import '../styles/shared.css';
+import '../styles/documentos.css';
 import './Compras.css';
 
 const ITEM_VACIO = { codigo: '', descripcion: '', unidadMedida: 'UND.', cantidad: 1, precioUnitario: 0 };
@@ -42,8 +43,6 @@ function formularioVacio(config, userProfile, cotizacion = null) {
             descripcion: item.descripcion || item.nombre || partner?.descripcion || '',
             unidadMedida: item.unidadMedida || 'UND.',
             cantidad: Number(item.cantidad) || 1,
-            // Precio Partner LP26 como costo de compra. No modifica precios existentes
-            // de equipos ni precios de venta guardados en Firestore.
             precioUnitario: partner?.precioPartner ?? 0,
             precioPartnerAplicado: Boolean(partner)
           };
@@ -75,7 +74,7 @@ export default function Compras() {
 
   const [busqueda, setBusqueda] = useState('');
   const [mensaje, setMensaje] = useState(null);
-  const [vista, setVista] = useState(cotizacionInicial ? 'form' : 'lista'); // 'lista' | 'form'
+  const [vista, setVista] = useState(cotizacionInicial ? 'form' : 'lista');
   const [editandoId, setEditandoId] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [exportandoId, setExportandoId] = useState(null);

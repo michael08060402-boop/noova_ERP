@@ -1,10 +1,6 @@
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../../firebase/config';
 
-// Arquitectura única de producción:
-// navegador -> Firebase callable -> Microsoft Graph -> OneDrive/SharePoint.
-// No hay fallback al disco local ni a un servidor Express del equipo.
-const PROVEEDOR = 'graph';
 const LIMITE_SUBIDA_BYTES = 4 * 1024 * 1024;
 
 async function llamar(nombre, datos = {}) {
@@ -98,11 +94,9 @@ async function eliminarItem(itemId) {
 export {
   listarCarpeta,
   buscarDocumentos,
-  PROVEEDOR,
   obtenerContexto,
   crearCarpeta,
   subirArchivo,
   renombrarItem,
-  eliminarItem,
-  LIMITE_SUBIDA_BYTES
+  eliminarItem
 };

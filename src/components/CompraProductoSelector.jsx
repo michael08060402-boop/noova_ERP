@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { LISTA_PRECIOS_PARTNER_2026 } from '../data/preciosPartner2026';
+import './CompraProductoSelector.css';
 
 const normalizar = (texto) => texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 

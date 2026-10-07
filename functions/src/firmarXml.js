@@ -1,9 +1,7 @@
 const forge = require('node-forge');
 const { SignedXml } = require('xml-crypto');
 
-// Firma un XML UBL 2.1 con el certificado digital P12 de la empresa.
 async function firmarXml(xmlString, certBase64, certPass, sigId = 'IDSignNOOVA') {
-  // 1. Cargar certificado P12 y extraer llave privada + certificado X509
   const p12Der = Buffer.from(certBase64, 'base64');
   const p12Asn1 = forge.asn1.fromDer(p12Der.toString('binary'));
   const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, certPass);
@@ -33,13 +31,11 @@ async function firmarXml(xmlString, certBase64, certPass, sigId = 'IDSignNOOVA')
   const privateKeyPem = forge.pki.privateKeyToPem(privateKey);
   const certPem = forge.pki.certificateToPem(cert);
 
-  // 2. Normalizar el XML de entrada
   const xmlPreparado = xmlString.replace(
     /<ext:ExtensionContent\s*\/>/g,
     '<ext:ExtensionContent></ext:ExtensionContent>'
   );
 
-  // 3. Configurar el firmador
   const sig = new SignedXml({
     privateKey: privateKeyPem,
     publicCert: certPem,
@@ -57,7 +53,6 @@ async function firmarXml(xmlString, certBase64, certPass, sigId = 'IDSignNOOVA')
     digestAlgorithm: 'http://www.w3.org/2001/04/xmlenc#sha256',
   });
 
-  // 4. Firmar e inyectar la firma
   sig.computeSignature(xmlPreparado, {
     prefix: 'ds',
     attrs: { Id: sigId },

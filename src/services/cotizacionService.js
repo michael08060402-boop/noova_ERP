@@ -19,23 +19,19 @@ function limpiarPrefijo(valor) {
   return String(valor || 'NV').toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 8) || 'NV';
 }
 
-// opciones.soloEpp: usado por el rol Jefe de Proyecto de Mina. Las reglas de
-// Firestore solo le permiten leer cotizaciones con tipoItem == 'epp' y, como
-// las rules NO actúan como filtros, la consulta debe incluir el where
-// explícito para no fallar. Las solicitudes se ordenan en memoria por fecha,
-// así no necesitan un correlativo ni un índice compuesto adicional.
+const MARCAS_SOLICITUD = ['solicitud', 'epp'];
+
 export async function getCotizaciones(opciones = {}) {
-  const { soloEpp = false } = opciones;
+  const { soloSolicitudes = false } = opciones;
   const base = collection(db, COLLECTION_NAME);
-  const q = soloEpp
-    ? query(base, where('tipoItem', '==', 'epp'))
-    : query(base, orderBy('codigo', 'desc'));
-  const snapshot = await getDocs(q);
-  const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-  if (soloEpp) {
-    data.sort((a, b) => String(b.createdAt || b.fechaEmision || '').localeCompare(String(a.createdAt || a.fechaEmision || '')));
+  if (!soloSolicitudes) {
+    const snapshot = await getDocs(query(base, orderBy('codigo', 'desc')));
+    return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
   }
-  return data;
+  const snapshots = await Promise.all(MARCAS_SOLICITUD.map((marca) => getDocs(query(base, where('tipoItem', '==', marca)))));
+  return snapshots
+    .flatMap((snapshot) => snapshot.docs.map((d) => ({ id: d.id, ...d.data() })))
+    .sort((a, b) => String(b.createdAt || b.fechaEmision || '').localeCompare(String(a.createdAt || a.fechaEmision || '')));
 }
 
 export async function getCotizacionById(id) {
@@ -46,14 +42,7 @@ export async function getCotizacionById(id) {
 export async function createCotizacion(data) {
   const usuario = auth.currentUser;
   if (!usuario) throw new Error('Debes iniciar sesión para crear una cotización');
-  if (!Array.isArray(data.items) || data.items.length === 0) {
-    throw new Error('La cotización debe contener al menos un ítem');
-  }
-
-  // Solicitud: escritura directa con ID único. No actualiza el documento
-  // global de Configuración, por lo que Jefe de Proyecto de Mina puede crearla
-  // con sus permisos EPP sin recibir "permission-denied" por el correlativo.
-  if (data.tipoItem === 'epp' && data.esSolicitudCotizacion === true) {
+  if (data.esSolicitudCotizacion === true) {
     const ref = doc(collection(db, COLLECTION_NAME));
     const ahoraIso = new Date().toISOString();
 
@@ -68,7 +57,6 @@ export async function createCotizacion(data) {
     return { id: ref.id };
   }
 
-  // Cotización comercial: conserva el correlativo configurado de NOOVA.
   const configRef = doc(db, 'configuracion', 'general');
   return runTransaction(db, async (tx) => {
     const configSnap = await tx.get(configRef);

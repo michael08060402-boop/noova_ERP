@@ -1,8 +1,3 @@
-// Lista oficial de precios Partner extraída de LP26 - Partners (2026-03-01).xlsm.
-// IMPORTANTE: esta tabla NO sincroniza ni modifica precios existentes en Firestore.
-// Se usa únicamente como referencia de costo Partner para Órdenes de Compra.
-export const LISTA_PRECIOS_PARTNER_VERSION = 'LP26-2026-03-01';
-export const LISTA_PRECIOS_PARTNER_FECHA = '2026-03-01';
 export const TOTAL_FILAS_PARTNER = 302;
 export const TOTAL_CODIGOS_PARTNER = 300;
 

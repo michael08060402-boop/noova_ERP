@@ -4,7 +4,6 @@ import { verificarRateLimit, limpiarRateLimit, sanitizarTexto } from '../utils/v
 import logo from '../assets/noova-logo.png';
 import './Login.css';
 
-// Rate limiting: máx 5 intentos por IP/navegador cada 5 minutos
 const RATE_LIMIT_LOGIN = { maximo: 5, ventanaMs: 5 * 60 * 1000 };
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
@@ -38,17 +37,12 @@ export default function Login() {
     e.preventDefault();
     setError('');
 
-    // Validación de campos antes de cualquier llamada
     const errValidacion = validarCampos();
     if (errValidacion) {
       setError(errValidacion);
       return;
     }
 
-    // Rate limiting por navegador (defensa contra fuerza bruta).
-    // IMPORTANTE: solo cuenta INTENTOS FALLIDOS, no cada envío del formulario.
-    // Antes se consumía un intento incluso con la contraseña correcta, lo
-    // que hacía aparecer el aviso de "bloqueo temporal" en sesiones normales.
     const rl = verificarRateLimit('login-intentos', RATE_LIMIT_LOGIN.maximo, RATE_LIMIT_LOGIN.ventanaMs, { soloVerificar: true });
     if (!rl.ok) {
       const mins = Math.ceil((rl.esperaMs || 0) / 60000);
@@ -59,10 +53,8 @@ export default function Login() {
 
     setLoading(true);
     try {
-      // Sanitizar email antes de enviarlo a Firebase
       const emailLimpio = sanitizarTexto(email, 120).toLowerCase();
       await login(emailLimpio, password);
-      // Login exitoso: se limpia el contador de intentos fallidos.
       limpiarRateLimit('login-intentos');
       setIntentosRestantes(null);
       if (rememberMe) {
@@ -71,11 +63,9 @@ export default function Login() {
         localStorage.removeItem('rememberedEmail');
       }
     } catch {
-      // Solo aquí, ante una credencial incorrecta, se registra el intento fallido.
       const rlFallo = verificarRateLimit('login-intentos', RATE_LIMIT_LOGIN.maximo, RATE_LIMIT_LOGIN.ventanaMs);
       setIntentosRestantes(rlFallo.ok ? rlFallo.restante : 0);
       setError('Credenciales incorrectas. Verifique su correo y contraseña.');
-      // Limpia la contraseña por seguridad
       setPassword('');
     } finally {
       setLoading(false);

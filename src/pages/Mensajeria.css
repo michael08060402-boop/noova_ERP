@@ -1,13 +1,8 @@
-/* ====================================================
-   MENSAJERIA - Estilos específicos de la página
-   ==================================================== */
-
 .pagina-mensajeria {
   display: flex;
   flex-direction: column;
 }
 
-/* ── AVISO DE SEGURIDAD ── */
 .mensaje-aviso-seguridad {
   display: flex;
   align-items: center;
@@ -27,7 +22,6 @@
   color: #d97706;
 }
 
-/* ── ESTADO EN HISTORIAL ── */
 .historial-item-footer {
   display: flex;
   align-items: center;
@@ -56,7 +50,6 @@
   color: #065f46;
 }
 
-/* ── LAYOUT PRINCIPAL: 3 columnas ── */
 .mensajeria-layout {
   display: grid;
   grid-template-columns: 280px 1fr 300px;
@@ -65,7 +58,6 @@
   min-height: 600px;
 }
 
-/* ── PANEL IZQUIERDO: lista de clientes ── */
 .mensajeria-sidebar {
   background: #fff;
   border: 1px solid var(--gris-borde);
@@ -180,7 +172,6 @@
   color: var(--texto-suave);
 }
 
-/* ── PANEL CENTRAL: composer ── */
 .mensajeria-composer {
   background: #fff;
   border: 1px solid var(--gris-borde);
@@ -385,22 +376,12 @@
   border-top: 1px solid var(--gris-borde);
 }
 
-.btn-enviar-whatsapp {
-  background: #25d366 !important;
-  color: #fff !important;
-}
-
-.btn-enviar-whatsapp:hover:not(:disabled) {
-  background: #1da851 !important;
-}
-
 .composer-destino-preview {
   font-size: 0.78rem;
   color: var(--texto-suave);
   font-family: 'Courier New', monospace;
 }
 
-/* ── PANEL DERECHO: historial ── */
 .mensajeria-historial {
   background: #fff;
   border: 1px solid var(--gris-borde);
@@ -518,7 +499,6 @@
   color: var(--texto-muy-suave);
 }
 
-/* ── RESPONSIVE ── */
 .composer-asunto {
   width: 100%;
   box-sizing: border-box;

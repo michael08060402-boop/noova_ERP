@@ -10,12 +10,6 @@ import interbankImg from '../assets/interbank.png';
 const IMG_FULL_HEADER = headerImg;
 const IMG_FULL_FOOTER = footerImg;
 
-// Cuentas bancarias que se muestran en el PDF de cotización.
-// Los logos se conservan como imágenes; los datos de cuenta se renderizan
-// como tabla real para mayor nitidez.
-// Nota: la cuenta del Banco de la Nación (detracciones) NO se incluye aquí;
-// esa cuenta solo aplica a las facturas electrónicas (generateFacturaPDF),
-// no a las cotizaciones.
 const BANCOS_PDF = [
   {
     logo: interbankImg,
@@ -27,7 +21,6 @@ const BANCOS_PDF = [
   },
 ];
 
-// Etiqueta de moneda según el código guardado en la cotización
 function etiquetaMoneda(codigo) {
   if (!codigo) return 'US$';
   const c = String(codigo).toUpperCase();
@@ -35,7 +28,6 @@ function etiquetaMoneda(codigo) {
   return 'US$';
 }
 
-// Formatea un monto según la moneda elegida, devolviendo etiqueta + número.
 function formatoMonto(monto, codigoMoneda) {
   const etiqueta = etiquetaMoneda(codigoMoneda);
   const locale = etiqueta === 'S/' ? 'es-PE' : 'en-US';
@@ -46,8 +38,6 @@ function formatoMonto(monto, codigoMoneda) {
   return `${etiqueta} ${numero}`;
 }
 
-// Igual que formatoMonto pero sin el prefijo de moneda: se usa dentro de
-// tablas cuyo encabezado de columna ya indica la moneda, para no duplicarla.
 function formatoNumero(monto, codigoMoneda) {
   const etiqueta = etiquetaMoneda(codigoMoneda);
   const locale = etiqueta === 'S/' ? 'es-PE' : 'en-US';
@@ -57,7 +47,6 @@ function formatoNumero(monto, codigoMoneda) {
   });
 }
 
-// Dibuja una fila "Etiqueta: valor" y devuelve el alto consumido.
 function drawFieldRow(doc, x, y, label, value, labelW = 24, contentW = 182) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
@@ -73,7 +62,7 @@ function drawFieldRow(doc, x, y, label, value, labelW = 24, contentW = 182) {
   return lines.length * 4.8;
 }
 
-export function generateCotizacionPDF(cotizacion, config = {}) {
+function generateCotizacionPDF(cotizacion, config = {}) {
   const doc = new jsPDF({ format:'a4', unit: 'mm' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -86,7 +75,6 @@ export function generateCotizacionPDF(cotizacion, config = {}) {
   const COLOR_TEAL = [20, 74, 99];
   const COLOR_BORDER = [180, 180, 180];
 
-  // Datos de la empresa (vienen únicamente de config; sin fallbacks hardcodeados)
   const empresa = config?.empresa || {};
   const razonSocial = empresa.razonSocial || '';
   const ruc = empresa.ruc || '';
@@ -94,8 +82,6 @@ export function generateCotizacionPDF(cotizacion, config = {}) {
   const lemaAnual = empresa.lemaAnual || '';
   const celularEmpresa = empresa.celular || empresa.telefono || '';
 
-  // Datos del responsable (quien genera la cotización) — se guardan al momento
-  // de crear la cotización desde el perfil del usuario logueado.
   const responsable = cotizacion.responsable || '';
   const cargoResponsable = cotizacion.cargoResponsable || '';
   const emailResponsable = cotizacion.emailResponsable || '';
@@ -104,21 +90,17 @@ export function generateCotizacionPDF(cotizacion, config = {}) {
   const moneda = etiquetaMoneda(cotizacion.moneda);
   const validez = cotizacion.validez || '15 días';
   const condicionPago = cotizacion.condicionPago || 'Contado';
-  // El tiempo de entrega puede venir como string ya formateado (cotizaciones viejas)
-  // o como número + unidad (nuevo formato con spinner en el formulario).
   const tiempoEntrega = cotizacion.tiempoEntrega
     || (cotizacion.tiempoEntregaNumero && cotizacion.tiempoEntregaUnidad
       ? `${cotizacion.tiempoEntregaNumero} ${cotizacion.tiempoEntregaUnidad} recibida la OC`
       : '03 semanas recibida la OC');
 
-  // 1. Lema anual
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(80, 80, 80);
   doc.text(`"${lemaAnual}"`, pageWidth / 2, y, { align: 'center' });
   y += 6;
 
-  // 2. Barra de cotización (naranja)
   const headerBoxH = 8;
   doc.setFillColor(...COLOR_ORANGE);
   doc.rect(margin, y, contentW, headerBoxH, 'F');
@@ -134,7 +116,6 @@ export function generateCotizacionPDF(cotizacion, config = {}) {
 
   y += headerBoxH + 7;
 
-  // 3. Datos del proveedor (razón social y RUC son fijos; contacto viene del responsable)
   y += drawFieldRow(doc, margin, y, 'Proveedor', razonSocial);
   y += drawFieldRow(doc, margin, y, 'RUC', ruc);
   y += drawFieldRow(doc, margin, y, 'Dirección', direccion);
@@ -148,7 +129,6 @@ export function generateCotizacionPDF(cotizacion, config = {}) {
   doc.line(margin, y, pageWidth - margin, y);
   y += 5;
 
-  // 4. Datos del cliente
   y += 2;
 
   doc.setFillColor(...COLOR_ORANGE);
@@ -179,7 +159,6 @@ export function generateCotizacionPDF(cotizacion, config = {}) {
   doc.line(margin, y, pageWidth - margin, y);
   y += 5;
 
-  // 5. Tabla de items (equipos, accesorios y transporte juntos)
   const todosLosItems = cotizacion.items || [];
   const tableHeaders = [
     ['ITEM', 'CÓDIGO', 'DESCRIPCIÓN', 'CANT.', `PRECIO UNIT.\n(${moneda})`, `TOTAL\n(${moneda})`],
@@ -226,7 +205,6 @@ export function generateCotizacionPDF(cotizacion, config = {}) {
 
   y = (doc.lastAutoTable?.finalY || y) + 4;
 
-  // 6. Sección de totales
   const subtotal = calcularSubtotal(todosLosItems);
   const sinIGV = !!cotizacion.sinIGV;
   const igv = sinIGV ? 0 : calcularIGV(subtotal);
@@ -259,7 +237,6 @@ export function generateCotizacionPDF(cotizacion, config = {}) {
   doc.text(formatoMonto(total, cotizacion.moneda), totX + totW - 3, y + 4.2, { align: 'right' });
   y += totRowH + 6;
 
-  // 7. INCLUYE (lista fija que reemplaza a la antigua sección "Observaciones")
   {
     const incluyeItems = [
       'Protocolo de calibración de fábrica',
@@ -290,14 +267,9 @@ export function generateCotizacionPDF(cotizacion, config = {}) {
     y += incluyeBodyH;
   }
 
-  // Salto a página 2 para condiciones y cuentas bancarias
   doc.addPage();
   y = 30;
 
-  // 8. Condiciones de venta (dinámicas según moneda, pago, validez y tiempo de entrega)
-  // Tiempo de entrega por ítem: si todos los ítems comparten el mismo valor
-  // (o no lo especifican), se muestra una sola línea; si difieren, se lista
-  // el tiempo de entrega de cada ítem por separado.
   const itemsConEntrega = todosLosItems.filter((it) => it.tipo !== 'transporte');
   const tiemposEntregaItems = itemsConEntrega.map((it) => (it.tiempoEntrega || '').trim()).filter(Boolean);
   const tiemposUnicos = [...new Set(tiemposEntregaItems)];
@@ -319,10 +291,6 @@ export function generateCotizacionPDF(cotizacion, config = {}) {
     `6.- Lugar de entrega: ${String(direccion || '').trim().replace(/\.+$/, '')}.`
   ];
 
-  // Garantía de fábrica, stock y capacitación en el uso del equipo no
-  // aplican si la cotización es 100% de servicios (todas las filas son
-  // de tipo "transporte": sin código de catálogo, no se vende ni entrega
-  // ningún equipo).
   const esCotizacionDeServicios = todosLosItems.length > 0
     && todosLosItems.every((it) => it.tipo === 'transporte');
   if (!esCotizacionDeServicios) {
@@ -350,7 +318,6 @@ export function generateCotizacionPDF(cotizacion, config = {}) {
   }
   y += 7;
 
-  // 9. Cuentas bancarias (logo arriba + tabla con datos abajo)
   const logoH = 16;
   const logoW = 50;
   const separacionLogoTabla = 2;
@@ -411,7 +378,6 @@ export function generateCotizacionPDF(cotizacion, config = {}) {
     y = (doc.lastAutoTable?.finalY || y) + separacionBancos;
   });
 
-  // 10. Cierre y firma
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(60, 60, 60);
@@ -430,7 +396,6 @@ export function generateCotizacionPDF(cotizacion, config = {}) {
   doc.setTextColor(100, 100, 100);
   doc.text((cargoResponsable || '').toUpperCase(), pageWidth / 2, y, { align: 'center' });
 
-  // 11. Inyección de header y footer fijos en todas las páginas
   const totalPages = doc.internal.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
@@ -446,9 +411,6 @@ export function downloadCotizacionPDF(cotizacion, config) {
   doc.save(`${cotizacion.codigo || 'cotizacion'}.pdf`);
 }
 
-
-
-// Convierte un número a letras en español (formato SUNAT para facturas).
 function numeroALetras(num) {
   num = parseFloat(num);
   if (isNaN(num)) return 'CERO Y 00/100';
@@ -521,26 +483,13 @@ function numeroALetras(num) {
   return (resultado + ' Y ' + decStr + '/100').toUpperCase();
 }
 
-// Generación de PDF para facturas y boletas electrónicas.
-// Réplica exacta del formato oficial SUNAT enviado como referencia:
-//   - Página US Letter (612x792 pts)
-//   - Márgenes laterales estrechos (~4mm) con marco exterior completo (excepto frase final)
-//   - Encabezado en UN SOLO recuadro que engloba razón social + dirección + caja derecha con doble borde
-//   - Datos del cliente SIN recuadro (texto plano, etiqueta en negrita + valor en normal)
-//   - Tabla de items con bordes completos (verticales y horizontales), fondo blanco, encabezado en negrita
-//   - Sección de totales en UN recuadro grande dividido por línea vertical: SON/Orden (izq) + totales (der)
-//   - Información de la detracción en su propio recuadro
-//   - Frase final FUERA del marco, con DOBLE línea horizontal arriba, fuente MÁS GRANDE y en CURSIVA
-//   - Todo en MAYÚSCULAS, "OFICINA" → "OF.", sin tildes
-//   - Unidades de medida permitidas: lt., kg., doc., pz., eq., m., kit., %., mill.
-export function generateFacturaPDF(factura, config = {}) {
+function generateFacturaPDF(factura, config = {}) {
   const doc = new jsPDF({ format: 'letter', unit: 'pt' });
-  const pageWidth = doc.internal.pageSize.getWidth();   // 612
+  const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 11.5;
   const contentW = pageWidth - 2 * margin;
-  const topMargin = 26.5; // Margen superior del original
+  const topMargin = 26.5;
 
-  // ===== Normalización de textos (mayúsculas + sin tildes + OFICINA→OF.) =====
   const norm = (s) => {
     if (s === null || s === undefined) return '';
     return String(s)
@@ -549,19 +498,13 @@ export function generateFacturaPDF(factura, config = {}) {
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   };
 
-  // ===== Unidades de medida permitidas por SUNAT =====
-  // Si el valor entrante ya es una unidad válida (UNIDAD, LT., KG., etc.), se respeta tal cual.
-  // Solo se normaliza cuando viene una variante reconocida.
   const UNIDADES_LITERAL = ['UNIDAD', 'LT.', 'KG.', 'DOC.', 'PZ.', 'EQ.', 'M.', 'KIT.', '%.', 'MILL.'];
   const normalizarUnidad = (u) => {
     if (!u) return 'UNIDAD';
     const upper = String(u).toUpperCase().trim();
-    // Si ya viene literal como está, respetarlo
     if (UNIDADES_LITERAL.includes(upper)) return upper;
-    // Formas sin punto final
     const sinPunto = upper.replace(/\.$/, '');
     if (UNIDADES_LITERAL.includes(sinPunto + '.')) return sinPunto + '.';
-    // Mapeo de variantes comunes
     const map = {
       'LT': 'LT.', 'LITRO': 'LT.', 'LITROS': 'LT.',
       'KG': 'KG.', 'KILOGRAMO': 'KG.', 'KILOS': 'KG.',
@@ -576,7 +519,6 @@ export function generateFacturaPDF(factura, config = {}) {
     return map[sinPunto] || upper;
   };
 
-  // ===== Datos de la empresa =====
   const empresa = config?.empresa || {};
   const ruc = empresa.ruc || '20550622930';
   const esNoova = !empresa.ruc || String(empresa.ruc) === '20550622930';
@@ -589,7 +531,6 @@ export function generateFacturaPDF(factura, config = {}) {
     : empresa.direccion || ''
   );
 
-  // ===== Datos del comprobante =====
   const tipoComprobante = factura.tipo || 'Factura';
   const tipoLabel = String(tipoComprobante).toUpperCase().includes('BOLETA')
     ? 'BOLETA ELECTRONICA'
@@ -610,7 +551,6 @@ export function generateFacturaPDF(factura, config = {}) {
   const cliente = factura.cliente || {};
   const items = factura.items || [];
 
-  // ===== Cálculos según formato SUNAT =====
   const subTotalVentas = factura.subtotal || 0;
   const anticipos = Number(factura.anticipos) || 0;
   const descuentos = Number(factura.descuentos) || 0;
@@ -624,10 +564,6 @@ export function generateFacturaPDF(factura, config = {}) {
   const redondeo = Number(factura.redondeo) || 0;
   const importeTotal = Number(factura.total) || (valorVenta + igv + isc + icbperTotal + otrosCargos + otrosTributos + redondeo);
 
-  // ===== Detracción =====
-  // Se leen los valores del objeto `detraccion` (estructura usada por la UI),
-  // con fallback a los campos legacy en la raíz de la factura. Si la detracción
-  // está desactivada explícitamente, se omite el recuadro completo en el PDF.
   const detraccionCfg = factura.detraccion || {};
   const aplicarDetraccion = detraccionCfg.aplicar !== false
     && (Number(factura.montoDetraccion) > 0 || Number(detraccionCfg.monto) > 0);
@@ -641,28 +577,21 @@ export function generateFacturaPDF(factura, config = {}) {
   const bienServicioDetraccion = norm(detraccionCfg.bienServicio || '037');
   const medioPagoDetraccion = norm(detraccionCfg.medioPago || '001');
 
-  // Formatea un monto con 2 decimales fijos
   const fmt = (n) => parseFloat(Number(n) || 0).toFixed(2);
 
   let y = topMargin;
 
-  // ===== HEADER (UN SOLO recuadro que engloba todo el encabezado) =====
   const headerTop = y;
   const headerH = 75;
 
-  // Recuadro principal del header (borde fino)
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.5);
   doc.rect(margin, headerTop, contentW, headerH);
 
-  // Bloque izquierdo: razón social (en 2 líneas) + dirección (en 3 líneas)
-  // Razón social dividida en 2 líneas por el guión
-  // Dirección dividida en 3 líneas: corte en último 'DE' antes del '702' y corte en ' - ' después de '702'
   let yL = headerTop + 16;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(0, 0, 0);
-  // Dividir la razón social en 2 líneas: parte antes del ' - ' y parte después
   let rsLine1 = razonSocial;
   let rsLine2 = '';
   const dashIdx = razonSocial.indexOf(' - ');
@@ -676,45 +605,35 @@ export function generateFacturaPDF(factura, config = {}) {
     doc.text(rsLine2, margin + 5, yL);
     yL += 10;
   }
-  // Espacio entre razón social y dirección
   yL += 5;
 
-  // Dirección formateada en 3 líneas
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
-  // Función para dividir la dirección en 3 líneas con cortes naturales
   const formatAddress3 = (addr) => {
     if (!addr) return [];
-    // Si ya contiene saltos de línea, usarlos
     if (addr.includes('\n')) return addr.split('\n').map(l => l.trim());
-    // Dividir por ' - ' para obtener las partes principales
     const parts = addr.split(' - ');
     if (parts.length >= 2) {
-      // La primera parte contiene 'AV. ... DE MONTERRI DPTO. 702'
-      // Cortar en el último ' DE ' para separar '... DE' de 'MONTERRI DPTO. 702'
       const firstPart = parts[0];
       const deIdx = firstPart.lastIndexOf(' DE ');
       if (deIdx > 0 && firstPart.length - deIdx > 15) {
         return [
-          firstPart.substring(0, deIdx + 3), // incluye ' DE'
-          firstPart.substring(deIdx + 4) + ' -', // resto + guión
+          firstPart.substring(0, deIdx + 3),
+          firstPart.substring(deIdx + 4) + ' -',
           parts.slice(1).join(' - ')
         ];
       }
     }
-    // Fallback: usar splitTextToSize con ancho ajustado
     return doc.splitTextToSize(addr, 240);
   };
   const dirLines = formatAddress3(direccionEmpresa);
   doc.text(dirLines, margin + 5, yL);
 
-  // Bloque derecho: tipo + RUC + serie-numero con BORDE SIMPLE, AMPLIO, pegado al borde derecho
   const boxW = 205;
   const boxX = pageWidth - margin - boxW - 2;
   const boxY = headerTop + 19;
   const boxH = 40;
 
-  // Borde SIMPLE (no doble)
   doc.setLineWidth(0.8);
   doc.rect(boxX, boxY, boxW, boxH);
 
@@ -738,15 +657,10 @@ export function generateFacturaPDF(factura, config = {}) {
   let yCli = y + 14;
 
   const leftX = margin + 2;
-  // Ancho reservado para la etiqueta. Todas las etiquetas empiezan en leftX
-  // (alineadas a la izquierda) y el ":" va en colonX = leftX + labelW.
   const labelW = 100;
   const colonX = leftX + labelW;
   const valueX = colonX + 4;
-  // Ancho máximo del valor (línea izquierda). Limita que la dirección se
-  // extienda hasta el otro lado: se corta en varias líneas si excede.
   const valMaxW = 220;
-  // Columna derecha (forma de pago, guía de remisión)
   const rightX = margin + contentW * 0.55;
   const rightLabelW = 110;
   const rightColonX = rightX + rightLabelW;
@@ -755,8 +669,6 @@ export function generateFacturaPDF(factura, config = {}) {
   const rowH = 9;
   const fSize = 7.5;
 
-  // Función para campo con etiqueta alineada a la izquierda + ":" alineado
-  // en columna vertical fija + valor arrancando en otra columna vertical.
   function evCli(etiqueta, valor, xPos, yPos, _etiquetaW, _etiquetaBold, maxW, opts = {}) {
     const isRight = opts.isRight === true;
     const colX = isRight ? rightColonX : colonX;
@@ -764,11 +676,8 @@ export function generateFacturaPDF(factura, config = {}) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(fSize);
     doc.setTextColor(0, 0, 0);
-    // Etiqueta alineada a la IZQUIERDA (empieza en xPos).
     doc.text(etiqueta, xPos, yPos);
-    // ":" en la columna vertical fija.
     doc.text(':', colX, yPos);
-    // Valor en negrita, arrancando en valueX, con ancho limitado por maxW.
     doc.setFont('helvetica', 'bold');
     const w = maxW || valMaxW;
     const valLines = doc.splitTextToSize(String(valor || ''), Math.max(w, 20));
@@ -776,23 +685,18 @@ export function generateFacturaPDF(factura, config = {}) {
     return valLines.length * rowH;
   }
 
-  // Fila 1: Fecha de Emisión (izq) + Forma de pago (der)
   yCli += Math.max(
     evCli('Fecha de Emisión', fechaFormatted, leftX, yCli, labelW, false, 175),
     evCli('Forma de pago', formaPago, rightX, yCli, rightLabelW, false, rightValMaxW, { isRight: true })
   );
 
-  // Fila 2: Señor(es) (izq) + Guía de remisión remitente (der)
   yCli += Math.max(
     evCli('Señor(es)', norm(cliente.razonSocial || '-'), leftX, yCli, labelW, false, 175),
     evCli('Guía de remisión remitente', guiaRemision || '-', rightX, yCli, rightLabelW, false, rightValMaxW, { isRight: true })
   );
 
-  // Fila 3: RUC (izq)
   yCli += evCli('RUC', norm(cliente.ruc || '-'), leftX, yCli, labelW, false);
 
-  // Fila 4: Establecimiento del Emisor (valor con ancho limitado para que
-  // NO se extienda hasta el otro lado — se corta en varias líneas).
   const estabLines = doc.splitTextToSize(
     norm(direccionEmpresa || '-'),
     valMaxW
@@ -800,26 +704,18 @@ export function generateFacturaPDF(factura, config = {}) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(fSize);
   doc.setTextColor(0, 0, 0);
-  // Etiqueta alineada a la izquierda (igual que las demás).
   doc.text('Establecimiento del Emisor', leftX, yCli);
-  // ":" alineado en la columna vertical fija.
   doc.text(':', colonX, yCli);
-  // Valor en negrita, arrancando en valueX, con ancho limitado.
   doc.setFont('helvetica', 'bold');
   doc.text(estabLines, valueX, yCli);
   yCli += estabLines.length * rowH;
 
-  // Fila 5: Tipo de Moneda
   yCli += evCli('Tipo de Moneda', nombreMoneda, leftX, yCli, labelW, false);
 
-  // Fila 6: Observación (texto libre ingresado manualmente en el modal).
   yCli += evCli('Observación', observacion, leftX, yCli, labelW, false);
 
   y = yCli + 8;
 
-  // ===== TABLA DE ITEMS (estilo 'open': solo líneas horizontales, SIN bordes verticales internos) =====
-  // El "Código" ya es el código del producto — no se añade una columna
-  // duplicada de "Cód. Producto".
   const colCant = 40;
   const colUnidad = 65;
   const colCodigo = 70;
@@ -849,7 +745,6 @@ export function generateFacturaPDF(factura, config = {}) {
       fontSize: 8,
       cellPadding: 2,
       lineColor: [0, 0, 0],
-      // SIN bordes izquierdo/derecho en celdas internas (solo horizontal)
       lineWidth: { top: 0, bottom: 0, left: 0, right: 0 },
       textColor: [0, 0, 0],
       fillColor: [255, 255, 255],
@@ -885,7 +780,6 @@ export function generateFacturaPDF(factura, config = {}) {
     },
   });
 
-  // Dibujar manualmente el borde superior e inferior de la tabla (línea horizontal completa)
   const tableTopY = y;
   const tableBottomY = doc.lastAutoTable?.finalY || y;
   doc.setDrawColor(0, 0, 0);
@@ -894,46 +788,31 @@ export function generateFacturaPDF(factura, config = {}) {
 
   y = tableBottomY + 4;
 
-  // ===== TOTALES + SON =====
-  // Lado izquierdo (SON): LIBRE, sin recuadro, sin líneas arriba/abajo
-  //   1. Valor de venta de operaciones gratuitas (negrita) + monto en caja (negrita, centrado verticalmente)
-  //   2. SON: [monto en letras] en UNA línea, negrita
-  //   3. orden de compra: [valor] más chiquito, minúscula
-  // Lado derecho (Totales): recuadro AMPLIO con cajas para cada valor
-  //   - Etiquetas alineadas a la DERECHA (pegadas a las cajas de valores)
-  //   - Valores centrados VERTICALMENTE dentro de las cajas
-  //   - Importe Total SIN negrita
   const totTop = y;
 
-  // 11 filas de totales; la venta gratuita va solo en el lado izquierdo.
   const filasTotales = 11;
   const filaH = 12;
   const totH = filasTotales * filaH + 16;
 
-  // Solo dibujar el recuadro del lado DERECHO (totales), NO alrededor del SON
-  // Recuadro MÁS AMPLIO: ocupa más de la mitad derecha
   const totRightX = margin + contentW * 0.54;
   const totRightW = margin + contentW - totRightX;
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.5);
   doc.rect(totRightX, totTop, totRightW, totH);
 
-  // --- Lado izquierdo: SON (LIBRE, sin recuadro) ---
   const sonX = margin + 4;
-  const sonW = totRightX - margin - 8; // ancho hasta el recuadro de totales
+  const sonW = totRightX - margin - 8;
   let ySon = totTop + 38;
 
   const montoLetras = factura.totalLetras
     ? factura.totalLetras.replace(/^SON:\s*/i, '').replace(/\s+(SOLES|DOLAR\s+AMERICANO)$/i, '').trim()
     : numeroALetras(importeTotal);
 
-  // 1. Primero: Valor de venta de operaciones gratuitas + monto en caja.
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(0, 0, 0);
   const vvogLabel = 'Valor de venta de operaciones gratuitas';
   doc.text(vvogLabel, sonX, ySon);
-  // Caja para el monto, pegada al texto como en la plantilla.
   const vvogBoxW = 50;
   const vvogBoxX = sonX + doc.getTextWidth(vvogLabel) + 8;
   const vvogBoxH = filaH;
@@ -945,12 +824,10 @@ export function generateFacturaPDF(factura, config = {}) {
   doc.text(`${simboloMoneda} ${fmt(valorVentaGratuita)}`, vvogBoxX + vvogBoxW / 2, vvogBoxY + vvogBoxH / 2 + 2, { align: 'center' });
   ySon += 18;
 
-  // 2. SON: [monto en letras] en UNA línea, negrita
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(0, 0, 0);
   const sonText = `SON: ${montoLetras} ${nombreMoneda}`;
-  // Reducir tamaño de fuente si es necesario para que entre en una línea
   let sonFontSize = 8;
   while (sonFontSize > 5 && doc.getTextWidth(sonText) > sonW) {
     sonFontSize -= 0.5;
@@ -959,33 +836,26 @@ export function generateFacturaPDF(factura, config = {}) {
   doc.text(sonText, sonX, ySon);
   ySon += 16;
 
-  // 3. orden de compra: [valor] más chiquito, minúscula
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   doc.setTextColor(0, 0, 0);
   doc.text(`orden de compra: ${String(ordenCompra || '-').toLowerCase()}`, sonX, ySon);
 
-  // --- Lado derecho: Totales (12 filas, cada valor en caja) ---
-  // Cajas de valores amplias, pegadas al borde derecho del recuadro
   const valorBoxW = 132;
   const valorBoxX = margin + contentW - valorBoxW - 4;
   const valorBoxH = filaH - 1;
-  // Etiquetas alineadas a la DERECHA (pegadas a las cajas de valores)
-  const totLabelRightX = valorBoxX - 4; // alineadas a la derecha, justo antes de las cajas
+  const totLabelRightX = valorBoxX - 4;
   let yTot = totTop + 14;
 
   function filaTotal(label, value, isBold) {
     doc.setFont('helvetica', isBold ? 'bold' : 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(0, 0, 0);
-    // Etiqueta alineada a la DERECHA (pegada a la caja)
     doc.text(label, totLabelRightX, yTot, { align: 'right' });
-    // Caja para el valor
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.3);
     const boxY = yTot - 6;
     doc.rect(valorBoxX, boxY, valorBoxW, valorBoxH);
-    // Valor alineado a la derecha dentro de la caja
     doc.text(`${simboloMoneda} ${fmt(value)}`, valorBoxX + valorBoxW - 4, boxY + valorBoxH / 2 + 2, { align: 'right' });
     yTot += filaH;
   }
@@ -1000,26 +870,20 @@ export function generateFacturaPDF(factura, config = {}) {
   filaTotal('Otros Cargos', otrosCargos, false);
   filaTotal('Otros Tributos', otrosTributos, false);
   filaTotal('Monto de redondeo', redondeo, false);
-  // Importe Total SIN negrita
   filaTotal('Importe Total', importeTotal, false);
 
   y = totTop + totH + 4;
 
-  // ===== INFORMACIÓN DE LA DETRACCIÓN (recuadro con DOBLE marco, contenido justificado a la derecha) =====
-  // Solo se dibuja si la detracción está activa. Si el usuario desactivó el
-  // checkbox en el formulario, esta sección no aparece en el PDF.
   if (aplicarDetraccion) {
     const detTop = y;
     let yDet = detTop + 14;
 
-    // Título en negrita, alineado a la izquierda con padding mayor
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(0, 0, 0);
     doc.text('Información de la detracción', margin + 8, yDet);
     yDet += 11;
 
-    // Contenido justificado: todas las líneas alineadas a la izquierda con el mismo padding
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     const detX = margin + 8;
@@ -1036,11 +900,6 @@ export function generateFacturaPDF(factura, config = {}) {
       : `${medioPagoDetraccion}`;
     doc.text(medioPagoLabel, detValueX, yDet);
     yDet += 11;
-    // Última línea con los datos del banco, porcentaje y monto alineados.
-    // El monto de detracción SIEMPRE se muestra en Soles (S/) porque la
-    // cuenta del Banco de la Nación es en soles y SUNAT exige que el
-    // depósito de detracción sea en esa moneda, sin importar la moneda
-    // del comprobante.
     doc.text('Nro. Cta. Banco de la Nación:', detX, yDet);
     doc.text(cuentaBancoNacion, detValueX, yDet);
     doc.text('Porcentaje de detracción:', detX + 230, yDet);
@@ -1050,7 +909,6 @@ export function generateFacturaPDF(factura, config = {}) {
     yDet += 8;
 
     const detH = yDet - detTop;
-    // DOBLE marco: borde externo + borde interno, abarca TODO el ancho
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.5);
     doc.rect(margin, detTop, contentW, detH);
@@ -1060,18 +918,14 @@ export function generateFacturaPDF(factura, config = {}) {
     y = detTop + detH + 6;
   }
 
-  // ===== LEYENDA FINAL (DENTRO del marco exterior, con borde inferior DOBLE) =====
-  // La frase va dentro del marco, después de la detracción, y el marco cierra con doble línea abajo
   const leyTop = y;
 
-  // Frase final en cursiva, MÁS GRANDE que el resto del texto, CENTRADA
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(12);
   doc.setTextColor(0, 0, 0);
   const leyenda = 'Esta es una representación impresa de la factura electrónica, generada en el Sistema de SUNAT. Puede verificarla utilizando su clave SOL.';
   const leyendaLines = doc.splitTextToSize(leyenda, contentW - 16);
   let yLey = leyTop + 15;
-  // Cada línea centrada horizontalmente
   const centerX = margin + contentW / 2;
   leyendaLines.forEach(line => {
     doc.text(line, centerX, yLey, { align: 'center' });
@@ -1082,21 +936,14 @@ export function generateFacturaPDF(factura, config = {}) {
   doc.setLineWidth(0.5);
   doc.rect(margin + 2, leyTop, contentW - 4, yLey - leyTop);
 
-  // ===== MARCO EXTERIOR que envuelve TODO: header + cliente + tabla + totales + detracción + frase final =====
-  // El marco cierra con DOBLE línea en el borde inferior
   const marcoTop = topMargin;
   const marcoBottom = yLey;
 
-  // Dibujar los 3 lados del marco (superior, izquierdo, derecho) con línea simple
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.5);
-  // Línea superior
   doc.line(margin, marcoTop, margin + contentW, marcoTop);
-  // Línea izquierda
   doc.line(margin, marcoTop, margin, marcoBottom);
-  // Línea derecha
   doc.line(margin + contentW, marcoTop, margin + contentW, marcoBottom);
-  // Borde inferior DOBLE (dos rayas paralelas separadas por ~3pt)
   doc.line(margin, marcoBottom, margin + contentW, marcoBottom);
   doc.line(margin, marcoBottom + 3, margin + contentW, marcoBottom + 3);
 

@@ -66,7 +66,6 @@ export default function Clientes() {
   const [eliminarId, setEliminarId] = useState(null);
   const [mensaje, setMensaje] = useState(null);
 
-  // Estado del modal de envío rápido de WhatsApp.
   const [modalWhatsapp, setModalWhatsapp] = useState(null);
   const [textoWhatsapp, setTextoWhatsapp] = useState('');
   const [errorWhatsapp, setErrorWhatsapp] = useState(null);
@@ -245,7 +244,6 @@ export default function Clientes() {
     setContactos(actualizado);
   }
 
-  // ── WhatsApp rápido desde la tabla ──
   function abrirWhatsappRapido(cliente, contacto) {
     if (!puedeMensajear) {
       mostrarMensaje(

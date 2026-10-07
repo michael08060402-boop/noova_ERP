@@ -1,530 +1,335 @@
-import { useState, useMemo } from 'react';
-import { useForm } from 'react-hook-form';
-import {
-  FiPlus, FiSearch, FiTrash2, FiEdit2, FiSend, FiEye, FiClock,
-  FiRefreshCw
-} from 'react-icons/fi';
-import { useSolicitudesCotizacion } from '../hooks/useSolicitudesCotizacion';
-import { useProveedores } from '../hooks/useProveedores';
+import { useMemo, useState } from 'react';
+import { FiArrowLeft, FiClipboard, FiCopy, FiDownload, FiEdit2, FiPlus, FiSave, FiSearch, FiTrash2 } from 'react-icons/fi';
+import { useCotizaciones } from '../hooks/useCotizaciones';
+import { usePlantillasSolicitud } from '../hooks/usePlantillasSolicitud';
 import { useAuth } from '../context/AuthContext';
+import { useConfig } from '../context/ConfigContext';
+import { puede } from '../services/userService';
 import { addLog } from '../services/logService';
-import { formatDate } from '../utils/formatDate';
-import { contienePatronPeligroso } from '../utils/validation';
-import Modal from '../components/Modal';
+import { formatDate, formatDateISO } from '../utils/formatDate';
+import {
+  ETIQUETAS_LEGACY, MONEDAS, bloquesDeSolicitud, clonarBloques, contarItems, crearCampo, primeraDescripcion, valorCampo
+} from '../utils/plantillasSolicitud';
+import EditorBloques from '../components/solicitud/EditorBloques';
+import VistaPreviaPDF from '../components/solicitud/VistaPreviaPDF';
+import IconoPlantilla from '../components/solicitud/IconoPlantilla';
 import ConfirmDialog from '../components/ConfirmDialog';
+import Paginacion from '../components/Paginacion';
 import Loading from '../components/Loading';
 import '../styles/shared.css';
 import './SolicitudesCotizacion.css';
 
-const TIPOS_SOLICITUD = ['Adquisición de equipos', 'Servicio de calibración', 'Servicio general', 'Otro'];
-
-// Mensajes predefinidos según lo que se vaya a pedir. El usuario solo
-// completa el detalle (qué equipo, qué servicio, cantidades, etc.) — no
-// hace falta armar una tabla de ítems ni registrar la empresa antes.
-const PLANTILLAS_POR_TIPO = {
-  'Adquisición de equipos':
-    'Detalle los equipos que necesita cotizar: nombre, marca/modelo de referencia, cantidad y especificaciones técnicas.\n\nEj: Termohigrómetro digital, rango -20°C a 60°C, 2 unidades, con certificado de calibración incluido.',
-  'Servicio de calibración':
-    'Detalle el equipo a calibrar: nombre, marca, modelo, rango y norma o patrón bajo el cual necesita el certificado.\n\nEj: Calibración de balanza analítica, marca XXX, modelo XXX, rango 0-220g, según NTP/ISO vigente.',
-  'Servicio general':
-    'Detalle el servicio que necesita cotizar (alcance, lugar, plazo estimado, condiciones particulares).',
-  'Otro':
-    'Detalle lo que necesita cotizar.'
-};
-
-const SOLICITUD_VACIA = {
-  tipo: TIPOS_SOLICITUD[0],
-  proveedorId: '',
-  proveedorNombre: '',
-  proveedorEmail: '',
-  fechaLimite: '',
-  detalle: PLANTILLAS_POR_TIPO[TIPOS_SOLICITUD[0]]
-};
-
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function badgeEstadoClase(estado) {
-  const mapa = { Borrador: 'borrador', Enviada: 'enviada', Respondida: 'aprobada', Cerrada: 'rechazada' };
-  return mapa[estado] || 'borrador';
+function normalizar(texto) {
+  return String(texto || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
-function construirCuerpoCorreo({ solicitud, empresaNombre, remitenteNombre }) {
-  const detalleHtml = (solicitud.detalle || '')
-    .split('\n')
-    .map((linea) => `<p style="margin:0 0 8px;">${linea || '&nbsp;'}</p>`)
-    .join('');
+function nombrePlantilla(sol) {
+  return sol.plantillaNombre || ETIQUETAS_LEGACY[sol.categoria] || 'EPP';
+}
 
-  return `
-    <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;">
-      <p>Estimados señores,</p>
-      <p>Por medio del presente, ${empresaNombre || 'nuestra empresa'} solicita a ustedes cotización
-      (${solicitud.tipo || 'requerimiento'}, ref. <strong>${solicitud.codigo || ''}</strong>) para lo siguiente:</p>
-      ${detalleHtml}
-      ${solicitud.fechaLimite ? `<p>Agradeceremos remitir su cotización antes del <strong>${formatDate(solicitud.fechaLimite)}</strong>.</p>` : ''}
-      <p>Quedamos atentos a su respuesta.</p>
-      <p>Saludos cordiales,<br/>${remitenteNombre || ''}<br/>${empresaNombre || ''}</p>
-    </div>
-  `;
+function asuntoDe(sol) {
+  const bloques = bloquesDeSolicitud(sol);
+  return valorCampo(bloques, 'asunto') || sol.asunto || primeraDescripcion(bloques) || '—';
+}
+
+function limpiar(valor) {
+  return JSON.parse(JSON.stringify(valor));
+}
+
+function tieneContenido(bloques) {
+  const tablas = bloques.filter((b) => b.tipo === 'tabla');
+  return !tablas.length || contarItems(bloques) > 0;
 }
 
 export default function SolicitudesCotizacion() {
-  const { userProfile, currentUser } = useAuth();
-  const {
-    solicitudes, loading, addSolicitud, editSolicitud, removeSolicitud, enviarSolicitud
-  } = useSolicitudesCotizacion();
-  const { proveedores, loading: loadingProveedores } = useProveedores();
+  const { currentUser, userProfile } = useAuth();
+  const { config, refreshConfig } = useConfig();
+  const { cotizaciones: solicitudes, loading, addCotizacion, editCotizacion, removeCotizacion } = useCotizaciones(true, { soloSolicitudes: true });
+  const { plantillas, loading: loadingPlantillas } = usePlantillasSolicitud();
 
-  const [terminoBusqueda, setTerminoBusqueda] = useState('');
+  const puedeCrear = puede(userProfile, 'solicitudes', 'create');
+  const puedeEditar = puede(userProfile, 'solicitudes', 'update');
+  const puedeEliminar = puede(userProfile, 'solicitudes', 'delete');
+
+  const responsable = userProfile?.nombre || currentUser?.displayName || currentUser?.email || '';
+
+  const [vista, setVista] = useState('lista');
+  const [borrador, setBorrador] = useState(null);
+  const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState(null);
+  const [eliminarId, setEliminarId] = useState(null);
+  const [eliminando, setEliminando] = useState(false);
+  const [termino, setTermino] = useState('');
+  const [filtroPlantilla, setFiltroPlantilla] = useState('');
+  const [pagina, setPagina] = useState(1);
+  const [porPagina, setPorPagina] = useState(10);
 
-  function mostrarMensaje(tipo, texto) {
-    setMensaje({ tipo, texto });
-    setTimeout(() => setMensaje(null), 5000);
-  }
+  const plantillasActivas = useMemo(() => plantillas.filter((p) => p.activa !== false), [plantillas]);
+  const nombresPlantilla = useMemo(() => [...new Set(solicitudes.map(nombrePlantilla))].sort(), [solicitudes]);
 
-  // ── Solicitudes: modal crear/editar + enviar en un solo paso ──
-  const [mostrarModalSolicitud, setMostrarModalSolicitud] = useState(false);
-  const [editandoSolicitudId, setEditandoSolicitudId] = useState(null);
-  const [enviandoDesdeModal, setEnviandoDesdeModal] = useState(false);
-  const [guardandoBorrador, setGuardandoBorrador] = useState(false);
-
-  const {
-    register, handleSubmit, reset, setValue, watch, getValues,
-    formState: { errors }
-  } = useForm({ defaultValues: SOLICITUD_VACIA });
-
-  const tipoSeleccionado = watch('tipo');
-  const proveedorIdSeleccionado = watch('proveedorId');
-
-  function alSeleccionarProveedor(id) {
-    setValue('proveedorId', id);
-    const prov = proveedores.find((p) => p.id === id);
-    if (prov) {
-      setValue('proveedorNombre', prov.razonSocial || '');
-      setValue('proveedorEmail', prov.email || '');
-    }
-  }
-
-  function usarPlantilla() {
-    setValue('detalle', PLANTILLAS_POR_TIPO[tipoSeleccionado] || '');
-  }
-
-  function alCambiarTipo(nuevoTipo) {
-    setValue('tipo', nuevoTipo);
-    const detalleActual = getValues('detalle');
-    const eraPlantilla = Object.values(PLANTILLAS_POR_TIPO).includes(detalleActual) || !detalleActual?.trim();
-    if (eraPlantilla) {
-      setValue('detalle', PLANTILLAS_POR_TIPO[nuevoTipo] || '');
-    }
-  }
-
-  function nuevaSolicitud() {
-    setEditandoSolicitudId(null);
-    reset(SOLICITUD_VACIA);
-    setMostrarModalSolicitud(true);
-  }
-
-  function editarSolicitud(sol) {
-    setEditandoSolicitudId(sol.id);
-    reset({
-      tipo: sol.tipo || TIPOS_SOLICITUD[0],
-      proveedorId: sol.proveedorId || '',
-      proveedorNombre: sol.proveedorNombre || '',
-      proveedorEmail: sol.proveedorEmail || '',
-      fechaLimite: sol.fechaLimite || '',
-      detalle: sol.detalle || PLANTILLAS_POR_TIPO[sol.tipo] || ''
+  const filtradas = useMemo(() => {
+    const t = normalizar(termino.trim());
+    return solicitudes.filter((s) => {
+      if (filtroPlantilla && nombrePlantilla(s) !== filtroPlantilla) return false;
+      if (!t) return true;
+      return [s.responsable, nombrePlantilla(s), asuntoDe(s)].some((v) => normalizar(v).includes(t));
     });
-    setMostrarModalSolicitud(true);
+  }, [solicitudes, termino, filtroPlantilla]);
+
+  const paginadas = useMemo(() => filtradas.slice((pagina - 1) * porPagina, pagina * porPagina), [filtradas, pagina, porPagina]);
+
+  const solicitudPDF = useMemo(() => (borrador ? { ...borrador, fechaEmision: borrador.fechaEmision || formatDateISO(), responsable: borrador.responsable || responsable, esSolicitudCotizacion: true } : null), [borrador, responsable]);
+  const contexto = {
+    fecha: formatDate(borrador?.fechaEmision || formatDateISO()),
+    solicitante: borrador?.responsable || responsable,
+    empresa: config?.empresa || {},
+    moneda: borrador?.moneda
+  };
+
+  function avisar(tipo, texto) {
+    setMensaje({ tipo, texto });
+    window.setTimeout(() => setMensaje((m) => (m?.texto === texto ? null : m)), 4500);
   }
 
-  function validarFormulario(data) {
-    if (!data.proveedorEmail || !EMAIL_REGEX.test(data.proveedorEmail)) {
-      mostrarMensaje('error', 'Ingresa un correo de destino válido');
-      return false;
-    }
-    if (!data.detalle || !data.detalle.trim()) {
-      mostrarMensaje('error', 'Escribe el detalle de lo que necesitas cotizar');
-      return false;
-    }
-    if (contienePatronPeligroso(data.detalle)) {
-      mostrarMensaje('error', 'El detalle contiene caracteres no permitidos');
-      return false;
-    }
-    return true;
+  function elegirPlantilla(p) {
+    setBorrador({ plantillaId: p.id, plantillaNombre: p.nombre, moneda: 'S/', bloques: clonarBloques(p.bloques) });
+    setVista('editor');
   }
 
-  function armarPayload(data) {
-    return {
-      tipo: data.tipo,
-      proveedorId: data.proveedorId || '',
-      proveedorNombre: (data.proveedorNombre || '').trim() || data.proveedorEmail,
-      proveedorEmail: data.proveedorEmail.trim(),
-      fechaLimite: data.fechaLimite || '',
-      detalle: data.detalle.trim()
-    };
+  function abrir(sol, duplicar = false) {
+    setBorrador({
+      id: duplicar ? undefined : sol.id,
+      plantillaId: sol.plantillaId || '',
+      plantillaNombre: nombrePlantilla(sol),
+      moneda: sol.moneda || 'S/',
+      fechaEmision: duplicar ? undefined : sol.fechaEmision,
+      responsable: duplicar ? undefined : sol.responsable,
+      bloques: clonarBloques(bloquesDeSolicitud(sol))
+    });
+    setVista('editor');
   }
 
-  // Guardar como borrador, sin enviar todavía
-  async function alGuardarBorrador(data) {
-    if (!validarFormulario(data)) return;
-    setGuardandoBorrador(true);
-    try {
-      const payload = armarPayload(data);
-      if (editandoSolicitudId) {
-        await editSolicitud(editandoSolicitudId, payload);
-        await addLog({ usuario: userProfile?.nombre || currentUser?.email, accion: 'editar_solicitud_cotizacion', detalle: editandoSolicitudId });
-      } else {
-        const { codigo } = await addSolicitud(payload);
-        await addLog({ usuario: userProfile?.nombre || currentUser?.email, accion: 'crear_solicitud_cotizacion', detalle: codigo });
+  function aplicarDatosImportados(datos = {}) {
+    setBorrador((b) => {
+      const bloques = b.bloques.map((bl) => (bl.tipo === 'campos'
+        ? { ...bl, campos: bl.campos.map((c) => (c.clave && datos[c.clave] && !String(c.valor || '').trim() ? { ...c, valor: datos[c.clave] } : c)) }
+        : bl));
+      if (datos.observacion) {
+        const i = bloques.findIndex((bl) => bl.tipo === 'campos');
+        if (i >= 0 && !bloques[i].campos.some((c) => c.clave === 'observacion')) {
+          bloques[i] = { ...bloques[i], campos: [...bloques[i].campos, crearCampo({ etiqueta: 'Observación', tipo: 'textoLargo', clave: 'observacion', valor: datos.observacion })] };
+        }
       }
-      mostrarMensaje('success', 'Guardado como borrador');
-      setMostrarModalSolicitud(false);
-    } catch (err) {
-      console.error('Error guardando solicitud:', err);
-      mostrarMensaje('error', 'Error al guardar: ' + err.message);
-    } finally {
-      setGuardandoBorrador(false);
-    }
+      return { ...b, bloques };
+    });
   }
 
-  // Flujo principal: guarda (o actualiza) Y envía el correo, en un solo clic
-  async function alEnviarDesdeModal(data) {
-    if (!validarFormulario(data)) return;
-    setEnviandoDesdeModal(true);
+  async function guardar() {
+    if (!borrador.bloques.length) return avisar('error', 'La solicitud no tiene secciones.');
+    if (!tieneContenido(borrador.bloques)) return avisar('error', 'Agrega al menos un ítem en la tabla antes de guardar.');
+    setGuardando(true);
     try {
-      const payload = armarPayload(data);
-      const empresaNombre = 'NOOVA S.A.C.';
-      const remitenteNombre = userProfile?.nombre || currentUser?.email || '';
-
-      let solicitudId = editandoSolicitudId;
-      let codigo;
-      if (solicitudId) {
-        await editSolicitud(solicitudId, payload);
+      const hoy = formatDateISO();
+      const data = limpiar({
+        clienteId: '',
+        cliente: {},
+        responsable: borrador.responsable || responsable,
+        cargoResponsable: userProfile?.cargo || '',
+        emailResponsable: userProfile?.email || currentUser?.email || '',
+        telefonoResponsable: userProfile?.telefono || '',
+        tipoItem: 'solicitud',
+        esSolicitudCotizacion: true,
+        plantillaId: borrador.plantillaId || '',
+        plantillaNombre: borrador.plantillaNombre || '',
+        moneda: borrador.moneda || 'S/',
+        bloques: borrador.bloques,
+        asunto: valorCampo(borrador.bloques, 'asunto') || primeraDescripcion(borrador.bloques) || '',
+        totalItems: contarItems(borrador.bloques),
+        estado: 'Generada',
+        fechaEmision: borrador.fechaEmision || hoy,
+        fecha: borrador.fechaEmision || hoy
+      });
+      if (borrador.id) {
+        await editCotizacion(borrador.id, data);
+        addLog({ usuario: responsable, accion: 'editar_solicitud_cotizacion', detalle: borrador.id }).catch(() => {});
       } else {
-        const creada = await addSolicitud(payload);
-        solicitudId = creada.id;
-        codigo = creada.codigo;
+        const r = await addCotizacion(data);
+        setBorrador((b) => ({ ...b, id: r.id, fechaEmision: data.fechaEmision }));
+        addLog({ usuario: responsable, accion: 'crear_solicitud_cotizacion', detalle: r.id || '' }).catch(() => {});
       }
-
-      const cuerpoHtml = construirCuerpoCorreo({
-        solicitud: { ...payload, codigo: codigo || solicitudes.find((s) => s.id === solicitudId)?.codigo },
-        empresaNombre,
-        remitenteNombre
-      });
-      const asunto = `Solicitud de cotización${codigo ? ` ${codigo}` : ''} - ${empresaNombre}`;
-
-      await enviarSolicitud({
-        solicitudId,
-        destinatarios: [payload.proveedorEmail],
-        cc: userProfile?.email || currentUser?.email ? [userProfile?.email || currentUser?.email] : [],
-        asunto,
-        cuerpoHtml
-      });
-
-      await addLog({
-        usuario: userProfile?.nombre || currentUser?.email,
-        accion: 'enviar_solicitud_cotizacion',
-        detalle: `${codigo || solicitudId} → ${payload.proveedorEmail}`
-      });
-
-      mostrarMensaje('success', 'Solicitud enviada correctamente');
-      setMostrarModalSolicitud(false);
+      avisar('success', 'Solicitud guardada.');
     } catch (err) {
-      console.error('Error enviando solicitud:', err);
-      mostrarMensaje('error', 'Error al enviar: ' + err.message);
+      console.error('Error guardando solicitud de cotización:', err);
+      avisar('error', 'No se pudo guardar la solicitud: ' + err.message);
     } finally {
-      setEnviandoDesdeModal(false);
+      setGuardando(false);
     }
   }
 
-  // ── Solicitudes: eliminar ──
-  const [mostrarConfirmSolicitud, setMostrarConfirmSolicitud] = useState(false);
-  const [eliminarSolicitudId, setEliminarSolicitudId] = useState(null);
-
-  async function confirmarEliminarSolicitud() {
+  async function descargar(sol) {
     try {
-      await removeSolicitud(eliminarSolicitudId);
-      setMostrarConfirmSolicitud(false);
-      setEliminarSolicitudId(null);
+      const c = config || (await refreshConfig());
+      const { downloadSolicitudPDF } = await import('../utils/generateSolicitudPDF');
+      downloadSolicitudPDF(sol, c);
     } catch (err) {
-      mostrarMensaje('error', 'Error al eliminar: ' + err.message);
+      console.error('Error generando PDF de solicitud:', err);
+      avisar('error', 'No se pudo generar el PDF: ' + err.message);
     }
   }
 
-  // ── Solicitudes: ver detalle ──
-  const [solicitudDetalle, setSolicitudDetalle] = useState(null);
-
-  // ── Solicitudes: reenviar una ya creada (desde la tabla) ──
-  const [reenviando, setReenviando] = useState(null); // id en curso
-
-  async function reenviarSolicitud(sol) {
-    if (!sol.proveedorEmail) {
-      mostrarMensaje('error', 'Esta solicitud no tiene un correo de destino registrado');
-      return;
-    }
-    setReenviando(sol.id);
+  async function confirmarEliminar() {
+    if (!eliminarId || eliminando) return;
+    setEliminando(true);
     try {
-      const empresaNombre = 'NOOVA S.A.C.';
-      const remitenteNombre = userProfile?.nombre || currentUser?.email || '';
-      const cuerpoHtml = construirCuerpoCorreo({ solicitud: sol, empresaNombre, remitenteNombre });
-      const asunto = `Solicitud de cotización ${sol.codigo || ''} - ${empresaNombre}`;
-      await enviarSolicitud({
-        solicitudId: sol.id,
-        destinatarios: [sol.proveedorEmail],
-        cc: userProfile?.email || currentUser?.email ? [userProfile?.email || currentUser?.email] : [],
-        asunto,
-        cuerpoHtml
-      });
-      await addLog({
-        usuario: userProfile?.nombre || currentUser?.email,
-        accion: 'reenviar_solicitud_cotizacion',
-        detalle: `${sol.codigo} → ${sol.proveedorEmail}`
-      });
-      mostrarMensaje('success', 'Solicitud reenviada correctamente');
+      await removeCotizacion(eliminarId);
+      addLog({ usuario: responsable, accion: 'eliminar_solicitud_cotizacion', detalle: eliminarId }).catch(() => {});
+      setEliminarId(null);
+      avisar('success', 'Solicitud eliminada.');
     } catch (err) {
-      mostrarMensaje('error', 'Error al reenviar: ' + err.message);
+      console.error('Error eliminando solicitud de cotización:', err);
+      avisar('error', 'No se pudo eliminar la solicitud.');
     } finally {
-      setReenviando(null);
+      setEliminando(false);
     }
   }
 
-  const solicitudesFiltradas = useMemo(() => {
-    const term = terminoBusqueda.toLowerCase();
-    return solicitudes.filter((s) =>
-      (s.codigo || '').toLowerCase().includes(term) ||
-      (s.proveedorNombre || '').toLowerCase().includes(term) ||
-      (s.tipo || '').toLowerCase().includes(term)
-    );
-  }, [solicitudes, terminoBusqueda]);
-
-  if (loading || loadingProveedores) return <Loading message="Cargando solicitudes de cotización..." />;
+  if (loading) return <Loading message="Cargando solicitudes..." />;
 
   return (
-    <div className="pagina">
+    <div className="pagina solicitudes-cotizacion-page">
       <div className="pagina-header">
         <div>
-          <h1 className="pagina-titulo">Solicitudes de Cotización a Proveedores</h1>
-          <p className="pagina-subtitle">Pide cotizaciones a otras empresas: escribe el correo, el detalle y envía.</p>
+          <h1 className="pagina-titulo">Solicitud de cotización</h1>
+          <p className="pagina-subtitulo">Arma la solicitud desde una plantilla, ajústala y descarga el PDF para enviarlo al proveedor.</p>
         </div>
-        <button className="btn-principal" onClick={nuevaSolicitud}>
-          <FiPlus size={16} /> Nueva Solicitud
-        </button>
+        {vista === 'lista' && puedeCrear && (
+          <button className="btn-principal" onClick={() => setVista('plantilla')}>
+            <FiPlus size={16} /> Nueva solicitud
+          </button>
+        )}
       </div>
 
-      {mensaje && (
-        <div className={`mensaje-flash mensaje-${mensaje.tipo}`}>{mensaje.texto}</div>
-      )}
+      {mensaje && <div className={`mensaje-flash mensaje-${mensaje.tipo}`} role="status">{mensaje.texto}</div>}
 
-      <div className="filtros-barra">
-        <div className="barra-busqueda">
-          <FiSearch className="icono-busqueda" size={18} />
-          <input
-            type="text"
-            placeholder="Buscar por código, proveedor o tipo..."
-            value={terminoBusqueda}
-            onChange={(e) => setTerminoBusqueda(e.target.value)}
-          />
-        </div>
-      </div>
-
-        <div className="tarjeta-tabla">
-          {solicitudesFiltradas.length === 0 ? (
-            <div className="estado-vacio">
-              <p>No hay solicitudes de cotización</p>
-              <p className="pista">Crea una nueva solicitud: solo necesitas el correo del proveedor y el detalle</p>
+      {vista === 'lista' && (
+        <>
+          <div className="filtros-barra">
+            <div className="barra-busqueda">
+              <FiSearch className="icono-busqueda" size={18} />
+              <input type="text" placeholder="Buscar por asunto, plantilla o solicitante..." value={termino} onChange={(e) => { setTermino(e.target.value); setPagina(1); }} />
             </div>
-          ) : (
-            <div className="tabla-contenedor">
-              <table className="tabla-datos">
-                <thead>
-                  <tr>
-                    <th>Código</th>
-                    <th>Proveedor / Correo</th>
-                    <th>Tipo</th>
-                    <th>Fecha límite</th>
-                    <th className="texto-centro">Estado</th>
-                    <th className="texto-centro">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {solicitudesFiltradas.map((s) => (
-                    <tr key={s.id}>
-                      <td className="texto-codigo">{s.codigo}</td>
-                      <td>
-                        <div className="texto-negrita">{s.proveedorNombre || '—'}</div>
-                        <div className="pista">{s.proveedorEmail}</div>
-                      </td>
-                      <td>{s.tipo}</td>
-                      <td>{s.fechaLimite ? formatDate(s.fechaLimite) : '—'}</td>
-                      <td className="texto-centro">
-                        <span className={`badge-estado ${badgeEstadoClase(s.estado)}`}>{s.estado}</span>
-                      </td>
-                      <td className="texto-centro">
-                        <div className="acciones-tabla">
-                          <button className="btn-accion" onClick={() => setSolicitudDetalle(s)} title="Ver detalle">
-                            <FiEye size={16} />
-                          </button>
-                          <button className="btn-accion" onClick={() => editarSolicitud(s)} title="Editar">
-                            <FiEdit2 size={16} />
-                          </button>
-                          <button
-                            className="btn-accion btn-enviar"
-                            onClick={() => reenviarSolicitud(s)}
-                            title={s.estado === 'Borrador' ? 'Enviar' : 'Reenviar'}
-                            disabled={reenviando === s.id}
-                          >
-                            {reenviando === s.id ? <FiRefreshCw size={16} className="sc-spin" /> : <FiSend size={16} />}
-                          </button>
-                          <button
-                            className="btn-accion btn-eliminar"
-                            onClick={() => { setEliminarSolicitudId(s.id); setMostrarConfirmSolicitud(true); }}
-                            title="Eliminar"
-                          >
-                            <FiTrash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      {/* Modal: nueva/editar solicitud — escribir y enviar en un solo paso */}
-      <Modal
-        isOpen={mostrarModalSolicitud}
-        onClose={() => setMostrarModalSolicitud(false)}
-        title={editandoSolicitudId ? 'Editar Solicitud de Cotización' : 'Nueva Solicitud de Cotización'}
-        size="large"
-      >
-        <div className="formulario">
-          <div className="campo">
-            <label>Tipo de solicitud (define el mensaje predefinido) *</label>
-            <select value={tipoSeleccionado} onChange={(e) => alCambiarTipo(e.target.value)}>
-              {TIPOS_SOLICITUD.map((t) => <option key={t} value={t}>{t}</option>)}
+            <select className="selector-filtro" value={filtroPlantilla} onChange={(e) => { setFiltroPlantilla(e.target.value); setPagina(1); }} aria-label="Filtrar por plantilla">
+              <option value="">Todas las plantillas</option>
+              {nombresPlantilla.map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
           </div>
 
-          {proveedores.length > 0 && (
-            <div className="campo">
-              <label>Usar un proveedor guardado (opcional)</label>
-              <select value={proveedorIdSeleccionado || ''} onChange={(e) => alSeleccionarProveedor(e.target.value)}>
-                <option value="">-- Escribir correo directamente --</option>
-                {proveedores.map((p) => (
-                  <option key={p.id} value={p.id}>{p.razonSocial}</option>
-                ))}
-              </select>
+          <Paginacion total={filtradas.length} paginaActual={pagina} porPagina={porPagina} onCambiarPagina={setPagina} onCambiarPorPagina={setPorPagina} compacta />
+
+          <div className="tarjeta-tabla">
+            {filtradas.length === 0 ? (
+              <div className="estado-vacio">
+                <FiClipboard size={28} />
+                <p>{termino || filtroPlantilla ? 'Sin resultados' : 'Aún no hay solicitudes. Crea la primera con "Nueva solicitud".'}</p>
+              </div>
+            ) : (
+              <div className="tabla-contenedor">
+                <table className="tabla-datos">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Plantilla</th>
+                      <th>Asunto</th>
+                      <th>Solicitante</th>
+                      <th className="texto-centro">Ítems</th>
+                      <th className="texto-centro">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginadas.map((s) => (
+                      <tr key={s.id}>
+                        <td>{formatDate(s.fecha || s.fechaEmision || s.createdAt)}</td>
+                        <td><span className="solicitud-plantilla-badge">{nombrePlantilla(s)}</span></td>
+                        <td className="solicitud-asunto-celda" title={asuntoDe(s)}>{asuntoDe(s)}</td>
+                        <td>{s.responsable || '—'}</td>
+                        <td className="texto-centro texto-negrita">{s.totalItems ?? contarItems(bloquesDeSolicitud(s))}</td>
+                        <td className="texto-centro">
+                          <div className="acciones-tabla">
+                            <button className="btn-accion" onClick={() => descargar(s)} title="Descargar PDF"><FiDownload size={18} /></button>
+                            {puedeEditar && <button className="btn-accion" onClick={() => abrir(s)} title="Editar"><FiEdit2 size={18} /></button>}
+                            {puedeCrear && <button className="btn-accion" onClick={() => abrir(s, true)} title="Duplicar como nueva"><FiCopy size={18} /></button>}
+                            {puedeEliminar && <button className="btn-accion btn-eliminar" onClick={() => setEliminarId(s.id)} title="Eliminar"><FiTrash2 size={18} /></button>}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {vista === 'plantilla' && (
+        <div className="solicitud-paso">
+          <button type="button" className="tab-volver-enlace" onClick={() => setVista('lista')}><FiArrowLeft size={14} /> Volver</button>
+          <h2 className="seccion-titulo">¿Qué necesitas cotizar?</h2>
+          <p className="pista-form">Elige la plantilla más parecida; después podrás agregar, quitar o mover cualquier sección.</p>
+          {loadingPlantillas ? <Loading message="Cargando plantillas..." /> : (
+            <div className="selector-plantillas">
+              {plantillasActivas.map((p) => (
+                <button key={p.id} type="button" className="tarjeta-plantilla" onClick={() => elegirPlantilla(p)}>
+                  <span className="tarjeta-plantilla-icono"><IconoPlantilla icono={p.icono} size={22} /></span>
+                  <span className="tarjeta-plantilla-nombre">{p.nombre}</span>
+                  <span className="tarjeta-plantilla-descripcion">{p.descripcion}</span>
+                </button>
+              ))}
             </div>
           )}
-
-          <div className="campo">
-            <label>Correo del proveedor *</label>
-            <input
-              type="email"
-              {...register('proveedorEmail', {
-                required: 'El correo es requerido',
-                pattern: { value: EMAIL_REGEX, message: 'Correo inválido' }
-              })}
-              className={errors.proveedorEmail ? 'input-error' : ''}
-              placeholder="contacto@proveedor.com"
-            />
-            {errors.proveedorEmail && <span className="mensaje-error">{errors.proveedorEmail.message}</span>}
-          </div>
-
-          <div className="campo">
-            <label>Nombre del proveedor (opcional)</label>
-            <input {...register('proveedorNombre')} placeholder="Si lo dejas vacío, se usa el correo" />
-          </div>
-
-          <div className="campo">
-            <label>Fecha límite para responder (opcional)</label>
-            <input type="date" {...register('fechaLimite')} />
-          </div>
-
-          <div className="campo campo-ancho">
-            <div className="sc-detalle-label-row">
-              <label>Detalle de lo que necesitas cotizar *</label>
-              <button type="button" className="sc-link-plantilla" onClick={usarPlantilla}>
-                Usar mensaje predefinido
-              </button>
-            </div>
-            <textarea
-              {...register('detalle', { required: true })}
-              rows={7}
-              placeholder="Describe qué necesitas cotizar..."
-            />
-          </div>
-
-          <div className="acciones-form">
-            <button type="button" className="btn-secundario" onClick={() => setMostrarModalSolicitud(false)}>
-              Cancelar
-            </button>
-            <button
-              type="button"
-              className="btn-secundario"
-              onClick={handleSubmit(alGuardarBorrador)}
-              disabled={guardandoBorrador || enviandoDesdeModal}
-            >
-              {guardandoBorrador ? 'Guardando...' : 'Guardar borrador'}
-            </button>
-            <button
-              type="button"
-              className="btn-principal"
-              onClick={handleSubmit(alEnviarDesdeModal)}
-              disabled={guardandoBorrador || enviandoDesdeModal}
-            >
-              {enviandoDesdeModal ? 'Enviando...' : <><FiSend size={14} /> Enviar por correo</>}
-            </button>
-          </div>
         </div>
-      </Modal>
+      )}
 
-      {/* Modal: ver detalle */}
-      <Modal
-        isOpen={!!solicitudDetalle}
-        onClose={() => setSolicitudDetalle(null)}
-        title={`Detalle ${solicitudDetalle?.codigo || ''}`}
-        size="large"
-      >
-        {solicitudDetalle && (
-          <div className="sc-detalle">
-            <div className="sc-detalle-grid">
-              <div><span className="sc-detalle-label">Proveedor</span><span>{solicitudDetalle.proveedorNombre || '—'}</span></div>
-              <div><span className="sc-detalle-label">Correo</span><span>{solicitudDetalle.proveedorEmail || '—'}</span></div>
-              <div><span className="sc-detalle-label">Tipo</span><span>{solicitudDetalle.tipo}</span></div>
-              <div><span className="sc-detalle-label">Estado</span><span className={`badge-estado ${badgeEstadoClase(solicitudDetalle.estado)}`}>{solicitudDetalle.estado}</span></div>
-              <div><span className="sc-detalle-label">Fecha límite</span><span>{solicitudDetalle.fechaLimite ? formatDate(solicitudDetalle.fechaLimite) : '—'}</span></div>
-            </div>
-
-            <p className="sc-detalle-label" style={{ marginTop: '0.75rem' }}>Detalle</p>
-            <p className="sc-detalle-obs" style={{ whiteSpace: 'pre-wrap' }}>{solicitudDetalle.detalle}</p>
-
-            <div className="sc-historial">
-              <span className="sc-detalle-label"><FiClock size={13} /> Historial de envíos</span>
-              {(solicitudDetalle.historialEnvios || []).length === 0 ? (
-                <p className="pista">Aún no se ha enviado esta solicitud</p>
-              ) : (
-                <ul>
-                  {solicitudDetalle.historialEnvios.map((h, i) => (
-                    <li key={i}>{formatDate(h.fecha)} — {(h.destinatarios || []).join(', ')}</li>
-                  ))}
-                </ul>
+      {vista === 'editor' && borrador && (
+        <div className="solicitud-editor">
+          <div className="solicitud-editor-barra">
+            <button type="button" className="tab-volver-enlace" onClick={() => { setVista('lista'); setBorrador(null); }}><FiArrowLeft size={14} /> Volver al historial</button>
+            <span className="solicitud-plantilla-badge">{borrador.plantillaNombre}</span>
+            <label className="solicitud-moneda">
+              Moneda
+              <select value={borrador.moneda} onChange={(e) => setBorrador((b) => ({ ...b, moneda: e.target.value }))}>
+                {MONEDAS.map((m) => <option key={m.codigo} value={m.codigo}>{m.label}</option>)}
+              </select>
+            </label>
+            <div className="solicitud-editor-acciones">
+              <button type="button" className="btn-secundario" onClick={() => descargar(solicitudPDF)}><FiDownload size={16} /> Descargar PDF</button>
+              {(borrador.id ? puedeEditar : puedeCrear) && (
+                <button type="button" className="btn-principal" onClick={guardar} disabled={guardando}><FiSave size={16} /> {guardando ? 'Guardando...' : 'Guardar'}</button>
               )}
             </div>
           </div>
-        )}
-      </Modal>
+          <div className="solicitud-editor-grid">
+            <EditorBloques
+              bloques={borrador.bloques}
+              onChange={(bloques) => setBorrador((b) => ({ ...b, bloques }))}
+              contexto={contexto}
+              onDatosImportados={aplicarDatosImportados}
+            />
+            <VistaPreviaPDF solicitud={solicitudPDF} config={config} />
+          </div>
+        </div>
+      )}
 
       <ConfirmDialog
-        isOpen={mostrarConfirmSolicitud}
-        onClose={() => setMostrarConfirmSolicitud(false)}
-        onConfirm={confirmarEliminarSolicitud}
+        isOpen={!!eliminarId}
+        onClose={() => !eliminando && setEliminarId(null)}
+        onConfirm={confirmarEliminar}
         title="¿Eliminar solicitud?"
-        message="Esta acción eliminará la solicitud de cotización permanentemente. ¿Está seguro?"
+        message="Esta acción eliminará la solicitud permanentemente."
+        confirmLabel="Eliminar"
+        busyLabel="Eliminando…"
+        busy={eliminando}
       />
-
     </div>
   );
 }

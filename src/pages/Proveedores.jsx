@@ -5,7 +5,7 @@ import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Loading from '../components/Loading';
 import '../styles/shared.css';
-import './Compras.css';
+import './Proveedores.css';
 
 const VACIO = {
   razonSocial: '', ruc: '', contacto: '', direccion: '', telefono: '', email: '',
