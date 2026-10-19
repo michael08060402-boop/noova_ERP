@@ -75,7 +75,19 @@ function generateServicioPDF(cotizacion, config = {}) {
   const margin = 14;
   const contentW = pageWidth - 2 * margin;
 
-  let y = 30;
+  // Header (22 mm) y footer (13 mm) se estampan al final en cada página: el contenido no debe pisarlos.
+  const TOPE_SUPERIOR = 30;
+  const MARGEN_INFERIOR = 18;
+  const LIMITE_INFERIOR = pageHeight - MARGEN_INFERIOR;
+
+  let y = TOPE_SUPERIOR;
+
+  function asegurarEspacio(alto) {
+    if (y + alto > LIMITE_INFERIOR) {
+      doc.addPage();
+      y = TOPE_SUPERIOR;
+    }
+  }
 
   const COLOR_ORANGE = [244, 122, 0];
   const COLOR_TEAL = [20, 74, 99];
@@ -184,7 +196,7 @@ function generateServicioPDF(cotizacion, config = {}) {
     head: tableHeaders,
     body: tableData,
     startY: y,
-    margin: { left: margin, right: margin },
+    margin: { top: TOPE_SUPERIOR, left: margin, right: margin, bottom: MARGEN_INFERIOR },
     styles: {
       fontSize: 8,
       cellPadding: 3,
@@ -221,6 +233,7 @@ function generateServicioPDF(cotizacion, config = {}) {
   const totW = 65;
   const totX = pageWidth - margin - totW;
   const totRowH = 6;
+  asegurarEspacio(totRowH * (sinIGV ? 2 : 3));
 
   doc.setDrawColor(...COLOR_BORDER);
   doc.setLineWidth(0.3);
@@ -248,6 +261,9 @@ function generateServicioPDF(cotizacion, config = {}) {
   {
     const incluyeItems = INCLUYE_SERVICIO;
 
+    const incluyeBodyH = incluyeItems.length * 5 + 4;
+    asegurarEspacio(6.5 + incluyeBodyH);
+
     doc.setFillColor(...COLOR_TEAL);
     doc.rect(margin, y, contentW, 6.5, 'F');
     doc.setFont('helvetica', 'bold');
@@ -257,7 +273,6 @@ function generateServicioPDF(cotizacion, config = {}) {
 
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(30, 30, 30);
-    const incluyeBodyH = incluyeItems.length * 5 + 4;
     doc.setDrawColor(...COLOR_BORDER);
     doc.rect(margin, y, contentW, incluyeBodyH);
 
@@ -272,7 +287,7 @@ function generateServicioPDF(cotizacion, config = {}) {
   }
 
   doc.addPage();
-  y = 30;
+  y = TOPE_SUPERIOR;
 
   const itemsConEntrega = todosLosItems.filter((it) => it.tipo !== 'transporte');
   const tiemposEntregaItems = itemsConEntrega.map((it) => (it.tiempoEntrega || '').trim()).filter(Boolean);
@@ -309,6 +324,7 @@ function generateServicioPDF(cotizacion, config = {}) {
 
   for (const cond of condiciones) {
     const condLines = doc.splitTextToSize(cond, contentW);
+    asegurarEspacio(condLines.length * 4.2);
     doc.text(condLines, margin, y);
     y += condLines.length * 4.2;
   }
@@ -320,6 +336,8 @@ function generateServicioPDF(cotizacion, config = {}) {
   const separacionBancos = 6;
 
   BANCOS_PDF.forEach((banco) => {
+    // Logo, cabecera y cuentas deben quedar juntos en la misma página.
+    asegurarEspacio(logoH + separacionLogoTabla + 8 + banco.cuentas.length * 7);
     doc.addImage(banco.logo, 'PNG', margin, y, logoW, logoH);
     y += logoH + separacionLogoTabla;
 
@@ -349,7 +367,7 @@ function generateServicioPDF(cotizacion, config = {}) {
 
     autoTable(doc, {
       startY: y,
-      margin: { left: margin },
+      margin: { top: TOPE_SUPERIOR, left: margin, bottom: MARGEN_INFERIOR },
       tableWidth: contentW,
       head: [headRow],
       body: bodyRows,
@@ -374,6 +392,7 @@ function generateServicioPDF(cotizacion, config = {}) {
     y = (doc.lastAutoTable?.finalY || y) + separacionBancos;
   });
 
+  asegurarEspacio(5 + 18 + 4.5 + 4);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(60, 60, 60);

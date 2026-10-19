@@ -446,6 +446,15 @@ async function generateMangaPDF(cotizacion, config = {}) {
 
   y = (doc.lastAutoTable?.finalY || y) + 2.5;
 
+  // Evita que totales y notas se corten al final de la hoja.
+  const limitePagina = pageHeight - 12;
+  function asegurarEspacio(alto) {
+    if (y + alto > limitePagina) {
+      doc.addPage();
+      y = margin + 5;
+    }
+  }
+
   const subtotal = calcularSubtotal(items);
   const sinIGV = !!cotizacion.sinIGV;
   const igv = sinIGV ? 0 : calcularIGV(subtotal);
@@ -454,6 +463,7 @@ async function generateMangaPDF(cotizacion, config = {}) {
   const totW = 68;
   const totX = pageWidth - margin - totW;
   const totRowH = 5;
+  asegurarEspacio(totRowH * 3 + 1);
 
   doc.setDrawColor(...COLOR_BORDER);
   doc.setLineWidth(0.2);
@@ -487,6 +497,7 @@ async function generateMangaPDF(cotizacion, config = {}) {
   }
   y += 5;
 
+  asegurarEspacio(3.5 + 3 * 3.5);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
   doc.setTextColor(...COLOR_PRIMARY);
@@ -614,6 +625,14 @@ async function generateMangaPDF(cotizacion, config = {}) {
 
   y = infoCardsY + infoCardsH + 5;
 
+  // El footer va al pie de la última página: bancos y cierre deben quedar por encima de él (y del RUC).
+  const footerH = 20;
+  const altoBancosYCierre = 27;
+  if (y + altoBancosYCierre > pageHeight - footerH - 6) {
+    doc.addPage();
+    y = margin + 5;
+  }
+
   {
     let interbankBase64 = null;
     try {
@@ -670,7 +689,6 @@ async function generateMangaPDF(cotizacion, config = {}) {
   doc.text(cierreLines, margin, y);
   y += cierreLines.length * 3.4 + 3;
 
-  const footerH = 20;
   const footerY = pageHeight - footerH;
 
   doc.setFillColor(...COLOR_ORANGE);

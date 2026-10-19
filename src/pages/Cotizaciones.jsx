@@ -85,6 +85,21 @@ function obtenerContactosCliente(cliente) {
   return [];
 }
 
+const normalizarTexto = (v) => String(v || '').trim().toLowerCase();
+
+// Ubica el contacto guardado en la lista vigente del cliente (por nombre+email, luego nombre, luego celular).
+function buscarIndiceContacto(contactos, contacto) {
+  if (!contacto) return -1;
+  const nombre = normalizarTexto(contacto.nombre);
+  const email = normalizarTexto(contacto.email);
+  const celular = normalizarTexto(contacto.celular);
+  let idx = contactos.findIndex((c) => normalizarTexto(c.nombre) === nombre && normalizarTexto(c.email) === email);
+  if (idx < 0 && nombre) idx = contactos.findIndex((c) => normalizarTexto(c.nombre) === nombre);
+  if (idx < 0 && email) idx = contactos.findIndex((c) => normalizarTexto(c.email) === email);
+  if (idx < 0 && celular) idx = contactos.findIndex((c) => normalizarTexto(c.celular) === celular);
+  return idx;
+}
+
 const ITEM_VACIO = { codigo: '', descripcion: '', cantidad: 1, precioUnitario: 0, equipoId: '', unidadMedida: 'UNIDAD', tiempoEntrega: '', tipo: 'producto' };
 
 // _uid solo vive en el formulario (no se guarda): mantiene estable la fila al reordenar.
@@ -309,6 +324,7 @@ export default function Cotizaciones() {
   const [vista, setVista] = useState('lista');
   const [mostrarConfirm, setMostrarConfirm] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
+  const [cotizacionEditada, setCotizacionEditada] = useState(null);
   const [eliminarId, setEliminarId] = useState(null);
   const [eliminando, setEliminando] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -350,6 +366,8 @@ export default function Cotizaciones() {
   const cargoResponsable = userProfile?.cargo || '';
   const emailResponsable = userProfile?.email || currentUser?.email || '';
   const telefonoResponsable = userProfile?.telefono || '';
+  // Al editar se conserva quien emitió la cotización; el usuario actual queda como editadoPor.
+  const responsableCotizacion = (editandoId && cotizacionEditada?.responsable) || responsable;
 
   const contactosCliente = useMemo(() => obtenerContactosCliente(clienteSeleccionado), [clienteSeleccionado]);
 
@@ -412,38 +430,76 @@ export default function Cotizaciones() {
     setPaginaActual(1);
   }
 
-  function nuevaCotizacion() {
+  // Limpia todo estado temporal del formulario (editor de contacto, búsquedas, RUC, arrastre)
+  // para que no pase de una cotización a otra.
+  function reiniciarEstadoFormulario() {
+    setErroresForm({});
+    setBusquedaCliente('');
+    setClienteSeleccionado(null);
+    setClienteDropdownAbierto(false);
+    cerrarEdicionContacto();
+    setBusquedaContacto('');
+    setContactoDropdownAbierto(false);
+    setContactoNuevoRuc({ nombre: '', celular: '', email: '' });
+    setErrorCrearCliente('');
+    limpiarRucLookup();
+    setBuscandoCodigo({});
+    terminarArrastreItem();
+  }
+
+  function volverALista() {
+    reiniciarEstadoFormulario();
     setEditandoId(null);
+    setCotizacionEditada(null);
+    setVista('lista');
+  }
+
+  function nuevaCotizacion() {
+    reiniciarEstadoFormulario();
+    setEditandoId(null);
+    setCotizacionEditada(null);
     setForm({
       ...FORMULARIO_VACIO,
       tipoItem: 'equipo',
       items: [nuevoItem()]
     });
-    setErroresForm({});
-    setBusquedaCliente('');
-    setClienteSeleccionado(null);
-    setClienteDropdownAbierto(false);
-    setBusquedaContacto('');
-    setContactoDropdownAbierto(false);
     setVista('form');
   }
 
-  function editarCotizacion(cot) {
-    setEditandoId(cot.id);
-    const validezStr = String(cot.validez || '');
-    const numeroEncontrado = validezStr.match(/\d+/);
-    // cot.cliente es una copia sin id: se usa el cliente vigente para poder editar sus contactos.
-    const clienteBase = clientes.find((c) => c.id === cot.clienteId) || (cot.cliente ? { ...cot.cliente, id: cot.clienteId } : null);
-    const contactosCliente = obtenerContactosCliente(clienteBase);
+  // cot.cliente es una copia sin id tomada al guardar: se usa el cliente vigente (módulo Clientes)
+  // para que edición y PDF muestren los mismos datos.
+  function resolverClienteCotizacion(cot) {
+    const clienteVigente = clientes.find((c) => c.id === cot.clienteId);
+    let clienteBase = clienteVigente || (cot.cliente ? { ...cot.cliente, id: cot.clienteId } : null);
+    let contactosCliente = obtenerContactosCliente(clienteBase);
+    const contactoGuardado = cot.contactoSeleccionado
+      || (cot.cliente?.contacto ? { nombre: cot.cliente.contacto, celular: cot.cliente.celular || '', email: cot.cliente.email || '' } : null);
     let contactoIdx = '';
-    if (cot.contactoSeleccionado) {
-      const idx = contactosCliente.findIndex(
-        c => (c.nombre || '') === (cot.contactoSeleccionado.nombre || '') &&
-          (c.email || '') === (cot.contactoSeleccionado.email || '')
-      );
-      if (idx >= 0) contactoIdx = String(idx);
+    if (contactoGuardado) {
+      let idx = buscarIndiceContacto(contactosCliente, contactoGuardado);
+      if (idx < 0) {
+        // El contacto de la cotización ya no está en el cliente: se conserva en vez de cambiarlo por el primero.
+        contactosCliente = [...contactosCliente, {
+          nombre: contactoGuardado.nombre || '',
+          celular: contactoGuardado.celular || '',
+          email: contactoGuardado.email || ''
+        }];
+        clienteBase = { ...clienteBase, contactos: contactosCliente };
+        idx = contactosCliente.length - 1;
+      }
+      contactoIdx = String(idx);
     }
     if (contactoIdx === '' && contactosCliente.length > 0) contactoIdx = '0';
+    return { clienteBase, contactosCliente, contactoIdx };
+  }
+
+  function editarCotizacion(cot) {
+    reiniciarEstadoFormulario();
+    setEditandoId(cot.id);
+    setCotizacionEditada(cot);
+    const validezStr = String(cot.validez || '');
+    const numeroEncontrado = validezStr.match(/\d+/);
+    const { clienteBase, contactoIdx } = resolverClienteCotizacion(cot);
 
     setForm({
       clienteId: cot.clienteId || '',
@@ -458,7 +514,6 @@ export default function Cotizaciones() {
       items: cot.items?.length ? cot.items.map((i) => ({ ...i, _uid: nuevoUid() })) : [nuevoItem()],
       estado: cot.estado || 'Generada'
     });
-    setErroresForm({});
     setBusquedaCliente(cot.cliente?.razonSocial || '');
     setClienteSeleccionado(clienteBase);
     setVista('form');
@@ -622,6 +677,7 @@ export default function Cotizaciones() {
     setClienteSeleccionado(cliente);
     setBusquedaCliente(cliente.razonSocial);
     setClienteDropdownAbierto(false);
+    cerrarEdicionContacto();
     if (erroresForm.clienteId) {
       setErroresForm((prev) => ({ ...prev, clienteId: null }));
     }
@@ -632,6 +688,7 @@ export default function Cotizaciones() {
     setClienteSeleccionado(null);
     setBusquedaCliente('');
     setClienteDropdownAbierto(false);
+    cerrarEdicionContacto();
     limpiarRucLookup();
   }
 
@@ -647,6 +704,7 @@ export default function Cotizaciones() {
 
   function cerrarEdicionContacto() {
     setEditandoContacto(false);
+    setContactoEditForm({ nombre: '', celular: '', email: '' });
   }
 
   async function guardarContactoEditado() {
@@ -668,8 +726,21 @@ export default function Cotizaciones() {
     );
     setGuardandoContacto(true);
     try {
-      await editCliente(clienteId, { contactos: contactosActualizados });
-      const clienteActualizado = { ...clienteSeleccionado, contactos: contactosActualizados };
+      const principal = contactosActualizados[0] || {};
+      // Igual que el módulo Clientes: contacto/telefono/email reflejan el contacto principal.
+      await editCliente(clienteId, {
+        contactos: contactosActualizados,
+        contacto: principal.nombre || '',
+        telefono: principal.celular || '',
+        email: principal.email || ''
+      });
+      const clienteActualizado = {
+        ...clienteSeleccionado,
+        contactos: contactosActualizados,
+        contacto: principal.nombre || '',
+        telefono: principal.celular || '',
+        email: principal.email || ''
+      };
       setClienteSeleccionado(clienteActualizado);
       setEditandoContacto(false);
       mostrarMensaje('success', 'Contacto actualizado correctamente.');
@@ -765,6 +836,9 @@ export default function Cotizaciones() {
   function validarFormulario() {
     const errores = {};
     if (!form.clienteId) errores.clienteId = 'Seleccione un cliente';
+    if (form.clienteId && contactosCliente.length > 0 && !contactosCliente[Number(form.contactoClienteId)]) {
+      errores.contactoClienteId = 'Seleccione el contacto del cliente';
+    }
 
     form.items.forEach((item, i) => {
       if (!item.descripcion) errores[`item_${i}_descripcion`] = 'Descripción requerida';
@@ -788,18 +862,15 @@ export default function Cotizaciones() {
 
     setGuardando(true);
     try {
-      const cliente = clientes.find((c) => c.id === form.clienteId);
+      const cliente = clientes.find((c) => c.id === form.clienteId) || clienteSeleccionado;
       const totalesCot = calcularTotalesCotizacion(form.items, { sinIGV: form.sinIGV });
       const subtotal = totalesCot.valorVenta;
       const igv = totalesCot.igv;
       const total = totalesCot.total;
 
-      const clienteContactos = obtenerContactosCliente(cliente);
-      let contactoSeleccionado = null;
-      if (clienteContactos.length > 0) {
-        const idx = form.contactoClienteId !== '' ? Number(form.contactoClienteId) : 0;
-        contactoSeleccionado = clienteContactos[idx] || clienteContactos[0];
-      }
+      // Misma lista que ve el usuario en pantalla: el índice seleccionado apunta a ella.
+      const clienteContactos = contactosCliente;
+      const contactoSeleccionado = clienteContactos[Number(form.contactoClienteId)] || null;
 
       const data = {
         clienteId: form.clienteId,
@@ -813,10 +884,15 @@ export default function Cotizaciones() {
           contacto: contactoSeleccionado?.nombre || cliente?.contacto || '',
           contactos: clienteContactos
         },
-        responsable,
-        cargoResponsable,
-        emailResponsable,
-        telefonoResponsable,
+        ...(editandoId && cotizacionEditada?.responsable
+          ? {
+              responsable: cotizacionEditada.responsable,
+              cargoResponsable: cotizacionEditada.cargoResponsable || '',
+              emailResponsable: cotizacionEditada.emailResponsable || '',
+              telefonoResponsable: cotizacionEditada.telefonoResponsable || '',
+              editadoPor: responsable
+            }
+          : { responsable, cargoResponsable, emailResponsable, telefonoResponsable }),
         contactoSeleccionado,
         condicionPago: form.condicionPago,
         validez: `${form.validezNumero} días`,
@@ -845,19 +921,19 @@ export default function Cotizaciones() {
         subtotal, igv, total,
         sinIGV: !!form.sinIGV,
         estado: form.estado,
-        fechaEmision: formatDateISO(),
-        fecha: formatDateISO(),
+        fechaEmision: (editandoId && (cotizacionEditada?.fechaEmision || cotizacionEditada?.fecha)) || formatDateISO(),
+        fecha: (editandoId && (cotizacionEditada?.fecha || cotizacionEditada?.fechaEmision)) || formatDateISO(),
         moneda: form.moneda || 'US$'
       };
 
       if (editandoId) {
         await editCotizacion(editandoId, data);
-        setVista('lista');
+        volverALista();
         addLog({ usuario: responsable, accion: 'editar_cotizacion', detalle: data.codigo || editandoId })
           .catch((err) => console.warn('No se pudo registrar el log de edición:', err));
       } else {
         const result = await addCotizacion(data);
-        setVista('lista');
+        volverALista();
         addLog({ usuario: responsable, accion: 'crear_cotizacion', detalle: result.codigo || '' })
           .catch((err) => console.warn('No se pudo registrar el log de creación:', err));
       }
@@ -879,8 +955,31 @@ export default function Cotizaciones() {
     return tieneCampoManga ? 'manga' : 'equipo';
   }
 
-  async function exportarPDF(cot) {
+  // El PDF usa los mismos datos de cliente y contacto que muestra la pantalla de edición.
+  function cotizacionConClienteVigente(cot) {
+    const { clienteBase, contactosCliente, contactoIdx } = resolverClienteCotizacion(cot);
+    if (!clienteBase) return cot;
+    const contacto = contactosCliente[Number(contactoIdx)] || cot.contactoSeleccionado || null;
+    return {
+      ...cot,
+      cliente: {
+        ...(cot.cliente || {}),
+        razonSocial: clienteBase.razonSocial || cot.cliente?.razonSocial || '',
+        ruc: clienteBase.ruc || cot.cliente?.ruc || '',
+        direccion: clienteBase.direccion || cot.cliente?.direccion || '',
+        contacto: contacto?.nombre || cot.cliente?.contacto || '',
+        celular: contacto?.celular || cot.cliente?.celular || '',
+        telefono: contacto?.celular || cot.cliente?.telefono || '',
+        email: contacto?.email || cot.cliente?.email || '',
+        contactos: contactosCliente
+      },
+      contactoSeleccionado: contacto
+    };
+  }
+
+  async function exportarPDF(cotGuardada) {
     try {
+      const cot = cotizacionConClienteVigente(cotGuardada);
       const c = config || (await refreshConfig());
       const tipoDetectado = detectarTipoItem(cot);
       console.log('[PDF] Cotización', cot.codigo, '→ tipoItem detectado:', tipoDetectado, '(guardado:', cot.tipoItem || 'null', ')');
@@ -952,11 +1051,11 @@ export default function Cotizaciones() {
 
       <div className="tabs-cotizaciones">
         {vista === 'form' ? (
-          <button type="button" className="tab-cotizacion tab-volver" onClick={() => setVista('lista')}>
+          <button type="button" className="tab-cotizacion tab-volver" onClick={volverALista}>
             <FiArrowLeft size={14} /> Volver a la lista de cotizaciones
           </button>
         ) : (
-          <button type="button" className="tab-cotizacion activa" onClick={() => setVista('lista')}>
+          <button type="button" className="tab-cotizacion activa" onClick={volverALista}>
             Lista de cotizaciones
           </button>
         )}
@@ -1310,7 +1409,7 @@ export default function Cotizaciones() {
               </div>
               <div className="campo">
                 <label>Responsable</label>
-                <input type="text" value={responsable} readOnly className="input-solo-lectura" />
+                <input type="text" value={responsableCotizacion} readOnly className="input-solo-lectura" />
               </div>
             </div>
 
@@ -1417,6 +1516,7 @@ export default function Cotizaciones() {
                     )}
                   </div>
                 )}
+                {erroresForm.contactoClienteId && <span className="mensaje-error">{erroresForm.contactoClienteId}</span>}
               </div>
             )}
 
@@ -1840,7 +1940,7 @@ export default function Cotizaciones() {
           </div>
 
           <div className="acciones-form acciones-form-sidebar">
-            <button type="button" className="btn-secundario" onClick={() => setVista('lista')}>
+            <button type="button" className="btn-secundario" onClick={volverALista}>
               Cancelar
             </button>
             <button type="submit" className="btn-principal" disabled={guardando}>
