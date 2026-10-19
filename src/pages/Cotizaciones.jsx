@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { FiDownload, FiEdit2, FiTrash2, FiPlus, FiSearch, FiUserPlus, FiLoader, FiX, FiShoppingCart, FiBriefcase, FiList, FiFileText, FiArrowLeft, FiFilter } from 'react-icons/fi';
+import { FiDownload, FiEdit2, FiTrash2, FiPlus, FiSearch, FiUserPlus, FiLoader, FiX, FiShoppingCart, FiBriefcase, FiList, FiFileText, FiArrowLeft, FiFilter, FiMenu, FiChevronUp, FiChevronDown } from 'react-icons/fi';
 import { useCotizaciones } from '../hooks/useCotizaciones';
 import { useClientes } from '../hooks/useClientes';
 import { useEquipos } from '../hooks/useEquipos';
@@ -87,6 +87,11 @@ function obtenerContactosCliente(cliente) {
 
 const ITEM_VACIO = { codigo: '', descripcion: '', cantidad: 1, precioUnitario: 0, equipoId: '', unidadMedida: 'UNIDAD', tiempoEntrega: '', tipo: 'producto' };
 
+// _uid solo vive en el formulario (no se guarda): mantiene estable la fila al reordenar.
+let secuenciaItem = 0;
+const nuevoUid = () => `item-${++secuenciaItem}`;
+const nuevoItem = (extra = {}) => ({ ...ITEM_VACIO, ...extra, _uid: nuevoUid() });
+
 function mapearProductoAItem(producto, familia) {
   const base = {
     equipoId: producto.id,
@@ -132,7 +137,7 @@ const FORMULARIO_VACIO = {
   tiempoEntregaUnidad: 'semanas',
   tipoItem: 'equipo',
   sinIGV: false,
-  items: [{ ...ITEM_VACIO }],
+  items: [nuevoItem()],
   estado: 'Generada'
 };
 
@@ -334,6 +339,8 @@ export default function Cotizaciones() {
   const [form, setForm] = useState({ ...FORMULARIO_VACIO });
   const [erroresForm, setErroresForm] = useState({});
   const [buscandoCodigo, setBuscandoCodigo] = useState({});
+  const [itemArrastrado, setItemArrastrado] = useState(null);
+  const [destinoItem, setDestinoItem] = useState(null);
 
   const CONDICIONES_PAGO = (config?.condicionesPago && config.condicionesPago.length > 0)
     ? config.condicionesPago
@@ -410,7 +417,7 @@ export default function Cotizaciones() {
     setForm({
       ...FORMULARIO_VACIO,
       tipoItem: 'equipo',
-      items: [{ ...ITEM_VACIO }]
+      items: [nuevoItem()]
     });
     setErroresForm({});
     setBusquedaCliente('');
@@ -425,7 +432,9 @@ export default function Cotizaciones() {
     setEditandoId(cot.id);
     const validezStr = String(cot.validez || '');
     const numeroEncontrado = validezStr.match(/\d+/);
-    const contactosCliente = obtenerContactosCliente(cot.cliente);
+    // cot.cliente es una copia sin id: se usa el cliente vigente para poder editar sus contactos.
+    const clienteBase = clientes.find((c) => c.id === cot.clienteId) || (cot.cliente ? { ...cot.cliente, id: cot.clienteId } : null);
+    const contactosCliente = obtenerContactosCliente(clienteBase);
     let contactoIdx = '';
     if (cot.contactoSeleccionado) {
       const idx = contactosCliente.findIndex(
@@ -446,12 +455,12 @@ export default function Cotizaciones() {
       tiempoEntregaUnidad: cot.tiempoEntregaUnidad || (cot.tiempoEntrega && /mes/i.test(cot.tiempoEntrega) ? 'meses' : cot.tiempoEntrega && /d[ií]a/i.test(cot.tiempoEntrega) ? 'días' : 'semanas'),
       tipoItem: cot.tipoItem || 'equipo',
       sinIGV: !!cot.sinIGV,
-      items: cot.items?.length ? cot.items.map((i) => ({ ...i })) : [{ ...ITEM_VACIO }],
+      items: cot.items?.length ? cot.items.map((i) => ({ ...i, _uid: nuevoUid() })) : [nuevoItem()],
       estado: cot.estado || 'Generada'
     });
     setErroresForm({});
     setBusquedaCliente(cot.cliente?.razonSocial || '');
-    setClienteSeleccionado(cot.cliente || null);
+    setClienteSeleccionado(clienteBase);
     setVista('form');
   }
 
@@ -468,7 +477,7 @@ export default function Cotizaciones() {
   }
 
   function cambiarTipoItem(valor) {
-    setForm((prev) => ({ ...prev, tipoItem: valor, items: [{ ...ITEM_VACIO }] }));
+    setForm((prev) => ({ ...prev, tipoItem: valor, items: [nuevoItem()] }));
   }
 
   function cambiarItem(index, campo, valor) {
@@ -526,7 +535,7 @@ export default function Cotizaciones() {
   }
 
   function agregarItem(tipo = 'producto') {
-    const nuevo = { ...ITEM_VACIO, tipo };
+    const nuevo = nuevoItem({ tipo });
     if (tipo === 'transporte') {
       nuevo.cantidad = 1;
       nuevo.unidadMedida = 'SERVICIO';
@@ -541,6 +550,51 @@ export default function Cotizaciones() {
   function quitarItem(index) {
     if (form.items.length <= 1) return;
     setForm((prev) => ({ ...prev, items: prev.items.filter((_, i) => i !== index) }));
+  }
+
+  function moverItem(desde, hasta) {
+    if (desde === hasta || desde < 0 || hasta < 0) return;
+    setForm((prev) => {
+      if (desde >= prev.items.length || hasta >= prev.items.length) return prev;
+      const items = [...prev.items];
+      const [movido] = items.splice(desde, 1);
+      items.splice(hasta, 0, movido);
+      return { ...prev, items };
+    });
+    // Los errores de ítems están indexados por posición: se recalculan al validar.
+    setErroresForm((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => !k.startsWith('item_'))));
+  }
+
+  function iniciarArrastreItem(e, index) {
+    const grupo = e.currentTarget.closest('tbody');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(index));
+    if (grupo) e.dataTransfer.setDragImage(grupo, 24, 16);
+    // Diferido: tocar el DOM dentro de dragstart cancela el arrastre en Chrome.
+    setTimeout(() => setItemArrastrado(index), 0);
+  }
+
+  function sobreItem(e, index) {
+    if (itemArrastrado === null) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const rect = e.currentTarget.getBoundingClientRect();
+    const despues = e.clientY > rect.top + rect.height / 2;
+    setDestinoItem((prev) => (prev && prev.index === index && prev.despues === despues ? prev : { index, despues }));
+  }
+
+  function soltarItem(e) {
+    if (itemArrastrado === null || !destinoItem) return;
+    e.preventDefault();
+    let posicion = destinoItem.despues ? destinoItem.index + 1 : destinoItem.index;
+    if (itemArrastrado < posicion) posicion -= 1;
+    moverItem(itemArrastrado, posicion);
+    terminarArrastreItem();
+  }
+
+  function terminarArrastreItem() {
+    setItemArrastrado(null);
+    setDestinoItem(null);
   }
 
   function seleccionarProducto(index, productoId) {
@@ -596,7 +650,11 @@ export default function Cotizaciones() {
   }
 
   async function guardarContactoEditado() {
-    if (!clienteSeleccionado) return;
+    const clienteId = clienteSeleccionado?.id || form.clienteId;
+    if (!clienteId) {
+      mostrarMensaje('error', 'No se pudo identificar al cliente. Vuelva a seleccionarlo.');
+      return;
+    }
     const nombre = contactoEditForm.nombre.trim();
     if (!nombre) {
       mostrarMensaje('error', 'El nombre del contacto es obligatorio.');
@@ -610,14 +668,15 @@ export default function Cotizaciones() {
     );
     setGuardandoContacto(true);
     try {
-      await editCliente(clienteSeleccionado.id, { contactos: contactosActualizados });
+      await editCliente(clienteId, { contactos: contactosActualizados });
       const clienteActualizado = { ...clienteSeleccionado, contactos: contactosActualizados };
       setClienteSeleccionado(clienteActualizado);
       setEditandoContacto(false);
       mostrarMensaje('success', 'Contacto actualizado correctamente.');
     } catch (err) {
       console.error('Error actualizando contacto:', err);
-      mostrarMensaje('error', 'No se pudo actualizar el contacto.');
+      const detalle = err?.code === 'permission-denied' ? ' No tiene permisos para editar clientes.' : (err?.message ? ` ${err.message}` : '');
+      mostrarMensaje('error', 'No se pudo actualizar el contacto.' + detalle);
     } finally {
       setGuardandoContacto(false);
     }
@@ -642,11 +701,13 @@ export default function Cotizaciones() {
   }, [busquedaCliente]);
 
   const [creandoClienteRuc, setCreandoClienteRuc] = useState(false);
+  const [errorCrearCliente, setErrorCrearCliente] = useState('');
   const [contactoNuevoRuc, setContactoNuevoRuc] = useState({ nombre: '', celular: '', email: '' });
 
   useEffect(() => {
     if (datosRuc) {
       setContactoNuevoRuc({ nombre: '', celular: '', email: '' });
+      setErrorCrearCliente('');
     }
   }, [datosRuc]);
 
@@ -659,6 +720,7 @@ export default function Cotizaciones() {
       return;
     }
 
+    setErrorCrearCliente('');
     setCreandoClienteRuc(true);
     try {
       const contactoLimpio = [{
@@ -678,11 +740,12 @@ export default function Cotizaciones() {
         createdAt: new Date().toISOString(),
       };
       const nuevoId = await addCliente(nuevoCliente);
-      await addLog({
+      // El log no debe bloquear ni revertir la creación del cliente.
+      addLog({
         usuario: responsable,
         accion: 'crear_cliente_autoruc',
         detalle: `${datosRuc.ruc} - ${datosRuc.razonSocial}`,
-      });
+      }).catch((err) => console.warn('No se pudo registrar el log de cliente:', err));
       const clienteCreado = { ...nuevoCliente, id: nuevoId };
       seleccionarCliente(clienteCreado);
       setBusquedaCliente(datosRuc.razonSocial);
@@ -690,7 +753,10 @@ export default function Cotizaciones() {
       setContactoNuevoRuc({ nombre: '', celular: '', email: '' });
     } catch (err) {
       console.error('Error creando cliente desde RUC:', err);
-      mostrarMensaje('error', 'Error al crear cliente: ' + err.message);
+      const detalle = err?.code === 'permission-denied'
+        ? 'No tiene permisos para crear clientes.'
+        : (err?.message || 'Error desconocido');
+      setErrorCrearCliente('No se pudo guardar el cliente: ' + detalle);
     } finally {
       setCreandoClienteRuc(false);
     }
@@ -1182,7 +1248,14 @@ export default function Cotizaciones() {
 
                             <div className="ruc-contacto-form">
                               <span className="ruc-contacto-label">Contacto del cliente *:</span>
-                              <div className="ruc-contacto-campos">
+                              <div
+                                className="ruc-contacto-campos"
+                                onKeyDown={(e) => {
+                                  if (e.key !== 'Enter') return;
+                                  e.preventDefault();
+                                  if (!creandoClienteRuc && contactoNuevoRuc.nombre.trim()) crearClienteDesdeRuc();
+                                }}
+                              >
                                 <input
                                   type="text"
                                   placeholder="Nombre *"
@@ -1210,6 +1283,9 @@ export default function Cotizaciones() {
                               </div>
                               {!contactoNuevoRuc.nombre.trim() && (
                                 <span className="ruc-contacto-hint">El nombre del contacto es obligatorio para crear el cliente.</span>
+                              )}
+                              {errorCrearCliente && (
+                                <span className="mensaje-error" role="alert">{errorCrearCliente}</span>
                               )}
                             </div>
                           </div>
@@ -1244,7 +1320,14 @@ export default function Cotizaciones() {
                 {form.contactoClienteId !== '' ? (
                   editandoContacto ? (
                     <div className="cliente-seleccionado contacto-edicion">
-                      <div className="ruc-contacto-campos">
+                      <div
+                        className="ruc-contacto-campos"
+                        onKeyDown={(e) => {
+                          if (e.key !== 'Enter') return;
+                          e.preventDefault();
+                          if (!guardandoContacto) guardarContactoEditado();
+                        }}
+                      >
                         <input
                           type="text"
                           placeholder="Nombre *"
@@ -1456,7 +1539,6 @@ export default function Cotizaciones() {
                     <th></th>
                   </tr>
                 </thead>
-                <tbody>
                   {form.items.map((item, index) => {
                     const colSpanFila = 8;
                     const numeroEnGrupo = form.items
@@ -1470,12 +1552,40 @@ export default function Cotizaciones() {
                             ? `Manga #${numeroEnGrupo}`
                             : `Equipo #${numeroEnGrupo}`);
                     const finGrupoEnMain = item.tipo === 'transporte';
+                    const claseGrupo = [
+                      'item-grupo',
+                      itemArrastrado === index ? 'item-arrastrado' : '',
+                      itemArrastrado !== null && destinoItem?.index === index ? (destinoItem.despues ? 'drop-despues' : 'drop-antes') : ''
+                    ].filter(Boolean).join(' ');
                     return (
-                      <Fragment key={index}>
+                      <tbody
+                        key={item._uid || index}
+                        className={claseGrupo}
+                        onDragOver={(e) => sobreItem(e, index)}
+                        onDrop={soltarItem}
+                      >
                         <tr className={`fila-badge-tipo ${item.tipo === 'accesorio' ? 'badge-accesorio' : item.tipo === 'transporte' ? 'badge-transporte' : 'badge-producto'}`}>
                           <td colSpan={colSpanFila}>
                             <div className="fila-badge-contenido">
+                              <span
+                                className="item-asa"
+                                draggable
+                                onDragStart={(e) => iniciarArrastreItem(e, index)}
+                                onDragEnd={terminarArrastreItem}
+                                title="Arrastre para reordenar"
+                                aria-label="Arrastrar para reordenar"
+                              >
+                                <FiMenu size={14} />
+                              </span>
                               <span className="badge-tipo-item">{etiquetaTipo}</span>
+                              <span className="item-mover-botones">
+                                <button type="button" className="btn-mover-item" onClick={() => moverItem(index, index - 1)} disabled={index === 0} title="Subir">
+                                  <FiChevronUp size={14} />
+                                </button>
+                                <button type="button" className="btn-mover-item" onClick={() => moverItem(index, index + 1)} disabled={index === form.items.length - 1} title="Bajar">
+                                  <FiChevronDown size={14} />
+                                </button>
+                              </span>
                             </div>
                           </td>
                         </tr>
@@ -1683,10 +1793,9 @@ export default function Cotizaciones() {
                             </td>
                           </tr>
                         )}
-                      </Fragment>
+                      </tbody>
                     );
                   })}
-                </tbody>
               </table>
             </div>
 
