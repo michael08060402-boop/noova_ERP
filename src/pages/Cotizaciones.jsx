@@ -142,7 +142,18 @@ function mapearProductoAItem(producto, familia) {
 const UNIDADES_MEDIDA = ['UNIDAD', 'LT.', 'KG.', 'DOC.', 'PZ.', 'EQ.', 'M.', 'KIT.', '%.', 'MILL.'];
 const UNIDADES_TIEMPO = ['semanas', 'meses', 'días'];
 
+// Fecha de emisión del documento como YYYY-MM-DD local; si no hay una válida, hoy.
+function fechaEmisionParaForm(cot) {
+  const guardada = cot?.fechaEmision || cot?.fecha;
+  if (typeof guardada === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(guardada)) return guardada;
+  const base = guardada || cot?.createdAt;
+  const d = base ? new Date(base) : null;
+  if (!d || isNaN(d.getTime())) return formatDateISO();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 const FORMULARIO_VACIO = {
+  fechaEmision: '',
   clienteId: '',
   contactoClienteId: '',
   condicionPago: 'Contado',
@@ -460,6 +471,7 @@ export default function Cotizaciones() {
     setCotizacionEditada(null);
     setForm({
       ...FORMULARIO_VACIO,
+      fechaEmision: formatDateISO(),
       tipoItem: 'equipo',
       items: [nuevoItem()]
     });
@@ -502,6 +514,7 @@ export default function Cotizaciones() {
     const { clienteBase, contactoIdx } = resolverClienteCotizacion(cot);
 
     setForm({
+      fechaEmision: fechaEmisionParaForm(cot),
       clienteId: cot.clienteId || '',
       contactoClienteId: contactoIdx,
       condicionPago: cot.condicionPago || 'Contado',
@@ -835,6 +848,7 @@ export default function Cotizaciones() {
 
   function validarFormulario() {
     const errores = {};
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(form.fechaEmision || '')) errores.fechaEmision = 'Ingrese la fecha de emisión';
     if (!form.clienteId) errores.clienteId = 'Seleccione un cliente';
     if (form.clienteId && contactosCliente.length > 0 && !contactosCliente[Number(form.contactoClienteId)]) {
       errores.contactoClienteId = 'Seleccione el contacto del cliente';
@@ -921,8 +935,8 @@ export default function Cotizaciones() {
         subtotal, igv, total,
         sinIGV: !!form.sinIGV,
         estado: form.estado,
-        fechaEmision: (editandoId && (cotizacionEditada?.fechaEmision || cotizacionEditada?.fecha)) || formatDateISO(),
-        fecha: (editandoId && (cotizacionEditada?.fecha || cotizacionEditada?.fechaEmision)) || formatDateISO(),
+        fechaEmision: form.fechaEmision,
+        fecha: form.fechaEmision,
         moneda: form.moneda || 'US$'
       };
 
@@ -1521,6 +1535,19 @@ export default function Cotizaciones() {
             )}
 
           </>
+
+          <div className="fila-form fila-form-4">
+            <div className="campo">
+              <label>Fecha de emisión</label>
+              <input
+                type="date"
+                value={form.fechaEmision}
+                onChange={(e) => handleChange('fechaEmision', e.target.value)}
+                className={erroresForm.fechaEmision ? 'input-error' : ''}
+              />
+              {erroresForm.fechaEmision && <span className="mensaje-error">{erroresForm.fechaEmision}</span>}
+            </div>
+          </div>
 
           <div className="fila-form fila-form-4">
             <div className="campo">
