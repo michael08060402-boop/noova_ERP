@@ -109,6 +109,23 @@ service cloud.firestore {
         && request.resource.data.tipoItem == 'solicitud';
     }
 
+    function canSalidas() {
+      return canBusinessAll() || isJefeProyectoMinaActivo();
+    }
+
+    function esSalidaValida(data) {
+      return data.keys().hasAll(['guia', 'formato', 'items', 'estado', 'claveGuia', 'version'])
+        && data.estado in ['pendiente', 'exportado']
+        && data.guia is map
+        && data.formato is map
+        && data.items is list
+        && data.items.size() <= 500
+        && data.claveGuia is string
+        && data.claveGuia.size() > 0
+        && data.claveGuia.size() <= 40
+        && data.version is int;
+    }
+
     function canGestionarPlantillas() {
       return isActiveUser() && (isGerente() || isAdministrador() || isSoporteTI());
     }
@@ -298,6 +315,43 @@ service cloud.firestore {
     match /plantillasSolicitud/{docId} {
       allow read: if canGestionarPlantillas() || isJefeProyectoMinaActivo();
       allow create, update, delete: if canGestionarPlantillas();
+    }
+
+    match /avatares/{userId} {
+      allow read: if isActiveUser();
+      allow create, update: if isActiveUser()
+        && (request.auth.uid == userId || canManageUsers())
+        && request.resource.data.keys().hasOnly(['nombre', 'email', 'foto', 'updatedAt'])
+        && (
+          !('foto' in request.resource.data)
+          || (
+            request.resource.data.foto is string
+            && request.resource.data.foto.size() < 150000
+            && request.resource.data.foto.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')
+          )
+        );
+      allow delete: if isActiveUser() && (request.auth.uid == userId || canManageUsers());
+    }
+
+    match /salidasGuias/{docId} {
+      allow read: if canSalidas();
+      allow create: if canSalidas()
+        && esSalidaValida(request.resource.data)
+        && request.resource.data.version == 1;
+      allow update: if canSalidas()
+        && esSalidaValida(request.resource.data)
+        && request.resource.data.version == resource.data.version + 1;
+      allow delete: if canBusinessAll();
+
+      match /archivos/{archivoId} {
+        allow read: if canSalidas();
+        allow create, update: if canSalidas()
+          && request.resource.data.keys().hasOnly(['nombre', 'tipo', 'datos'])
+          && request.resource.data.tipo in ['pdf', 'png', 'jpg']
+          && request.resource.data.datos is string
+          && request.resource.data.datos.size() < 1000000;
+        allow delete: if canBusinessAll();
+      }
     }
 
     match /mensajeria/{docId} {

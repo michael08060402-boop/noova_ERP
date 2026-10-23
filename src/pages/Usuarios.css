@@ -102,3 +102,23 @@
   font-size: .76rem;
   color: var(--texto-suave);
 }
+
+.usuario-con-foto {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.usuario-foto-boton {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+
+.usuario-foto-boton:hover .avatar-usuario,
+.usuario-foto-boton:focus-visible .avatar-usuario {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--azul-primario);
+}

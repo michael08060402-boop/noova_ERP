@@ -24,6 +24,7 @@ const PERMISOS_TOTALES = {
   servicios: TODO,
   cotizaciones: TODO,
   solicitudes: TODO,
+  salidas: TODO,
   calibraciones: ['read'],
   mensajeria: TODO,
   proveedores: TODO,
@@ -87,6 +88,7 @@ export const ROLES = {
     areaPredeterminada: 'minas',
     permissions: {
       solicitudes: ['read', 'create', 'update'],
+      salidas: ['read', 'create', 'update'],
       nube: TODO,
       perfil: ['read', 'update']
     },
@@ -104,6 +106,7 @@ const MODULOS = [
   { key: 'servicios', label: 'Servicios' },
   { key: 'cotizaciones', label: 'Cotizaciones' },
   { key: 'solicitudes', label: 'Solicitud de cotización' },
+  { key: 'salidas', label: 'Formato de salida' },
   { key: 'calibraciones', label: 'Calibraciones' },
   { key: 'mensajeria', label: 'Mensajería' },
   { key: 'proveedores', label: 'Proveedores' },

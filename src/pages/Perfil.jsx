@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { puede, updateUserProfile } from '../services/userService';
 import { addLog } from '../services/logService';
@@ -13,7 +13,9 @@ import {
   updateEmail,
   updatePassword
 } from 'firebase/auth';
-import logo from '../assets/noova-logo.png';
+import AvatarUsuario from '../components/AvatarUsuario';
+import { useAvatares } from '../hooks/useAvatares';
+import { prepararFoto } from '../utils/avatar';
 import '../styles/shared.css';
 import './Perfil.css';
 
@@ -22,6 +24,10 @@ const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 export default function Perfil({ embebido = false }) {
   const { currentUser, userProfile, refreshProfile } = useAuth();
   const puedeEditarPerfil = puede(userProfile, 'perfil', 'update');
+  const { buscar: buscarAvatar, guardar: guardarAvatar } = useAvatares();
+  const miAvatar = buscarAvatar({ uid: currentUser?.uid });
+  const entradaFoto = useRef(null);
+  const [guardandoFoto, setGuardandoFoto] = useState(false);
 
   const [form, setForm] = useState({
     nombre: '',
@@ -46,6 +52,32 @@ export default function Perfil({ embebido = false }) {
   const [passwordConfirmar, setPasswordConfirmar] = useState('');
   const [guardandoPassword, setGuardandoPassword] = useState(false);
   const [errorPassword, setErrorPassword] = useState('');
+
+  function elegirFoto(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) cambiarFoto(file);
+  }
+
+  async function cambiarFoto(file) {
+    if (!currentUser?.uid) return;
+    setGuardandoFoto(true);
+    try {
+      const foto = file ? await prepararFoto(file) : null;
+      await guardarAvatar(currentUser.uid, {
+        nombre: form.nombre || userProfile?.nombre || '',
+        email: form.email || currentUser.email,
+        foto
+      });
+      setMensaje({ tipo: 'success', texto: foto ? 'Foto actualizada' : 'Foto eliminada' });
+    } catch (err) {
+      console.error('Error guardando la foto de perfil:', err);
+      setMensaje({ tipo: 'error', texto: err.message || 'No se pudo guardar la foto' });
+    } finally {
+      setGuardandoFoto(false);
+      setTimeout(() => setMensaje(null), 3000);
+    }
+  }
 
   useEffect(() => {
     if (userProfile) {
@@ -352,12 +384,28 @@ export default function Perfil({ embebido = false }) {
       <div className={`perfil-grid ${!puedeEditarPerfil ? 'perfil-grid-solo-datos' : ''}`}>
       <div className="perfil-card perfil-datos">
         <div className="perfil-avatar-section">
-          <img className="perfil-logo" src={logo} alt="Noova" />
+          <AvatarUsuario
+            nombre={form.nombre || currentUser?.email}
+            email={form.email || currentUser?.email}
+            foto={miAvatar?.foto}
+            tamano={72}
+          />
           <div className="perfil-avatar-info">
             <span className="perfil-name">{form.nombre || 'Sin nombre'}</span>
             <span className="perfil-email">
               {form.email || currentUser?.email}
             </span>
+            <div className="perfil-foto-acciones">
+              <button type="button" className="btn-secundario btn-pequeno" onClick={() => entradaFoto.current?.click()} disabled={guardandoFoto}>
+                {guardandoFoto ? 'Guardando…' : miAvatar?.foto ? 'Cambiar foto' : 'Subir foto'}
+              </button>
+              {miAvatar?.foto && (
+                <button type="button" className="btn-secundario btn-pequeno" onClick={() => cambiarFoto(null)} disabled={guardandoFoto}>
+                  Quitar foto
+                </button>
+              )}
+              <input ref={entradaFoto} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={elegirFoto} />
+            </div>
           </div>
         </div>
 

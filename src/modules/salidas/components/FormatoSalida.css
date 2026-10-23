@@ -1,0 +1,389 @@
+.fsx-hoja {
+  --fsx-azul: #2f5597;
+  --fsx-etiqueta: #d9d9d9;
+  --fsx-borde: #3f3f3f;
+  width: 100%;
+  max-width: 1040px;
+  padding: 18px;
+  border: 1px solid var(--gris-borde);
+  border-radius: var(--radius-lg);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  color: #111;
+  font-family: 'Arial Narrow', Arial, sans-serif;
+  font-size: 13px;
+}
+
+.fsx-hoja input,
+.fsx-hoja textarea,
+.fsx-hoja select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: #111;
+  font: inherit;
+  text-align: center;
+}
+
+.fsx-hoja input[type="date"],
+.fsx-hoja input[type="time"] {
+  display: flex;
+  justify-content: center;
+}
+
+.fsx-hoja input::-webkit-datetime-edit {
+  flex: 0 0 auto;
+}
+
+.fsx-hoja textarea {
+  resize: none;
+  line-height: 1.3;
+  field-sizing: content;
+}
+
+.fsx-hoja input:hover:not(:disabled),
+.fsx-hoja textarea:hover:not(:disabled) {
+  background: #f8fafc;
+}
+
+.fsx-hoja input:focus,
+.fsx-hoja textarea:focus,
+.fsx-hoja select:focus {
+  border-color: var(--azul-primario);
+  background: #fff;
+  outline: none;
+}
+
+.fsx-hoja .fsx-input-error input,
+.fsx-hoja .fsx-input-error textarea,
+.fsx-hoja input.fsx-input-error,
+.fsx-hoja textarea.fsx-input-error {
+  border-color: var(--rojo);
+  background: #fef2f2;
+}
+
+.fsx-cabecera {
+  display: grid;
+  grid-template-columns: 130px 1fr 110px;
+  border: 1px solid var(--fsx-borde);
+}
+
+.fsx-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-right: 1px solid var(--fsx-borde);
+}
+
+.fsx-logo img {
+  max-width: 100%;
+  max-height: 64px;
+}
+
+.fsx-titulo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  background: var(--fsx-azul);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.fsx-codigo {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  border-left: 1px solid var(--fsx-borde);
+  text-align: center;
+}
+
+.fsx-codigo span,
+.fsx-codigo label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 2px 6px;
+}
+
+.fsx-codigo label {
+  border-top: 1px solid var(--fsx-borde);
+  background: var(--fsx-etiqueta);
+  font-weight: 700;
+}
+
+.fsx-codigo label input {
+  width: 56px;
+  font-weight: 700;
+}
+
+.fsx-barra {
+  margin-top: 16px;
+  padding: 4px 8px;
+  border: 1px solid var(--fsx-borde);
+  background: var(--fsx-azul);
+  color: #fff;
+  font-weight: 700;
+  text-align: center;
+}
+
+.fsx-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.fsx-tabla th,
+.fsx-tabla td {
+  border: 1px solid var(--fsx-borde);
+  vertical-align: middle;
+}
+
+.fsx-tabla th {
+  padding: 4px;
+  background: var(--fsx-etiqueta);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.fsx-tabla td {
+  padding: 1px;
+}
+
+.fsx-separada {
+  margin-top: 14px;
+}
+
+.fsx-ancha {
+  width: 38%;
+}
+
+.fsx-fila-guia {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+  padding: 4px 8px;
+  border: 1px solid var(--fsx-borde);
+  border-bottom: 0;
+  font-weight: 700;
+}
+
+.fsx-paquete,
+.fsx-guia {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.fsx-paquete input {
+  width: 60px;
+  border-bottom: 1px dashed #9ca3af;
+  font-weight: 700;
+}
+
+.fsx-guia input {
+  width: 150px;
+  border-bottom: 1px dashed #9ca3af;
+  font-weight: 700;
+}
+
+.fsx-items th {
+  height: 34px;
+}
+
+.fsx-items td input,
+.fsx-items td textarea {
+  font-size: 12px;
+}
+
+.fsx-col-modelo {
+  width: 33%;
+}
+
+.fsx-col-serie {
+  width: 13%;
+}
+
+.fsx-col-media {
+  width: 11%;
+}
+
+.fsx-col-corta {
+  width: 8%;
+}
+
+.fsx-tabla td.fsx-sugerida {
+  background: #fef9c3;
+}
+
+.fsx-tabla td.fsx-error {
+  background: #fee2e2;
+  box-shadow: inset 0 0 0 1px var(--rojo);
+}
+
+.fsx-pie-tabla {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+.fsx-agregar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px dashed #9ca3af;
+  border-radius: 4px;
+  background: #fff;
+  color: var(--texto-medio);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fsx-agregar:hover {
+  border-color: var(--azul-primario);
+  color: var(--azul-primario);
+}
+
+.fsx-motivos {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px 14px;
+  margin: 16px 0 0;
+  padding: 12px 6px;
+  border: 0;
+  border-top: 1px solid var(--fsx-borde);
+  border-bottom: 1px solid var(--fsx-borde);
+}
+
+.fsx-motivos legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.fsx-motivo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.fsx-hoja .fsx-motivo input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.fsx-casilla {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--fsx-borde);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.fsx-motivo input:focus-visible + .fsx-casilla {
+  outline: 2px solid var(--azul-primario);
+  outline-offset: 2px;
+}
+
+.fsx-control .fsx-etiqueta {
+  width: 14%;
+  font-weight: 400;
+}
+
+.fsx-firmas td {
+  height: 70px;
+  text-align: center;
+}
+
+.fsx-firmas img {
+  display: block;
+  margin: 0 auto;
+  max-width: 70%;
+  max-height: 64px;
+  object-fit: contain;
+}
+
+.fsx-firmas span {
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+.fsx-observacion {
+  margin-top: 16px;
+  font-weight: 700;
+}
+
+.fsx-observacion textarea {
+  margin-top: 4px;
+  border: 1px solid var(--fsx-borde);
+  text-align: left;
+}
+
+.fsx-faltan {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #991b1b;
+  font-family: var(--font-family, inherit);
+  font-size: 13px;
+}
+
+.fsx-faltan ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+@media (max-width: 760px) {
+  .fsx-hoja {
+    padding: 10px;
+    overflow-x: auto;
+  }
+
+  .fsx-cabecera {
+    grid-template-columns: 90px 1fr 90px;
+  }
+
+  .fsx-titulo {
+    font-size: 12px;
+  }
+
+  .fsx-motivos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fsx-items {
+    min-width: 760px;
+  }
+}

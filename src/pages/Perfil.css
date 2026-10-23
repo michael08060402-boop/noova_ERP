@@ -30,12 +30,11 @@
   border-bottom: 1px solid #e5e7eb;
 }
 
-.perfil-logo {
-  width: 84px;
-  height: 72px;
-  object-fit: contain;
-  border-radius: 8px;
-  flex-shrink: 0;
+.perfil-foto-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
 }
 
 .perfil-avatar-info {

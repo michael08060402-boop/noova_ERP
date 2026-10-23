@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import {
   FiPlus,
@@ -22,6 +22,9 @@ import {
 import { addLog } from '../services/logService';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
+import AvatarUsuario from '../components/AvatarUsuario';
+import { useAvatares } from '../hooks/useAvatares';
+import { prepararFoto } from '../utils/avatar';
 import Loading from '../components/Loading';
 import '../styles/shared.css';
 import './Usuarios.css';
@@ -80,10 +83,34 @@ export default function Usuarios({ embebido = false }) {
 
   const [terminoBusqueda, setTerminoBusqueda] = useState('');
   const [mensaje, setMensaje] = useState(null);
+  const { buscar: buscarAvatar, guardar: guardarAvatar } = useAvatares();
+  const entradaFoto = useRef(null);
+  const [usuarioFoto, setUsuarioFoto] = useState(null);
 
   function mostrarMensaje(tipo, texto) {
     setMensaje({ tipo, texto });
     setTimeout(() => setMensaje(null), 5000);
+  }
+
+  function elegirFotoDe(usuario) {
+    setUsuarioFoto(usuario);
+    entradaFoto.current?.click();
+  }
+
+  async function guardarFotoUsuario(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !usuarioFoto) return;
+    try {
+      const foto = await prepararFoto(file);
+      await guardarAvatar(usuarioFoto.uid, { nombre: usuarioFoto.nombre, email: usuarioFoto.email, foto });
+      mostrarMensaje('success', `Foto de ${usuarioFoto.nombre || usuarioFoto.email} actualizada`);
+    } catch (err) {
+      console.error('Error guardando foto de usuario:', err);
+      mostrarMensaje('error', err.message || 'No se pudo guardar la foto');
+    } finally {
+      setUsuarioFoto(null);
+    }
   }
 
   const [mostrarModalNuevo, setMostrarModalNuevo] = useState(false);
@@ -343,6 +370,8 @@ export default function Usuarios({ embebido = false }) {
         </div>
       </div>
 
+      <input ref={entradaFoto} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={guardarFotoUsuario} />
+
       <div className="tarjeta-tabla">
         {usuariosFiltrados.length === 0 ? (
           <div className="estado-vacio">
@@ -375,7 +404,22 @@ export default function Usuarios({ embebido = false }) {
                       className={usuario.activo === false ? 'fila-inactiva' : ''}
                     >
                       <td className="texto-negrita">
-                        {usuario.nombre || '—'}
+                        <span className="usuario-con-foto">
+                          <button
+                            type="button"
+                            className="usuario-foto-boton"
+                            onClick={() => elegirFotoDe(usuario)}
+                            title="Cambiar foto"
+                          >
+                            <AvatarUsuario
+                              nombre={usuario.nombre || usuario.email}
+                              email={usuario.email}
+                              foto={buscarAvatar({ uid: usuario.uid })?.foto}
+                              tamano={32}
+                            />
+                          </button>
+                          {usuario.nombre || '—'}
+                        </span>
                       </td>
                       <td>{usuario.email}</td>
                       <td>{usuario.cargo || '—'}</td>

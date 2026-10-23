@@ -4,7 +4,7 @@ import {
   FiBarChart2, FiUsers, FiFileText, FiSettings,
   FiMenu, FiLogOut, FiX, FiChevronDown, FiDollarSign, FiBell, FiTool,
   FiWind, FiMessageCircle, FiCloud, FiShoppingCart, FiTruck, FiSearch,
-  FiBriefcase, FiClipboard, FiTarget
+  FiBriefcase, FiClipboard, FiTarget, FiPackage
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useCotizaciones } from '../hooks/useCotizaciones';
@@ -12,6 +12,8 @@ import useNotificacionesVistas from '../hooks/useNotificacionesVistas';
 import { puede, ROLES, normalizarRol, esRolMinas } from '../services/userService';
 import { obtenerCalibracionesProximas } from '../utils/calibracion';
 import ConfirmDialog from '../components/ConfirmDialog';
+import AvatarUsuario from '../components/AvatarUsuario';
+import { useAvatares, useRegistrarUsuario } from '../hooks/useAvatares';
 import logoBlanco from '../assets/logo-blanco.png';
 import '../styles/shared.css';
 import './DashboardLayout.css';
@@ -30,18 +32,20 @@ const ITEMS_MENU = [
   { path: '/nube', label: 'Nube', icon: <FiCloud />, key: 'nube' },
   { path: '/proveedores', label: 'Proveedores', icon: <FiTruck />, key: 'proveedores' },
   { path: '/compras', label: 'Órdenes de compra', icon: <FiShoppingCart />, key: 'compras' },
+  { path: '/salidas', label: 'Formato de salida', icon: <FiPackage />, key: 'salidas' },
   { path: '/configuracion', label: 'Configuración', icon: <FiSettings />, key: 'configuracion' }
 ];
 
 const GRUPOS_MENU = [
   { id: 'comercial', label: 'COMERCIAL', keys: ['dashboard', 'clientes', 'cotizaciones', 'facturacion'] },
   { id: 'compras', label: 'COMPRAS', keys: ['solicitudes', 'proveedores', 'compras'] },
+  { id: 'logistica', label: 'LOGÍSTICA', keys: ['salidas'] },
   { id: 'catalogo', label: 'CATÁLOGO', keys: ['equipos', 'mangas', 'servicios'] },
   { id: 'postventa', label: 'POSTVENTA', keys: ['calibraciones'] }
 ];
 
 const GRUPOS_MENU_MINAS = [
-  { id: 'minas', label: 'MINAS', keys: ['solicitudes', 'nube'] }
+  { id: 'minas', label: 'MINAS', keys: ['solicitudes', 'salidas', 'nube'] }
 ];
 
 function useEsMobile() {
@@ -59,6 +63,9 @@ function useEsMobile() {
 export default function DashboardLayout() {
   const { currentUser, userProfile, logout } = useAuth();
   const esMinas = esRolMinas(userProfile);
+  const { buscar: buscarAvatar } = useAvatares();
+  const miAvatar = buscarAvatar({ uid: currentUser?.uid });
+  useRegistrarUsuario(currentUser?.uid, userProfile?.nombre, userProfile?.email || currentUser?.email);
   const puedeVerCotizaciones = puede(userProfile, 'cotizaciones', 'read');
   const puedeVerSolicitudes = puede(userProfile, 'solicitudes', 'read');
   const puedeVerDocumentos = puedeVerCotizaciones || puedeVerSolicitudes;
@@ -272,15 +279,13 @@ export default function DashboardLayout() {
               title={nombreUsuario}
               aria-label="Menú de usuario"
             >
-              <span className="topbar-user-icon">
-                {nombreUsuario
-                  .trim()
-                  .split(/\s+/)
-                  .slice(0, 2)
-                  .map((nombre) => nombre[0])
-                  .join('')
-                  .toUpperCase()}
-              </span>
+              <AvatarUsuario
+                className="topbar-user-icon"
+                nombre={nombreUsuario}
+                email={userProfile?.email || currentUser?.email}
+                foto={miAvatar?.foto}
+                tamano={null}
+              />
               <span className="topbar-user-data">
                 <span className="topbar-user-name">{nombreUsuario}</span>
                 <span className="topbar-user-role">{rolUsuario}</span>

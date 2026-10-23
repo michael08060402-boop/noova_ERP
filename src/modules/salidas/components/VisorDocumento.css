@@ -1,0 +1,115 @@
+.visor-documento {
+  position: sticky;
+  top: 1rem;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 2rem);
+  border: 1px solid var(--gris-borde);
+  border-radius: var(--radius-lg);
+  background: #e9eef3;
+  overflow: hidden;
+}
+
+.visor-documento-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--gris-borde);
+  background: #fff;
+}
+
+.visor-documento-titulo {
+  overflow: hidden;
+  color: var(--texto-medio);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visor-documento-herramientas {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.visor-documento-paginas {
+  margin-right: 0.35rem;
+  color: var(--texto-suave);
+  font-size: 0.75rem;
+}
+
+.visor-documento-boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--gris-borde);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--texto-medio);
+  cursor: pointer;
+}
+
+.visor-documento-boton:hover {
+  border-color: var(--azul-primario);
+  color: var(--azul-primario);
+}
+
+.visor-documento-aviso {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 0.78rem;
+}
+
+.visor-documento-error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.visor-documento-vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2rem 1.25rem;
+  color: var(--texto-suave);
+  font-size: 0.84rem;
+  text-align: center;
+}
+
+.visor-documento-vacio p {
+  margin: 0;
+}
+
+.visor-documento-hojas {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  overflow: auto;
+}
+
+.visor-documento-pagina {
+  display: block;
+  max-width: none;
+  height: auto;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(15, 35, 60, 0.15);
+}
+
+@media (max-width: 1100px) {
+  .visor-documento {
+    position: static;
+    max-height: 70vh;
+  }
+}

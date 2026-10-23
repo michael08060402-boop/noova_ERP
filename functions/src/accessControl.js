@@ -10,6 +10,7 @@ const PERMISOS_TOTALES = {
   servicios: TODO,
   cotizaciones: TODO,
   solicitudes: TODO,
+  salidas: TODO,
   calibraciones: ['read'],
   mensajeria: TODO,
   proveedores: TODO,
@@ -78,6 +79,7 @@ const ROLES = {
     areaPredeterminada: 'minas',
     permissions: {
       solicitudes: ['read', 'create', 'update'],
+      salidas: ['read', 'create', 'update'],
       nube: TODO,
       perfil: ['read', 'update']
     },

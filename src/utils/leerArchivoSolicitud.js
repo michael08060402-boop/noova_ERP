@@ -5,55 +5,10 @@ import {
   interpretarTextoSolicitud,
   normalizarUnidad
 } from './solicitudCotizacion';
+import { abrirZip } from './zip';
 
 function extension(nombre) {
   return String(nombre || '').toLowerCase().split('.').pop();
-}
-
-async function inflar(datos) {
-  const stream = new Blob([datos]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
-}
-
-async function leerZip(buffer) {
-  const bytes = new Uint8Array(buffer);
-  const vista = new DataView(buffer);
-
-  let fin = -1;
-  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65557); i -= 1) {
-    if (vista.getUint32(i, true) === 0x06054b50) { fin = i; break; }
-  }
-  if (fin < 0) throw new Error('El archivo está dañado o no es un documento de Office válido.');
-
-  const total = vista.getUint16(fin + 10, true);
-  let pos = vista.getUint32(fin + 16, true);
-  const decoder = new TextDecoder();
-  const entradas = new Map();
-
-  for (let n = 0; n < total; n += 1) {
-    if (vista.getUint32(pos, true) !== 0x02014b50) break;
-    const metodo = vista.getUint16(pos + 10, true);
-    const tamComprimido = vista.getUint32(pos + 20, true);
-    const largoNombre = vista.getUint16(pos + 28, true);
-    const largoExtra = vista.getUint16(pos + 30, true);
-    const largoComentario = vista.getUint16(pos + 32, true);
-    const offsetLocal = vista.getUint32(pos + 42, true);
-    const nombre = decoder.decode(bytes.subarray(pos + 46, pos + 46 + largoNombre));
-    entradas.set(nombre, { metodo, tamComprimido, offsetLocal });
-    pos += 46 + largoNombre + largoExtra + largoComentario;
-  }
-
-  return async function leerEntrada(nombre) {
-    const entrada = entradas.get(nombre);
-    if (!entrada) return null;
-    const { metodo, tamComprimido, offsetLocal } = entrada;
-    const inicio = offsetLocal + 30
-      + vista.getUint16(offsetLocal + 26, true)
-      + vista.getUint16(offsetLocal + 28, true);
-    const datos = bytes.subarray(inicio, inicio + tamComprimido);
-    const contenido = metodo === 0 ? datos : await inflar(datos);
-    return decoder.decode(contenido);
-  };
 }
 
 function parsearXml(texto) {
@@ -72,7 +27,7 @@ function columnaDesdeRef(ref) {
 }
 
 async function leerExcel(buffer) {
-  const leer = await leerZip(buffer);
+  const { leerTexto: leer } = await abrirZip(buffer);
   const compartidosXml = await leer('xl/sharedStrings.xml');
   const compartidos = compartidosXml
     ? hijos(parsearXml(compartidosXml), 'si').map((si) => hijos(si, 't').map((t) => t.textContent).join(''))
@@ -110,7 +65,7 @@ async function leerExcel(buffer) {
 }
 
 async function leerWord(buffer) {
-  const leer = await leerZip(buffer);
+  const { leerTexto: leer } = await abrirZip(buffer);
   const xml = await leer('word/document.xml');
   if (!xml) throw new Error('No se encontró el contenido del documento Word.');
   const cuerpo = hijos(parsearXml(xml), 'body')[0];

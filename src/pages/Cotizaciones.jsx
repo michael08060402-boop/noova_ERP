@@ -17,7 +17,10 @@ import { addLog } from '../services/logService';
 import { useRucLookup } from '../hooks/useRucLookup';
 import { formatDate, formatDateISO } from '../utils/formatDate';
 import { formatUSD, formatCurrency, calcularTotalesCotizacion } from '../utils/formatCurrency';
+import { ESTADOS_VISIBLES, actualizacionReciente, estadoVisible } from '../utils/vencimientoCotizacion';
+import { useAvatares } from '../hooks/useAvatares';
 import ConfirmDialog from '../components/ConfirmDialog';
+import AvatarUsuario from '../components/AvatarUsuario';
 import Paginacion from '../components/Paginacion';
 import Loading from '../components/Loading';
 import '../styles/shared.css';
@@ -320,6 +323,7 @@ function EquipoCombobox({ equipos, value, onSelect }) {
 export default function Cotizaciones() {
   const navigate = useNavigate();
   const { currentUser, userProfile } = useAuth();
+  const { buscar: buscarAvatar } = useAvatares();
 
   const perfilListo = Boolean(userProfile);
   const { cotizaciones, loading, addCotizacion, editCotizacion, removeCotizacion } = useCotizaciones(perfilListo);
@@ -348,6 +352,12 @@ export default function Cotizaciones() {
 
   const [terminoBusqueda, setTerminoBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
+  const [ahora, setAhora] = useState(() => new Date());
+
+  useEffect(() => {
+    const intervalo = setInterval(() => setAhora(new Date()), 60000);
+    return () => clearInterval(intervalo);
+  }, []);
   const [filtroFamilia, setFiltroFamilia] = useState('');
   const [paginaActual, setPaginaActual] = useState(1);
   const [porPagina, setPorPagina] = useState(10);
@@ -405,16 +415,27 @@ export default function Cotizaciones() {
         c.codigo?.toLowerCase().includes(term) ||
         c.cliente?.razonSocial?.toLowerCase().includes(term) ||
         c.responsable?.toLowerCase().includes(term);
-      const coincideEstado = !filtroEstado || c.estado === filtroEstado;
+      const coincideEstado = !filtroEstado || estadoVisible(c, ahora).clave === filtroEstado;
       const coincideFamilia = !filtroFamilia || detectarTipoItem(c) === filtroFamilia;
       return coincideBusqueda && coincideEstado && coincideFamilia;
     });
-  }, [cotizaciones, terminoBusqueda, filtroEstado, filtroFamilia]);
+  }, [cotizaciones, terminoBusqueda, filtroEstado, filtroFamilia, ahora]);
 
   const cotizacionesPaginadas = useMemo(() => {
     const inicio = (paginaActual - 1) * porPagina;
     return cotizacionesFiltradas.slice(inicio, inicio + porPagina);
   }, [cotizacionesFiltradas, paginaActual, porPagina]);
+
+  const conteoEstados = useMemo(() => {
+    const conteo = {};
+    for (const c of cotizaciones) {
+      const { clave } = estadoVisible(c, ahora);
+      conteo[clave] = (conteo[clave] || 0) + 1;
+    }
+    return conteo;
+  }, [cotizaciones, ahora]);
+
+  const pestanasEstado = ESTADOS_VISIBLES.filter((e) => conteoEstados[e.clave] || !['error', 'generada'].includes(e.clave));
 
   const pendientesCount = cotizaciones.filter(
     (c) => c.estado === 'Generada' || c.estado === 'Borrador' || c.estado === 'Enviada'
@@ -907,6 +928,8 @@ export default function Cotizaciones() {
               editadoPor: responsable
             }
           : { responsable, cargoResponsable, emailResponsable, telefonoResponsable }),
+        actualizadoPor: responsable,
+        emailActualizadoPor: emailResponsable,
         contactoSeleccionado,
         condicionPago: form.condicionPago,
         validez: `${form.validezNumero} días`,
@@ -1063,22 +1086,16 @@ export default function Cotizaciones() {
         )}
       </div>
 
-      <div className="tabs-cotizaciones">
-        {vista === 'form' ? (
+      {vista === 'form' && (
+        <div className="tabs-cotizaciones">
           <button type="button" className="tab-cotizacion tab-volver" onClick={volverALista}>
             <FiArrowLeft size={14} /> Volver a la lista de cotizaciones
           </button>
-        ) : (
-          <button type="button" className="tab-cotizacion activa" onClick={volverALista}>
-            Lista de cotizaciones
-          </button>
-        )}
-        {vista === 'form' && (
           <button type="button" className="tab-cotizacion activa" disabled>
             {editandoId ? 'Editar Cotización' : 'Nueva Cotización'}
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {mensaje && (
         <div className={`mensaje-flash mensaje-${mensaje.tipo}`}>
@@ -1098,15 +1115,15 @@ export default function Cotizaciones() {
             onClick={() => alCambiarEstado('')}>
             Todos <span className="pestana-estado-contador">{cotizaciones.length}</span>
           </button>
-          {ESTADOS.filter((e) => e !== 'Error').map((e) => (
+          {pestanasEstado.map((e) => (
             <button
               type="button"
-              key={e}
-              className={`pestana-estado${filtroEstado === e ? ' activa' : ''}`}
-              aria-pressed={filtroEstado === e}
-              onClick={() => alCambiarEstado(filtroEstado === e ? '' : e)}
+              key={e.clave}
+              className={`pestana-estado pestana-${e.clave}${filtroEstado === e.clave ? ' activa' : ''}`}
+              aria-pressed={filtroEstado === e.clave}
+              onClick={() => alCambiarEstado(filtroEstado === e.clave ? '' : e.clave)}
             >
-              {e} <span className="pestana-estado-contador">{cotizaciones.filter((c) => c.estado === e).length}</span>
+              {e.label} <span className="pestana-estado-contador">{conteoEstados[e.clave] || 0}</span>
             </button>
           ))}
         </div>
@@ -1184,15 +1201,33 @@ export default function Cotizaciones() {
                 <tbody>
                   {cotizacionesPaginadas.map((cot) => {
                     const tipoCot = detectarTipoItem(cot);
+                    const estadoCot = estadoVisible(cot, ahora);
+                    const reciente = actualizacionReciente(cot, ahora);
+                    const usuarioResponsable = buscarAvatar({ email: cot.emailResponsable, nombre: cot.responsable });
+                    const nombreResponsable = usuarioResponsable?.nombre || cot.responsable;
+                    const usuarioEditor = cot.emailActualizadoPor || cot.actualizadoPor
+                      ? buscarAvatar({ email: cot.emailActualizadoPor, nombre: cot.actualizadoPor })
+                      : null;
+                    const nombreEditor = usuarioEditor?.nombre || cot.actualizadoPor;
                     return (
-                      <tr key={cot.id} className={COLOR_FILA_ESTADO[cot.estado] || ''}>
+                      <tr key={cot.id} className={[COLOR_FILA_ESTADO[cot.estado], reciente && 'fila-reciente'].filter(Boolean).join(' ')}>
                         <td className="texto-codigo">{cot.codigo}</td>
-                        <td>{formatDate(cot.fecha || cot.fechaEmision || cot.createdAt)}</td>
+                        <td>
+                          {formatDate(cot.fecha || cot.fechaEmision || cot.createdAt)}
+                          {reciente && (
+                            <span className="cotizacion-reciente" title={nombreEditor ? `${reciente.nueva ? 'Creada' : 'Actualizada'} por ${nombreEditor}` : undefined}>
+                              {nombreEditor && (
+                                <AvatarUsuario nombre={nombreEditor} email={usuarioEditor?.email || cot.emailActualizadoPor} foto={usuarioEditor?.foto} tamano={18} />
+                              )}
+                              {reciente.nueva ? 'Nueva' : 'Actualizada'} {reciente.hace}
+                            </span>
+                          )}
+                        </td>
                         <>
                           <td>
                             <div className="cliente-con-avatar">
                               <div className="cliente-con-avatar-info">
-                                <span className="cliente-con-avatar-nombre">{cot.cliente?.razonSocial || '-'}</span>
+                                <span className="cliente-con-avatar-nombre" title={cot.cliente?.razonSocial}>{cot.cliente?.razonSocial || '-'}</span>
                                 <span
                                   className={`badge-tipo-cotizacion badge-tipo-${tipoCot}`}
                                   title={cot.tipoItem ? 'Tipo guardado al crear' : 'Tipo detectado automáticamente'}
@@ -1202,16 +1237,23 @@ export default function Cotizaciones() {
                               </div>
                             </div>
                           </td>
-                          <td>{cot.responsable || '-'}</td>
+                          <td>
+                            {cot.responsable ? (
+                              <span className="responsable-con-foto">
+                                <AvatarUsuario nombre={nombreResponsable} email={usuarioResponsable?.email || cot.emailResponsable} foto={usuarioResponsable?.foto} tamano={28} />
+                                <span>{nombreResponsable}</span>
+                              </span>
+                            ) : '-'}
+                          </td>
                           <td>{cot.condicionPago || '-'}</td>
                           <td className="texto-derecha texto-negrita cotizacion-total-lista">{formatMoneda(cot.total || 0, cot.moneda)}</td>
                         </>
                         <td className="texto-centro">
                           <span
-                            className={`badge-estado-sunat estado-${(cot.estado || 'Generada').toLowerCase()}`}
-                            title={(cot.estado === 'Error' || cot.estado === 'Cancelada' || cot.estado === 'Rechazada') && cot.motivoRechazoSunat ? `Motivo: ${cot.motivoRechazoSunat}` : 'Estado de la cotización'}
+                            className={`badge-estado-cotizacion estado-cot-${estadoCot.clave}`}
+                            title={(cot.estado === 'Error' || cot.estado === 'Cancelada' || cot.estado === 'Rechazada') && cot.motivoRechazoSunat ? `Motivo: ${cot.motivoRechazoSunat}` : estadoCot.detalle || 'Estado de la cotización'}
                           >
-                            {cot.estado || 'Generada'}
+                            {estadoCot.label}
                           </span>
                           {(cot.estado === 'Error' || cot.estado === 'Cancelada' || cot.estado === 'Rechazada') && cot.motivoRechazoSunat && (
                             <div

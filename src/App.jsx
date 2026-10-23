@@ -14,6 +14,7 @@ import Dashboard from './pages/Dashboard';
 import Clientes from './pages/Clientes';
 import Cotizaciones from './pages/Cotizaciones';
 import SolicitudesCotizacion from './pages/SolicitudesCotizacion';
+import SalidasPage from './modules/salidas/pages/SalidasPage';
 import Calibraciones from './pages/Calibraciones';
 import Equipos from './pages/Equipos';
 import Mangas from './pages/Mangas';
@@ -230,6 +231,15 @@ function App() {
             element={
               <RutaConPermiso modulo="solicitudes">
                 <SolicitudesCotizacion />
+              </RutaConPermiso>
+            }
+          />
+
+          <Route
+            path="salidas"
+            element={
+              <RutaConPermiso modulo="salidas">
+                <SalidasPage />
               </RutaConPermiso>
             }
           />
