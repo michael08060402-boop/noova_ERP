@@ -17,6 +17,7 @@ const PERMISOS_TOTALES = {
   compras: TODO,
   facturacion: TODO,
   nube: TODO,
+  marketing: TODO,
   perfil: TODO,
   configuracion: ['read', 'update']
 };
@@ -54,7 +55,8 @@ const ROLES = {
       configuracion: ['read', 'update'],
       perfil: TODO,
       nube: TODO,
-      mensajeria: TODO
+      mensajeria: TODO,
+      marketing: ['read']
     },
     configuracion: ['*'],
     nubeCarpeta: 'NOOVA SAC/10. SISTEMAS'
@@ -68,7 +70,8 @@ const ROLES = {
       clientes: ['read'],
       mensajeria: TODO,
       perfil: ['read'],
-      nube: TODO
+      nube: TODO,
+      marketing: ['read']
     },
     configuracion: [],
     nubeCarpeta: 'NOOVA SAC/04. MARKETING'

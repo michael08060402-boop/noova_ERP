@@ -10,7 +10,8 @@ const { validarRuc, consultarRucCompleto } = require('./src/consultarRuc');
 const {
   listarCarpeta,
   obtenerCarpetaPorRuta, obtenerItem, crearCarpeta, subirArchivo,
-  renombrarItem, eliminarItem, estaDentroDeCarpeta, buscarDocumentos
+  renombrarItem, eliminarItem, estaDentroDeCarpeta, buscarDocumentos,
+  listarArchivosPublicacionCarpeta
 } = require('./src/graph/graphDriveProvider');
 const {
   normalizarRol,
@@ -295,7 +296,131 @@ exports.nubeListarCarpeta = onCall(
 );
 
 const GRAPH_SECRETS_NUBE = ['GRAPH_TENANT_ID', 'GRAPH_CLIENT_ID', 'GRAPH_CLIENT_SECRET', 'GRAPH_DRIVE_TYPE', 'GRAPH_DRIVE_ID'];
+
+// ── MÓDULO MARKETING ──
+// Publicaciones: imágenes de la carpeta de borradores IA en SharePoint, solo lectura.
+const RUTA_PUBLICACIONES = 'NOOVA SAC/04. MARKETING/BORRADORES IA';
+
+function detectarRedSocial(nombreCarpeta) {
+  const nombre = String(nombreCarpeta || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .trim()
+    .toLowerCase();
+
+  if (/facebook|^fb$/.test(nombre)) return 'facebook';
+  if (/instagram|^ig$/.test(nombre)) return 'instagram';
+  if (/linkedin/.test(nombre)) return 'linkedin';
+  return null;
+}
+
+exports.marketingListarPublicaciones = onCall(
+  { region: 'us-central1', timeoutSeconds: 30, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'No autenticado');
+    }
+    await exigirPermiso(request.auth.uid, 'marketing');
+
+    try {
+      const carpeta = await obtenerCarpetaPorRuta(RUTA_PUBLICACIONES);
+      const hijos = await listarCarpeta(carpeta.id);
+
+      // Cada subcarpeta de red social (FACEBOOK, INSTAGRAM/IG, LINKEDIN) aporta
+      // sus imágenes con la red asignada. Las sueltas en la raíz quedan sin red.
+      const carpetasRed = hijos
+        .filter((hijo) => hijo.tipo === 'carpeta')
+        .map((hijo) => ({ id: hijo.id, red: detectarRedSocial(hijo.nombre) }))
+        .filter((hijo) => hijo.red);
+
+      const grupos = await Promise.all([
+        listarArchivosPublicacionCarpeta(carpeta.id).then((imgs) => imgs.map((img) => ({ ...img, red: null }))),
+        ...carpetasRed.map(({ id, red }) =>
+          listarArchivosPublicacionCarpeta(id).then((imgs) => imgs.map((img) => ({ ...img, red })))
+        )
+      ]);
+
+      const items = grupos
+        .flat()
+        .sort((a, b) => String(b.fechaModificacion).localeCompare(String(a.fechaModificacion)));
+      return { items };
+    } catch (err) {
+      console.error('Error en marketingListarPublicaciones:', err.message);
+      throw convertirErrorGraph(err, 'Error listando publicaciones');
+    }
+  }
+);
 const RUTA_CONFIDENCIAL = 'NOOVA SAC/09. CONFIDENCIAL';
+// Las observaciones se administran mediante funciones: el cliente no decide
+// el autor ni la fecha, y las reglas deniegan el acceso directo a la colección.
+async function contextoObservacionMarketing(request) {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
+  const perfil = await exigirPermiso(request.auth.uid, 'marketing');
+  const publicacionId = request.data?.publicacionId;
+  if (typeof publicacionId !== 'string' || !/^[a-zA-Z0-9!._-]{1,300}$/.test(publicacionId) || ['.', '..'].includes(publicacionId)) {
+    throw new HttpsError('invalid-argument', 'La publicación no es válida.');
+  }
+
+  const carpeta = await obtenerCarpetaPorRuta(RUTA_PUBLICACIONES);
+  if (!await estaDentroDeCarpeta(publicacionId, carpeta.id)) {
+    throw new HttpsError('permission-denied', 'El archivo no pertenece a Publicaciones.');
+  }
+  const item = await obtenerItem(publicacionId);
+  if (!item.file || !(/^image\//i.test(item.file.mimeType || '') || item.file.mimeType?.toLowerCase() === 'application/pdf' || /\.pdf$/i.test(item.name))) {
+    throw new HttpsError('invalid-argument', 'Solo puedes observar imágenes o PDF de Publicaciones.');
+  }
+  return {
+    perfil,
+    notas: db.collection('marketingPublicaciones').doc(publicacionId).collection('observaciones')
+  };
+}
+
+exports.marketingListarObservaciones = onCall(
+  { region: 'us-central1', timeoutSeconds: 30, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
+  async (request) => {
+    const { notas } = await contextoObservacionMarketing(request);
+    const snapshot = await notas.orderBy('fecha', 'desc').get();
+    return { items: snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id })) };
+  }
+);
+
+exports.marketingCrearObservacion = onCall(
+  { region: 'us-central1', timeoutSeconds: 30, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
+    const texto = request.data?.texto;
+    if (typeof texto !== 'string' || !texto.trim() || texto.length > 500) {
+      throw new HttpsError('invalid-argument', 'Escribe una observación de entre 1 y 500 caracteres.');
+    }
+    const solicitudId = request.data?.solicitudId;
+    if (typeof solicitudId !== 'string' || !/^[a-zA-Z0-9-]{16,80}$/.test(solicitudId)) {
+      throw new HttpsError('invalid-argument', 'La solicitud de observación no es válida.');
+    }
+    const { perfil, notas } = await contextoObservacionMarketing(request);
+    const referencia = notas.doc(solicitudId);
+    // La misma solicitud no crea dos notas si se reintenta tras un fallo de red.
+    const item = await db.runTransaction(async (transaction) => {
+      const anterior = await transaction.get(referencia);
+      if (anterior.exists) {
+        const guardada = anterior.data();
+        if (guardada.usuarioUid !== request.auth.uid || guardada.texto !== texto.trim()) {
+          throw new HttpsError('already-exists', 'Esta solicitud ya fue utilizada.');
+        }
+        return { ...guardada, id: referencia.id };
+      }
+      const observacion = {
+        texto: texto.trim(),
+        usuarioUid: request.auth.uid,
+        usuarioNombre: textoSeguro(perfil.nombre || request.auth.token?.name || request.auth.token?.email || 'Usuario', 150),
+        fecha: new Date().toISOString()
+      };
+      transaction.create(referencia, observacion);
+      return { ...observacion, id: referencia.id };
+    });
+    return { item };
+  }
+);
+
 const ROLES_NUBE_RESTRINGIDA = new Set([
   'soporte_ti',
   'responsable_marketing',

@@ -4,7 +4,7 @@ import {
   FiBarChart2, FiUsers, FiFileText, FiSettings,
   FiMenu, FiLogOut, FiX, FiChevronDown, FiDollarSign, FiBell, FiTool,
   FiWind, FiMessageCircle, FiCloud, FiShoppingCart, FiTruck, FiSearch,
-  FiBriefcase, FiClipboard, FiTarget, FiPackage
+  FiBriefcase, FiClipboard, FiTarget, FiPackage, FiImage
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import { useCotizaciones } from '../hooks/useCotizaciones';
@@ -28,6 +28,7 @@ const ITEMS_MENU = [
   { path: '/mangas', label: 'Mangas', icon: <FiWind />, key: 'mangas' },
   { path: '/servicios', label: 'Servicios', icon: <FiBriefcase />, key: 'servicios' },
   { path: '/calibraciones', label: 'Calibraciones', icon: <FiTarget />, key: 'calibraciones' },
+  { path: '/marketing/publicaciones', label: 'Publicaciones', icon: <FiImage />, key: 'marketing' },
   { path: '/mensajeria', label: 'Mensajería', icon: <FiMessageCircle />, key: 'mensajeria' },
   { path: '/nube', label: 'Nube', icon: <FiCloud />, key: 'nube' },
   { path: '/proveedores', label: 'Proveedores', icon: <FiTruck />, key: 'proveedores' },
@@ -41,7 +42,8 @@ const GRUPOS_MENU = [
   { id: 'compras', label: 'COMPRAS', keys: ['solicitudes', 'proveedores', 'compras'] },
   { id: 'logistica', label: 'LOGÍSTICA', keys: ['salidas'] },
   { id: 'catalogo', label: 'CATÁLOGO', keys: ['equipos', 'mangas', 'servicios'] },
-  { id: 'postventa', label: 'POSTVENTA', keys: ['calibraciones'] }
+  { id: 'postventa', label: 'POSTVENTA', keys: ['calibraciones'] },
+  { id: 'marketing', label: 'MARKETING', keys: ['marketing'] }
 ];
 
 const GRUPOS_MENU_MINAS = [

@@ -24,6 +24,7 @@ import Perfil from './pages/Perfil';
 import Facturacion from './pages/Facturacion';
 import Mensajeria from './pages/Mensajeria';
 import NubePage from './modules/nube/pages/NubePage';
+import PublicacionesPage from './modules/marketing/pages/PublicacionesPage';
 import Compras from './pages/Compras';
 import Proveedores from './pages/Proveedores';
 
@@ -344,6 +345,20 @@ function App() {
             element={
               <RutaConPermiso modulo="nube">
                 <NubePage />
+              </RutaConPermiso>
+            }
+          />
+
+          <Route
+            path="marketing"
+            element={<Navigate to="/marketing/publicaciones" replace />}
+          />
+
+          <Route
+            path="marketing/publicaciones"
+            element={
+              <RutaConPermiso modulo="marketing">
+                <PublicacionesPage />
               </RutaConPermiso>
             }
           />

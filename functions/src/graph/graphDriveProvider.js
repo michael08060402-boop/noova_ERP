@@ -206,7 +206,44 @@ async function estaDentroDeCarpeta(itemId, carpetaRaizId) {
   return false;
 }
 
+// Lista solo las imágenes de una carpeta con sus miniaturas. Las URLs de
+// miniatura de Graph son temporales, por eso se piden en cada consulta.
+async function listarArchivosPublicacionCarpeta(carpetaId) {
+  const prefijo = obtenerPrefijoDrive();
+  const endpoint = `${prefijo}/items/${codificarItemId(carpetaId)}/children`;
+
+  const items = await graphClient.getPaginado(endpoint, {
+    $select: 'id,name,size,lastModifiedDateTime,file,webUrl',
+    $expand: 'thumbnails',
+    $orderby: 'lastModifiedDateTime desc',
+    $top: 200
+  });
+
+  return Promise.all(items
+    .filter((item) => item.file && (
+      /^image\//i.test(item.file.mimeType || '') ||
+      item.file.mimeType?.toLowerCase() === 'application/pdf' || /\.pdf$/i.test(item.name)
+    ))
+    .map(async (item) => {
+      const miniatura = item.thumbnails?.[0] || {};
+      const esPdf = item.file.mimeType?.toLowerCase() === 'application/pdf' || /\.pdf$/i.test(item.name);
+      const descarga = esPdf ? await obtenerLinkDescarga(item.id) : null;
+      return {
+        id: item.id,
+        nombre: item.name,
+        tamaño: item.size || 0,
+        fechaModificacion: item.lastModifiedDateTime,
+        urlWeb: item.webUrl || null,
+        tipo: esPdf ? 'pdf' : 'imagen',
+        urlDocumento: descarga?.urlDescarga || null,
+        urlMiniatura: miniatura.medium?.url || miniatura.small?.url || null,
+        urlGrande: miniatura.large?.url || miniatura.medium?.url || null
+      };
+    }));
+}
+
 module.exports = {
+  listarArchivosPublicacionCarpeta,
   listarCarpeta,
   buscarDocumentos,
   obtenerCarpetaPorRuta,
