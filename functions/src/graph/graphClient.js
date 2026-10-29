@@ -18,6 +18,18 @@ async function get(endpoint, params = {}, headers = {}) {
   return respuesta.data;
 }
 
+async function getTexto(endpoint, maxBytes = 128 * 1024) {
+  const token = await obtenerToken();
+  const respuesta = await axios.get(`${GRAPH_BASE}${endpoint}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    timeout: TIMEOUT_MS,
+    responseType: 'text',
+    maxContentLength: maxBytes,
+    transformResponse: [(data) => data]
+  });
+  return respuesta.data;
+}
+
 async function getPaginado(endpoint, params = {}) {
   const token = await obtenerToken();
   let url = `${GRAPH_BASE}${endpoint}`;
@@ -96,14 +108,15 @@ async function del(endpoint, headers = {}) {
   await axios.delete(url, config);
 }
 
-async function putBinario(endpoint, buffer, contentType) {
+async function putBinario(endpoint, buffer, contentType, headers = {}) {
   const token = await obtenerToken();
 
   const url = `${GRAPH_BASE}${endpoint}`;
   const config = {
     headers: {
       Authorization: `Bearer ${token}`,
-      'Content-Type': contentType || 'application/octet-stream'
+      'Content-Type': contentType || 'application/octet-stream',
+      ...headers
     },
     maxBodyLength: Infinity,
     maxContentLength: Infinity,
@@ -114,4 +127,4 @@ async function putBinario(endpoint, buffer, contentType) {
   return respuesta.data;
 }
 
-module.exports = { get, getPaginado, post, patch, del, putBinario };
+module.exports = { get, getTexto, getPaginado, post, patch, del, putBinario };

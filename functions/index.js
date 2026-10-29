@@ -11,7 +11,7 @@ const {
   listarCarpeta,
   obtenerCarpetaPorRuta, obtenerItem, crearCarpeta, subirArchivo,
   renombrarItem, eliminarItem, estaDentroDeCarpeta, buscarDocumentos,
-  listarArchivosPublicacionCarpeta
+  listarArchivosPublicacionCarpeta, listarPostsRed, actualizarTextoPublicacion
 } = require('./src/graph/graphDriveProvider');
 const {
   normalizarRol,
@@ -315,7 +315,7 @@ function detectarRedSocial(nombreCarpeta) {
 }
 
 exports.marketingListarPublicaciones = onCall(
-  { region: 'us-central1', timeoutSeconds: 30, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
+  { region: 'us-central1', timeoutSeconds: 120, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'No autenticado');
@@ -336,7 +336,12 @@ exports.marketingListarPublicaciones = onCall(
       const grupos = await Promise.all([
         listarArchivosPublicacionCarpeta(carpeta.id).then((imgs) => imgs.map((img) => ({ ...img, red: null }))),
         ...carpetasRed.map(({ id, red }) =>
-          listarArchivosPublicacionCarpeta(id).then((imgs) => imgs.map((img) => ({ ...img, red })))
+          listarPostsRed(id).then((imgs) => imgs.map((img) => ({
+            ...img,
+            red,
+            aviso: img.metadatos?.red && img.metadatos.red !== red
+              ? 'La red del JSON no coincide con la carpeta de destino.' : img.aviso
+          })))
         )
       ]);
 
@@ -350,6 +355,73 @@ exports.marketingListarPublicaciones = onCall(
     }
   }
 );
+
+// Generación de piezas: dispara el workflow "generar-pieza" del repo de marketing, que
+// deja el borrador en SharePoint. Las opciones deben coincidir con los inputs del workflow.
+const REPO_MARKETING = { propietario: 'Luanho11', repo: 'noova-marketing', workflow: 'generar-pieza.yml', rama: 'main' };
+// Formatos con variantes en el catálogo del repo de marketing, por red.
+const FORMATOS_POR_RED_PIEZA = {
+  linkedin: ['flyer', 'carrusel', 'publicacion'],
+  facebook: ['flyer', 'carrusel', 'publicacion'],
+  instagram: ['flyer', 'carrusel', 'publicacion', 'vertical']
+};
+const OPCIONES_PIEZA = {
+  red: Object.keys(FORMATOS_POR_RED_PIEZA),
+  formato: ['flyer', 'carrusel', 'publicacion', 'vertical'],
+  tema: ['automatico', 'trayectoria', 'proyectos', 'operaciones', 'alcance', 'fases-ventilacion', 'metodo-bombeo', 'ductos']
+};
+
+exports.marketingGenerarPieza = onCall(
+  { region: 'us-central1', timeoutSeconds: 30, memory: '256MiB', secrets: ['MARKETING_GH_TOKEN'] },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
+    const perfil = await exigirPermiso(request.auth.uid, 'marketing');
+    if (!['gerencia', 'administrador', 'responsable_marketing'].includes(perfil.role)) {
+      throw new HttpsError('permission-denied', 'Tu rol no puede generar piezas.');
+    }
+
+    const { red, formato, tema, fecha } = request.data || {};
+    for (const [campo, valor] of Object.entries({ red, formato, tema })) {
+      if (!OPCIONES_PIEZA[campo].includes(valor)) {
+        throw new HttpsError('invalid-argument', `El campo "${campo}" no es válido.`);
+      }
+    }
+    if (!FORMATOS_POR_RED_PIEZA[red].includes(formato)) {
+      throw new HttpsError('invalid-argument', 'Ese formato no está disponible para la red elegida.');
+    }
+    if (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      throw new HttpsError('invalid-argument', 'La fecha debe tener el formato AAAA-MM-DD.');
+    }
+
+    const { propietario, repo, workflow, rama } = REPO_MARKETING;
+    const inputs = { red, formato, tema };
+    if (fecha) inputs.fecha = fecha;
+
+    let respuesta;
+    try {
+      respuesta = await fetch(`https://api.github.com/repos/${propietario}/${repo}/actions/workflows/${workflow}/dispatches`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.MARKETING_GH_TOKEN}`,
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ ref: rama, inputs })
+      });
+    } catch (error) {
+      console.error('Error en marketingGenerarPieza:', error.message);
+      throw new HttpsError('unavailable', 'No se pudo contactar con GitHub.');
+    }
+
+    if (respuesta.status !== 204) {
+      console.error('GitHub rechazó el disparo:', respuesta.status, (await respuesta.text()).slice(0, 300));
+      throw new HttpsError('internal', 'GitHub no aceptó la solicitud de generación.');
+    }
+    return { ok: true };
+  }
+);
+
 const RUTA_CONFIDENCIAL = 'NOOVA SAC/09. CONFIDENCIAL';
 // Las observaciones se administran mediante funciones: el cliente no decide
 // el autor ni la fecha, y las reglas deniegan el acceso directo a la colección.
@@ -381,6 +453,76 @@ exports.marketingListarObservaciones = onCall(
     const { notas } = await contextoObservacionMarketing(request);
     const snapshot = await notas.orderBy('fecha', 'desc').get();
     return { items: snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id })) };
+  }
+);
+
+exports.marketingActualizarTexto = onCall(
+  { region: 'us-central1', timeoutSeconds: 60, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
+    const perfil = await exigirPermiso(request.auth.uid, 'marketing');
+    if (!['gerencia', 'administrador', 'responsable_marketing'].includes(perfil.role)) {
+      throw new HttpsError('permission-denied', 'Tu rol no puede editar el texto de las publicaciones.');
+    }
+    const { texto, eTag } = request.data || {};
+    if (typeof texto !== 'string' || !texto.trim() || texto.length > 32000 || typeof eTag !== 'string' || eTag.length > 500) {
+      throw new HttpsError('invalid-argument', 'El texto o la versión de la publicación no es válido.');
+    }
+    await contextoObservacionMarketing(request);
+    try {
+      return await actualizarTextoPublicacion(request.data.publicacionId, texto.trim(), eTag);
+    } catch (error) {
+      if (error.code === 'PUBLICACION_CONFLICTO' || error.response?.status === 412) {
+        throw new HttpsError('aborted', 'El post cambió en SharePoint. Actualiza las publicaciones antes de guardar.');
+      }
+      console.error('Error en marketingActualizarTexto:', error.message);
+      throw new HttpsError('internal', 'No se pudo guardar el texto en SharePoint.');
+    }
+  }
+);
+
+// Borra una pieza completa: si vive en su propia carpeta se elimina la carpeta (imagen/PDF y JSON);
+// si es un archivo suelto en la raíz o en la carpeta de una red, solo ese archivo. Va a la papelera de SharePoint.
+exports.marketingEliminarPublicacion = onCall(
+  { region: 'us-central1', timeoutSeconds: 60, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
+  async (request) => {
+    const { perfil, notas } = await contextoObservacionMarketing(request);
+    if (!['gerencia', 'administrador', 'responsable_marketing'].includes(perfil.role)) {
+      throw new HttpsError('permission-denied', 'Tu rol no puede eliminar publicaciones.');
+    }
+    const publicacionId = request.data.publicacionId;
+
+    try {
+      const raiz = await obtenerCarpetaPorRuta(RUTA_PUBLICACIONES);
+      const archivo = await obtenerItem(publicacionId);
+      const padreId = archivo.parentReference?.id;
+      if (!padreId) throw new HttpsError('failed-precondition', 'No se encontró la carpeta de la publicación.');
+
+      const hermanas = await listarArchivosPublicacionCarpeta(padreId);
+      const estado = hermanas.find((item) => item.id === publicacionId)?.metadatos?.estado || '';
+      if (/aprob|program|publicad/i.test(estado)) {
+        throw new HttpsError('failed-precondition', 'La publicación ya fue aprobada o programada y no se puede eliminar desde aquí.');
+      }
+
+      const padre = padreId === raiz.id ? null : await obtenerItem(padreId);
+      const sueltaEnRed = padre && padre.parentReference?.id === raiz.id;
+      const objetivoId = !padre || sueltaEnRed ? publicacionId : padreId;
+
+      await eliminarItem(objetivoId);
+
+      const observaciones = await notas.get();
+      if (!observaciones.empty) {
+        const lote = db.batch();
+        observaciones.docs.slice(0, 450).forEach((doc) => lote.delete(doc.ref));
+        await lote.commit();
+      }
+      console.log(`marketingEliminarPublicacion: ${request.auth.uid} eliminó ${archivo.name}`);
+      return { eliminado: true };
+    } catch (error) {
+      if (error instanceof HttpsError) throw error;
+      console.error('Error en marketingEliminarPublicacion:', error.message);
+      throw convertirErrorGraph(error, 'Error eliminando la publicación');
+    }
   }
 );
 

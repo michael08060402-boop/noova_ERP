@@ -4,6 +4,7 @@ import { FiChevronLeft, FiChevronRight, FiFileText, FiSend, FiX } from 'react-ic
 import { getRed } from './redesSociales';
 import { useAuth } from '../../../context/AuthContext';
 import { crearObservacion, listarObservaciones } from '../services/observacionesService';
+import VistaPreviaPost from './VistaPreviaPost';
 
 const formatoFechaObservacion = new Intl.DateTimeFormat('es-PE', {
   timeZone: 'America/Lima',
@@ -133,12 +134,11 @@ function Observaciones({ publicacion }) {
   );
 }
 
-export default function VisorPublicacion({ publicacion, publicaciones, onCambiar, onCerrar }) {
+export default function VisorPublicacion({ publicacion, publicaciones, onCambiar, onCerrar, onActualizada }) {
   const red = getRed(publicacion.red);
   const indice = publicaciones.findIndex((item) => item.id === publicacion.id);
   const cerrarRef = useRef(null);
-  const [proporcionImagen, setProporcionImagen] = useState(null);
-  const proporcion = proporcionImagen?.id === publicacion.id ? proporcionImagen.valor : null;
+  const [editandoPost, setEditandoPost] = useState(false);
 
   useEffect(() => {
     const anterior = document.activeElement;
@@ -152,8 +152,12 @@ export default function VisorPublicacion({ publicacion, publicaciones, onCambiar
   }, []);
 
   function manejarTecla(event) {
+    if (editandoPost && ['Escape', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+      event.stopPropagation();
+      return;
+    }
     if (event.key !== 'Tab') return;
-    const elementos = event.currentTarget.querySelectorAll('button:not(:disabled), a[href], textarea:not(:disabled), [tabindex="0"]');
+    const elementos = event.currentTarget.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), [tabindex="0"]');
     const primero = elementos[0];
     const ultimo = elementos[elementos.length - 1];
     if (event.shiftKey && document.activeElement === primero) {
@@ -166,10 +170,9 @@ export default function VisorPublicacion({ publicacion, publicaciones, onCambiar
   }
 
   return createPortal(
-    <div className="publicacion-visor publicacion-revision-overlay" onClick={onCerrar}>
+    <div className="publicacion-visor publicacion-revision-overlay" onClick={() => { if (!editandoPost) onCerrar(); }}>
       <section
         className={`publicacion-revision ${publicacion.tipo === 'pdf' ? 'publicacion-revision-documento' : ''}`}
-        style={proporcion ? { '--publicacion-ancho-imagen': `min(660px, calc((100dvh - 170px) * ${proporcion}))` } : undefined}
         role="dialog"
         aria-modal="true"
         aria-labelledby="publicacion-visor-titulo"
@@ -182,19 +185,24 @@ export default function VisorPublicacion({ publicacion, publicaciones, onCambiar
               {red ? <red.Icono size={30} aria-hidden="true" /> : <FiFileText size={28} aria-hidden="true" />}
               <span className="publicacion-solo-lector">{red?.label || 'Sin red de destino'}</span>
             </span>
-            <h2 id="publicacion-visor-titulo" title={publicacion.nombre}>{publicacion.nombre}</h2>
+            <h2 id="publicacion-visor-titulo" title={publicacion.nombre}>{publicacion.titulo || publicacion.nombre}</h2>
           </div>
           <nav className="publicacion-revision-controles" aria-label="Recorrer publicaciones">
-            <button type="button" onClick={() => onCambiar(-1)} disabled={publicaciones.length < 2} aria-label="Publicación anterior"><FiChevronLeft size={26} /></button>
+            <button type="button" onClick={() => onCambiar(-1)} disabled={publicaciones.length < 2 || editandoPost} aria-label="Publicación anterior"><FiChevronLeft size={26} /></button>
             <span aria-live="polite">{indice < 0 ? 1 : indice + 1} de {publicaciones.length}</span>
-            <button type="button" onClick={() => onCambiar(1)} disabled={publicaciones.length < 2} aria-label="Publicación siguiente"><FiChevronRight size={26} /></button>
+            <button type="button" onClick={() => onCambiar(1)} disabled={publicaciones.length < 2 || editandoPost} aria-label="Publicación siguiente"><FiChevronRight size={26} /></button>
           </nav>
-          <button ref={cerrarRef} type="button" className="publicacion-revision-cerrar" onClick={onCerrar} aria-label="Cerrar"><FiX size={30} /></button>
+          <button ref={cerrarRef} type="button" className="publicacion-revision-cerrar" onClick={onCerrar} disabled={editandoPost} aria-label="Cerrar"><FiX size={30} /></button>
         </header>
         <div className="publicacion-revision-cuerpo">
-          <div className="publicacion-revision-preview">
+          <div key={`preview-${publicacion.id}`} className="publicacion-revision-preview" tabIndex={0} role="region" aria-label="Vista previa de la publicación">
+            <VistaPreviaPost publicacion={publicacion} onActualizada={onActualizada} onEdicionChange={setEditandoPost}>
             {publicacion.tipo === 'pdf' ? (
-              <div className="publicacion-pdf-acceso">
+              <div className={`publicacion-pdf-acceso ${publicacion.urlGrande || publicacion.urlMiniatura ? 'publicacion-pdf-con-portada' : ''}`}>
+                {(publicacion.urlGrande || publicacion.urlMiniatura) && (
+                  <img src={publicacion.urlGrande || publicacion.urlMiniatura} alt={`Portada: ${publicacion.titulo || publicacion.nombre}`} />
+                )}
+                {publicacion.metadatos?.paginas && <span className="post-social-paginas">Carrusel · {publicacion.metadatos.paginas} páginas</span>}
                 {(publicacion.urlDocumento || publicacion.urlWeb) ? (
                   <a href={publicacion.urlDocumento || publicacion.urlWeb} target="_blank" rel="noopener noreferrer">Abrir PDF para visualizar carrusel ↗</a>
                 ) : <span>PDF no disponible. Actualiza las publicaciones.</span>}
@@ -203,15 +211,10 @@ export default function VisorPublicacion({ publicacion, publicaciones, onCambiar
               key={publicacion.id}
               src={publicacion.urlGrande || publicacion.urlMiniatura}
               alt={publicacion.nombre}
-              onLoad={(event) => {
-                const imagen = event.currentTarget;
-                if (imagen.naturalHeight > 0) {
-                  setProporcionImagen({ id: publicacion.id, valor: imagen.naturalWidth / imagen.naturalHeight });
-                }
-              }}
             />}
+            </VistaPreviaPost>
           </div>
-          <Observaciones key={publicacion.id} publicacion={publicacion} />
+          <Observaciones key={`observaciones-${publicacion.id}`} publicacion={publicacion} />
         </div>
       </section>
     </div>,

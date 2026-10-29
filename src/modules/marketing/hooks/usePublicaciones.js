@@ -18,5 +18,13 @@ export default function usePublicaciones() {
     }
   }, []);
 
-  return { publicaciones, cargando, error, cargar };
+  const actualizarPublicacion = useCallback((actualizada) => {
+    setPublicaciones((anteriores) => anteriores.map((item) => item.id === actualizada.id ? actualizada : item));
+  }, []);
+
+  const quitarPublicacion = useCallback((id) => {
+    setPublicaciones((anteriores) => anteriores.filter((item) => item.id !== id));
+  }, []);
+
+  return { publicaciones, cargando, error, cargar, actualizarPublicacion, quitarPublicacion };
 }

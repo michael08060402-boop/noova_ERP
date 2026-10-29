@@ -206,31 +206,77 @@ async function estaDentroDeCarpeta(itemId, carpetaRaizId) {
   return false;
 }
 
-// Lista solo las imágenes de una carpeta con sus miniaturas. Las URLs de
-// miniatura de Graph son temporales, por eso se piden en cada consulta.
+// Enlace temporal para abrir los PDF de Publicaciones.
+async function obtenerLinkDescarga(itemId) {
+  const prefijo = obtenerPrefijoDrive();
+  const data = await graphClient.get(
+    `${prefijo}/items/${codificarItemId(itemId)}`,
+    { $select: 'id,@microsoft.graph.downloadUrl' }
+  );
+  return { urlDescarga: data['@microsoft.graph.downloadUrl'] || null };
+}
+
+// Lista imágenes y PDF con miniaturas y enlaces temporales de Graph.
 async function listarArchivosPublicacionCarpeta(carpetaId) {
   const prefijo = obtenerPrefijoDrive();
   const endpoint = `${prefijo}/items/${codificarItemId(carpetaId)}/children`;
 
   const items = await graphClient.getPaginado(endpoint, {
-    $select: 'id,name,size,lastModifiedDateTime,file,webUrl',
+    $select: 'id,name,size,lastModifiedDateTime,file,webUrl,eTag',
     $expand: 'thumbnails',
     $orderby: 'lastModifiedDateTime desc',
     $top: 200
   });
 
+  let metadatos = null;
+  let aviso = null;
+  const jsons = items.filter((item) => item.file && /\.json$/i.test(item.name));
+  const json = jsons.find((item) => /^publicacion\.json$/i.test(item.name)) || (jsons.length === 1 ? jsons[0] : null);
+  if (json) {
+    try {
+      if (json.size > 128 * 1024) throw new Error('JSON demasiado grande');
+      const contenido = await graphClient.getTexto(`${prefijo}/items/${codificarItemId(json.id)}/content`);
+      const datos = JSON.parse(contenido.replace(/^\uFEFF/, ''));
+      if (!datos || typeof datos !== 'object' || Array.isArray(datos) || datos.schema_version !== 1) throw new Error('Esquema no reconocido');
+      if (typeof datos.archivo !== 'string' || !items.some((item) => item.file && item.name === datos.archivo)) throw new Error('No se encontró el archivo asociado');
+      metadatos = {
+        jsonId: json.id,
+        jsonEtag: json.eTag || null,
+        titulo: typeof datos.titulo === 'string' ? datos.titulo.slice(0, 300) : '',
+        texto: typeof datos.texto === 'string' ? datos.texto.slice(0, 32000) : '',
+        red: ['facebook', 'instagram', 'linkedin'].includes(datos.red) ? datos.red : null,
+        estado: typeof datos.estado === 'string' ? datos.estado.slice(0, 40) : '',
+        archivo: datos.archivo,
+        portada: typeof datos.portada === 'string' ? datos.portada : null,
+        paginas: Number.isInteger(datos.paginas) && datos.paginas > 0 ? datos.paginas : null,
+        formato: typeof datos.formato === 'string' ? datos.formato.slice(0, 60) : '',
+        revision: Number.isInteger(datos.revision) ? datos.revision : null,
+        pendientes: Array.isArray(datos.pendientes) ? datos.pendientes.filter((p) => typeof p === 'string').slice(0, 20).map((p) => p.slice(0, 1000)) : []
+      };
+    } catch {
+      aviso = 'No se pudo leer el JSON de esta publicación. Se muestra el archivo sin su texto.';
+    }
+  } else if (jsons.length > 1) {
+    aviso = 'Hay varios JSON en esta carpeta y no se encontró publicacion.json.';
+  }
+
   return Promise.all(items
     .filter((item) => item.file && (
       /^image\//i.test(item.file.mimeType || '') ||
       item.file.mimeType?.toLowerCase() === 'application/pdf' || /\.pdf$/i.test(item.name)
-    ))
+    ) && (!metadatos || item.name === metadatos.archivo))
     .map(async (item) => {
-      const miniatura = item.thumbnails?.[0] || {};
+      const portada = metadatos?.portada ? items.find((p) => p.file && /^image\//i.test(p.file.mimeType || '') && p.name === metadatos.portada) : null;
+      const miniatura = (portada || item).thumbnails?.[0] || {};
       const esPdf = item.file.mimeType?.toLowerCase() === 'application/pdf' || /\.pdf$/i.test(item.name);
       const descarga = esPdf ? await obtenerLinkDescarga(item.id) : null;
       return {
         id: item.id,
         nombre: item.name,
+        titulo: metadatos?.titulo || item.name,
+        texto: metadatos?.texto || '',
+        metadatos,
+        aviso,
         tamaño: item.size || 0,
         fechaModificacion: item.lastModifiedDateTime,
         urlWeb: item.webUrl || null,
@@ -242,7 +288,58 @@ async function listarArchivosPublicacionCarpeta(carpetaId) {
     }));
 }
 
+// Cada subcarpeta de una red es un post. Los archivos sueltos se mantienen
+// para seguir mostrando publicaciones anteriores a la estructura con JSON.
+async function listarPostsRed(carpetaId) {
+  const hijos = await listarCarpeta(carpetaId);
+  const resultados = [await listarArchivosPublicacionCarpeta(carpetaId)];
+  const carpetas = hijos.filter((item) => item.tipo === 'carpeta');
+  // Limitar las consultas simultáneas evita ráfagas de peticiones a Graph.
+  for (let i = 0; i < carpetas.length; i += 4) {
+    resultados.push(...await Promise.all(carpetas.slice(i, i + 4).map((carpeta) => listarArchivosPublicacionCarpeta(carpeta.id))));
+  }
+  return resultados.flat();
+}
+
+async function actualizarTextoPublicacion(publicacionId, texto, eTag) {
+  const archivo = await obtenerItem(publicacionId);
+  if (!archivo.parentReference?.id) throw new Error('No se encontró la carpeta de la publicación.');
+  const hijos = await listarCarpeta(archivo.parentReference.id);
+  const jsons = hijos.filter((item) => item.tipo === 'archivo' && /\.json$/i.test(item.nombre));
+  const json = jsons.find((item) => /^publicacion\.json$/i.test(item.nombre)) || (jsons.length === 1 ? jsons[0] : null);
+  if (!json) throw new Error('No se encontró el JSON de la publicación.');
+  const actual = await obtenerItem(json.id);
+  if (!eTag || actual.eTag !== eTag) {
+    const error = new Error('El post cambió en SharePoint. Actualiza las publicaciones antes de editarlo.');
+    error.code = 'PUBLICACION_CONFLICTO';
+    throw error;
+  }
+  const prefijo = obtenerPrefijoDrive();
+  const contenido = await graphClient.getTexto(`${prefijo}/items/${codificarItemId(json.id)}/content`);
+  const datos = JSON.parse(contenido.replace(/^\uFEFF/, ''));
+  if (!datos || datos.schema_version !== 1 || datos.archivo !== archivo.name) {
+    throw new Error('El JSON no corresponde a esta publicación.');
+  }
+  const actualizado = {
+    ...datos,
+    texto,
+    revision: Number.isInteger(datos.revision) ? datos.revision + 1 : 1,
+    actualizado_en: new Date().toISOString(),
+    estado: 'borrador',
+    aprobado_en: null
+  };
+  const buffer = Buffer.from(`${JSON.stringify(actualizado, null, 2)}\n`, 'utf8');
+  if (buffer.length > 128 * 1024) throw new Error('El JSON supera el tamaño permitido.');
+  const guardado = await graphClient.putBinario(
+    `${prefijo}/items/${codificarItemId(json.id)}/content`, buffer,
+    'application/json; charset=utf-8', { 'If-Match': eTag }
+  );
+  return { texto, jsonEtag: guardado.eTag || null, revision: actualizado.revision, estado: actualizado.estado };
+}
+
 module.exports = {
+  actualizarTextoPublicacion,
+  listarPostsRed,
   listarArchivosPublicacionCarpeta,
   listarCarpeta,
   buscarDocumentos,
