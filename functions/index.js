@@ -757,9 +757,10 @@ exports.marketingCrearObservacion = onCall(
 // ── Monitoreo automático de redes ──
 // Lee los seguidores con las APIs oficiales (ver functions/src/monitoreoRedes.js) y los guarda en
 // marketingRedes/{cuenta}_{fecha}. El estado de cada conexión queda en marketingEstadoRedes/actual.
-// Antes de desplegar: firebase functions:secrets:set YOUTUBE_API_KEY y META_ACCESS_TOKEN
-// (puede ponerse «pendiente» hasta tener la credencial: la pantalla mostrará «conexión pendiente»).
-const SECRETOS_MONITOREO = ['YOUTUBE_API_KEY', 'META_ACCESS_TOKEN'];
+// Temporal: sin las credenciales YOUTUBE_API_KEY y META_ACCESS_TOKEN el despliegue falla, así que no se
+// enlazan por ahora y la pantalla muestra «conexión pendiente». Para activarlas: firebase functions:secrets:set
+// YOUTUBE_API_KEY y META_ACCESS_TOKEN, y volver a poner la lista ['YOUTUBE_API_KEY', 'META_ACCESS_TOKEN'].
+const SECRETOS_MONITOREO = [];
 
 async function recolectarRedes() {
   const configuracion = (await db.doc('marketingConfig/redes').get()).data() || {};
