@@ -1,0 +1,90 @@
+{
+ "total": {
+  "e": 11,
+  "p": 9,
+  "f": 25
+ },
+ "n": 45,
+ "ramas": [
+  {
+   "nombre": "Planificar",
+   "color": "#004669",
+   "e": 1,
+   "p": 2,
+   "f": 1,
+   "total": 4
+  },
+  {
+   "nombre": "Crear",
+   "color": "#1486ba",
+   "e": 2,
+   "p": 1,
+   "f": 1,
+   "total": 4
+  },
+  {
+   "nombre": "Biblioteca de diseños",
+   "color": "#7a4fa0",
+   "e": 1,
+   "p": 1,
+   "f": 3,
+   "total": 5
+  },
+  {
+   "nombre": "Taller manual",
+   "color": "#00a2b1",
+   "e": 0,
+   "p": 2,
+   "f": 3,
+   "total": 5
+  },
+  {
+   "nombre": "Revisar y aprobar",
+   "color": "#3852a0",
+   "e": 3,
+   "p": 0,
+   "f": 2,
+   "total": 5
+  },
+  {
+   "nombre": "Programar y publicar",
+   "color": "#0b6e8a",
+   "e": 0,
+   "p": 0,
+   "f": 5,
+   "total": 5
+  },
+  {
+   "nombre": "Medir",
+   "color": "#5b6f82",
+   "e": 0,
+   "p": 1,
+   "f": 4,
+   "total": 5
+  },
+  {
+   "nombre": "Monitoreo de redes",
+   "color": "#c2603a",
+   "e": 0,
+   "p": 0,
+   "f": 4,
+   "total": 4
+  },
+  {
+   "nombre": "Aprender",
+   "color": "#8a8f12",
+   "e": 1,
+   "p": 1,
+   "f": 2,
+   "total": 4
+  },
+  {
+   "nombre": "Gobierno",
+   "color": "#3a6f5f",
+   "e": 3,
+   "p": 1,
+   "f": 0,
+   "total": 4
+  }
+ ]
+}

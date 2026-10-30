@@ -662,3 +662,40 @@
     opacity: 1;
   }
 }
+
+/* Estado y aprobación */
+.publicacion-estado-aprobada { position: absolute; left: 8px; bottom: 8px; padding: 4px 8px; border-radius: var(--radius-full); background: #1f8a4c; color: #fff; font-size: var(--text-xs); font-weight: 700; }
+.post-social-acciones-estado { display: flex; flex-wrap: wrap; gap: 6px; }
+.post-social-estado { margin: 0 0 8px; padding: 6px 9px; border-radius: 7px; background: #eef3fa; color: #33414c; font-size: 11px; }
+.post-social-estado-aprobada { background: #e5f6ec; color: #145a33; }
+.post-social-aprobar { border-color: #1f8a4c; background: #1f8a4c; color: #fff; }
+.post-social-historial { margin-top: 10px; font-size: 11px; color: #33414c; }
+.post-social-historial summary { cursor: pointer; font-weight: 600; color: #064c70; }
+.post-social-historial ul { margin: 6px 0 0; padding-left: 16px; }
+.post-social-historial li { margin-bottom: 4px; }
+.aprobar-texto { width: 100%; resize: vertical; font: inherit; }
+.aprobar-confirmacion { display: flex; align-items: center; gap: 8px; margin: 8px 0 12px; font-size: var(--text-sm); }
+
+/* Generar pieza: previsualización del diseño */
+.generar-previsualizacion { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 4px 0 12px; padding: 12px; background: #f7fafb; border: 1px solid #d3dde4; border-radius: var(--radius-lg); }
+.previsual-diseno { width: 100%; max-height: 170px; }
+.generar-previsualizacion-pie { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: var(--text-sm); text-align: center; color: #46525d; }
+.generar-previsualizacion-pie strong { color: #124b7d; }
+.generar-previsualizacion-botones { display: flex; gap: 8px; margin-top: 4px; }
+.generar-resumen { font-size: var(--text-sm); color: #5a6672; }
+
+/* Taller manual: paquete y versión editada */
+.taller-lista { margin: 8px 0 12px; padding-left: 18px; font-size: var(--text-sm); }
+.taller-aviso { padding: 6px 10px; border-radius: 8px; background: #fbf8d6; color: #5c5b0d; font-size: var(--text-sm); }
+.taller-progreso { position: relative; height: 14px; margin: 8px 0 12px; overflow: hidden; border-radius: 999px; background: #e3eaee; }
+.taller-progreso span { display: block; height: 100%; background: #00a2b1; transition: width 0.2s; }
+.taller-progreso small { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #14181c; }
+
+/* Generar pieza: formulario a la izquierda, imagen real del diseño a la derecha */
+.generar-formulario { display: grid; grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); gap: var(--spacing-xl, 24px); align-items: start; }
+.generar-previsualizacion { position: sticky; top: 0; margin: 0; padding: 12px; }
+.previsual-diseno { display: block; width: auto; max-width: 100%; height: auto; max-height: min(62vh, 560px); border-radius: 8px; box-shadow: 0 6px 22px rgb(8 38 77 / 18%); background: #fff; }
+@media (max-width: 760px) {
+  .generar-formulario { grid-template-columns: 1fr; }
+  .generar-previsualizacion { position: static; }
+}

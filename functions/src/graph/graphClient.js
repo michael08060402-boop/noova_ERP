@@ -127,4 +127,16 @@ async function putBinario(endpoint, buffer, contentType, headers = {}) {
   return respuesta.data;
 }
 
-module.exports = { get, getTexto, getPaginado, post, patch, del, putBinario };
+// Las sesiones de subida de Graph traen su propia autorización: no se envía el token.
+async function putSesion(url, buffer, inicio, fin, total) {
+  const respuesta = await axios.put(url, buffer, {
+    headers: { 'Content-Length': buffer.length, 'Content-Range': `bytes ${inicio}-${fin}/${total}` },
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
+    timeout: 120000,
+    validateStatus: (estado) => [200, 201, 202].includes(estado)
+  });
+  return { estado: respuesta.status, datos: respuesta.data };
+}
+
+module.exports = { get, getTexto, getPaginado, post, patch, del, putBinario, putSesion };

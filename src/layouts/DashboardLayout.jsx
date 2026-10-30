@@ -28,7 +28,7 @@ const ITEMS_MENU = [
   { path: '/mangas', label: 'Mangas', icon: <FiWind />, key: 'mangas' },
   { path: '/servicios', label: 'Servicios', icon: <FiBriefcase />, key: 'servicios' },
   { path: '/calibraciones', label: 'Calibraciones', icon: <FiTarget />, key: 'calibraciones' },
-  { path: '/marketing/publicaciones', label: 'Publicaciones', icon: <FiImage />, key: 'marketing' },
+  { path: '/marketing', label: 'Marketing', icon: <FiImage />, key: 'marketing' },
   { path: '/mensajeria', label: 'Mensajería', icon: <FiMessageCircle />, key: 'mensajeria' },
   { path: '/nube', label: 'Nube', icon: <FiCloud />, key: 'nube' },
   { path: '/proveedores', label: 'Proveedores', icon: <FiTruck />, key: 'proveedores' },

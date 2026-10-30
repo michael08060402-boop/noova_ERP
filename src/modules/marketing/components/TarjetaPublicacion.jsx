@@ -1,48 +1,39 @@
 import { formatDate } from '../../../utils/formatDate';
 import { getRed } from './redesSociales';
-import { FiFileText, FiTrash2 } from 'react-icons/fi';
+import { FiFileText, FiImage, FiTrash2 } from 'react-icons/fi';
+import { claveEstado, etiquetaEstado } from '../utils/aprobacion';
 
 export default function TarjetaPublicacion({ publicacion, onAbrir, onEliminar }) {
   const red = getRed(publicacion.red);
+  const estado = publicacion.metadatos?.estado;
+  const titulo = publicacion.titulo || publicacion.nombre;
 
   return (
-    <div className="publicacion-tarjeta">
-      <button
-        type="button"
-        className="publicacion-card"
-        onClick={() => onAbrir(publicacion)}
-      >
-        <div className="publicacion-imagen">
+    <article className="mk-pieza">
+      <button type="button" className="mk-pieza-abrir" onClick={() => onAbrir(publicacion)}>
+        <div className="mk-pieza-imagen">
           {publicacion.urlMiniatura ? (
             <img src={publicacion.urlMiniatura} alt={publicacion.nombre} loading="lazy" />
           ) : (
-            <span className="publicacion-sin-imagen">
-              {publicacion.tipo === 'pdf' ? <><FiFileText size={36} /> Documento PDF</> : 'Sin vista previa'}
+            <span className="mk-pieza-vacia">
+              {publicacion.tipo === 'pdf' ? <FiFileText size={30} aria-hidden="true" /> : <FiImage size={30} aria-hidden="true" />}
+              {publicacion.tipo === 'pdf' ? 'Documento PDF' : 'Sin vista previa'}
             </span>
           )}
-          {publicacion.tipo === 'pdf' && <span className="publicacion-tipo-pdf">PDF</span>}
-          {red && (
-            <span className={`publicacion-red publicacion-red-${red.key}`} title={red.label}>
-              <red.Icono size={14} aria-hidden="true" />
-            </span>
-          )}
+          {red && <span className="mk-red" style={{ background: red.color }} title={red.label}><red.Icono size={13} aria-hidden="true" /></span>}
+          {publicacion.tipo === 'pdf' && <span className="mk-pieza-tipo">PDF</span>}
         </div>
-        <div className="publicacion-info">
-          <span className="publicacion-nombre" title={publicacion.nombre}>{publicacion.titulo || publicacion.nombre}</span>
-          <span className="publicacion-fecha">{formatDate(publicacion.fechaModificacion)}</span>
+        <div className="mk-pieza-info">
+          <span className={`mk-estado mk-estado-${claveEstado(estado)}`}><i aria-hidden="true" />{etiquetaEstado(estado)}</span>
+          <strong title={titulo}>{titulo}</strong>
+          <small>{formatDate(publicacion.fechaModificacion)}{publicacion.metadatos?.origen === 'manual' ? ' · editada a mano' : ''}</small>
         </div>
       </button>
       {onEliminar && (
-        <button
-          type="button"
-          className="publicacion-eliminar"
-          onClick={() => onEliminar(publicacion)}
-          aria-label={`Eliminar ${publicacion.titulo || publicacion.nombre}`}
-          title="Eliminar"
-        >
+        <button type="button" className="mk-pieza-eliminar" onClick={() => onEliminar(publicacion)} aria-label={`Eliminar ${titulo}`} title="Eliminar">
           <FiTrash2 size={14} aria-hidden="true" />
         </button>
       )}
-    </div>
+    </article>
   );
 }

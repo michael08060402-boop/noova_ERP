@@ -216,6 +216,18 @@ async function obtenerLinkDescarga(itemId) {
   return { urlDescarga: data['@microsoft.graph.downloadUrl'] || null };
 }
 
+function leerAprobacion(valor) {
+  if (!valor || typeof valor !== 'object') return null;
+  const texto = (campo, max) => (typeof valor[campo] === 'string' ? valor[campo].slice(0, max) : '');
+  return { por: texto('por', 150), red: texto('red', 20), fecha: texto('fecha', 10), hora: texto('hora', 5), revision: Number.isInteger(valor.revision) ? valor.revision : null };
+}
+
+function leerDevolucion(valor) {
+  if (!valor || typeof valor !== 'object') return null;
+  const texto = (campo, max) => (typeof valor[campo] === 'string' ? valor[campo].slice(0, max) : '');
+  return { motivo: texto('motivo', 500), por: texto('por', 150), en: texto('en', 40) };
+}
+
 // Lista imágenes y PDF con miniaturas y enlaces temporales de Graph.
 async function listarArchivosPublicacionCarpeta(carpetaId) {
   const prefijo = obtenerPrefijoDrive();
@@ -244,13 +256,20 @@ async function listarArchivosPublicacionCarpeta(carpetaId) {
         jsonEtag: json.eTag || null,
         titulo: typeof datos.titulo === 'string' ? datos.titulo.slice(0, 300) : '',
         texto: typeof datos.texto === 'string' ? datos.texto.slice(0, 32000) : '',
-        red: ['facebook', 'instagram', 'linkedin'].includes(datos.red) ? datos.red : null,
+        red: ['facebook', 'instagram', 'linkedin', 'tiktok'].includes(datos.red) ? datos.red : null,
         estado: typeof datos.estado === 'string' ? datos.estado.slice(0, 40) : '',
         archivo: datos.archivo,
         portada: typeof datos.portada === 'string' ? datos.portada : null,
         paginas: Number.isInteger(datos.paginas) && datos.paginas > 0 ? datos.paginas : null,
         formato: typeof datos.formato === 'string' ? datos.formato.slice(0, 60) : '',
         revision: Number.isInteger(datos.revision) ? datos.revision : null,
+        publicadoEn: typeof datos.publicado_en === 'string' ? datos.publicado_en : null,
+        urlPublicada: typeof datos.url_publicada === 'string' && /^https:\/\//i.test(datos.url_publicada) ? datos.url_publicada.slice(0, 500) : null,
+        origen: datos.origen === 'manual' ? 'manual' : 'generado',
+        versiones: Array.isArray(datos.versiones) ? datos.versiones.length : 0,
+        aprobadoEn: typeof datos.aprobado_en === 'string' ? datos.aprobado_en : null,
+        aprobacion: leerAprobacion(datos.aprobacion),
+        devuelto: leerDevolucion(datos.devuelto),
         pendientes: Array.isArray(datos.pendientes) ? datos.pendientes.filter((p) => typeof p === 'string').slice(0, 20).map((p) => p.slice(0, 1000)) : []
       };
     } catch {
@@ -301,7 +320,15 @@ async function listarPostsRed(carpetaId) {
   return resultados.flat();
 }
 
-async function actualizarTextoPublicacion(publicacionId, texto, eTag) {
+function errorPublicacion(codigo, mensaje) {
+  const error = new Error(mensaje);
+  error.code = codigo;
+  return error;
+}
+
+// Localiza publicacion.json junto al archivo, comprueba que no cambió desde que el ERP lo leyó
+// (ETag) y devuelve su contenido. Toda escritura sobre el JSON pasa por aquí.
+async function abrirJsonPublicacion(publicacionId, eTag) {
   const archivo = await obtenerItem(publicacionId);
   if (!archivo.parentReference?.id) throw new Error('No se encontró la carpeta de la publicación.');
   const hijos = await listarCarpeta(archivo.parentReference.id);
@@ -310,9 +337,7 @@ async function actualizarTextoPublicacion(publicacionId, texto, eTag) {
   if (!json) throw new Error('No se encontró el JSON de la publicación.');
   const actual = await obtenerItem(json.id);
   if (!eTag || actual.eTag !== eTag) {
-    const error = new Error('El post cambió en SharePoint. Actualiza las publicaciones antes de editarlo.');
-    error.code = 'PUBLICACION_CONFLICTO';
-    throw error;
+    throw errorPublicacion('PUBLICACION_CONFLICTO', 'El post cambió en SharePoint. Actualiza las publicaciones antes de editarlo.');
   }
   const prefijo = obtenerPrefijoDrive();
   const contenido = await graphClient.getTexto(`${prefijo}/items/${codificarItemId(json.id)}/content`);
@@ -320,25 +345,167 @@ async function actualizarTextoPublicacion(publicacionId, texto, eTag) {
   if (!datos || datos.schema_version !== 1 || datos.archivo !== archivo.name) {
     throw new Error('El JSON no corresponde a esta publicación.');
   }
+  return { prefijo, json, datos };
+}
+
+async function guardarJsonPublicacion({ prefijo, json }, actualizado, eTag) {
+  const buffer = Buffer.from(`${JSON.stringify(actualizado, null, 2)}
+`, 'utf8');
+  if (buffer.length > 128 * 1024) throw new Error('El JSON supera el tamaño permitido.');
+  return graphClient.putBinario(
+    `${prefijo}/items/${codificarItemId(json.id)}/content`, buffer,
+    'application/json; charset=utf-8', { 'If-Match': eTag }
+  );
+}
+
+async function actualizarTextoPublicacion(publicacionId, texto, eTag) {
+  const abierto = await abrirJsonPublicacion(publicacionId, eTag);
+  const { datos } = abierto;
   const actualizado = {
     ...datos,
     texto,
     revision: Number.isInteger(datos.revision) ? datos.revision + 1 : 1,
     actualizado_en: new Date().toISOString(),
     estado: 'borrador',
-    aprobado_en: null
+    aprobado_en: null,
+    aprobacion: null
   };
-  const buffer = Buffer.from(`${JSON.stringify(actualizado, null, 2)}\n`, 'utf8');
-  if (buffer.length > 128 * 1024) throw new Error('El JSON supera el tamaño permitido.');
-  const guardado = await graphClient.putBinario(
-    `${prefijo}/items/${codificarItemId(json.id)}/content`, buffer,
-    'application/json; charset=utf-8', { 'If-Match': eTag }
-  );
-  return { texto, jsonEtag: guardado.eTag || null, revision: actualizado.revision, estado: actualizado.estado };
+  const guardado = await guardarJsonPublicacion(abierto, actualizado, eTag);
+  return {
+    texto, jsonEtag: guardado.eTag || null, revision: actualizado.revision, estado: actualizado.estado,
+    estadoAnterior: typeof datos.estado === 'string' ? datos.estado : '', aprobadoEn: null, aprobacion: null
+  };
+}
+
+const ESTADO_BLOQUEADO = /aprob|program|publicad/i;
+
+// Taller manual: la versión editada reemplaza el contenido del mismo archivo. Así conserva su id
+// (y con él las observaciones y el historial) y SharePoint guarda la versión anterior.
+const LIMITE_VERSION_BYTES = 25 * 1024 * 1024;
+const TAMANO_TROZO_BYTES = 10 * 320 * 1024; // Graph exige múltiplos de 320 KiB
+const TIPOS_VERSION = { png: 'imagen', jpg: 'imagen', webp: 'imagen', pdf: 'pdf' };
+
+function extensionVersion(nombre) {
+  const extension = String(nombre || '').split('.').pop().toLowerCase();
+  return extension === 'jpeg' ? 'jpg' : extension;
+}
+
+async function crearSesionSubidaVersion(publicacionId, { nombre, tamano }) {
+  const actual = await obtenerItem(publicacionId);
+  if (!actual.file) throw errorPublicacion('PUBLICACION_ARCHIVO', 'La publicación no es un archivo.');
+  const extensionActual = extensionVersion(actual.name);
+  const extensionNueva = extensionVersion(nombre);
+  if (!TIPOS_VERSION[extensionNueva]) throw errorPublicacion('PUBLICACION_ARCHIVO', 'Solo se pueden subir imágenes PNG, JPG o WEBP, o PDF.');
+  if (extensionActual !== extensionNueva) {
+    throw errorPublicacion('PUBLICACION_ARCHIVO', `La versión debe ser ${extensionActual.toUpperCase()}, igual que el archivo actual.`);
+  }
+  if (!Number.isInteger(tamano) || tamano <= 0 || tamano > LIMITE_VERSION_BYTES) {
+    throw errorPublicacion('PUBLICACION_ARCHIVO', 'El archivo debe pesar entre 1 byte y 25 MB.');
+  }
+  const prefijo = obtenerPrefijoDrive();
+  const sesion = await graphClient.post(`${prefijo}/items/${codificarItemId(publicacionId)}/createUploadSession`, {
+    item: { '@microsoft.graph.conflictBehavior': 'replace' }
+  });
+  if (!sesion.uploadUrl) throw new Error('SharePoint no devolvió la sesión de subida.');
+  return { uploadUrl: sesion.uploadUrl, tamanoTrozo: TAMANO_TROZO_BYTES };
+}
+
+function validarUrlSesion(url) {
+  let direccion;
+  try { direccion = new URL(url); } catch { throw errorPublicacion('PUBLICACION_ARCHIVO', 'La sesión de subida no es válida.'); }
+  if (direccion.protocol !== 'https:' || !/(^|\.)sharepoint(-df)?\.com$/i.test(direccion.hostname) || !/uploadSession/i.test(direccion.pathname)) {
+    throw errorPublicacion('PUBLICACION_ARCHIVO', 'La sesión de subida no es válida.');
+  }
+}
+
+async function subirTrozoVersion(uploadUrl, { inicio, fin, total, contenidoBase64 }) {
+  validarUrlSesion(uploadUrl);
+  const buffer = Buffer.from(contenidoBase64, 'base64');
+  const esperado = fin - inicio + 1;
+  if (!Number.isInteger(inicio) || !Number.isInteger(fin) || !Number.isInteger(total) || inicio < 0 || fin < inicio || fin >= total
+    || total > LIMITE_VERSION_BYTES || buffer.length !== esperado || buffer.length > TAMANO_TROZO_BYTES) {
+    throw errorPublicacion('PUBLICACION_ARCHIVO', 'El trozo del archivo no es válido.');
+  }
+  const { estado } = await graphClient.putSesion(uploadUrl, buffer, inicio, fin, total);
+  return { completo: estado === 200 || estado === 201 };
+}
+
+// Anota en publicacion.json que hay una versión hecha a mano: vuelve a borrador y anula la aprobación.
+async function registrarVersionManual(publicacionId, { eTag, usuario }) {
+  const abierto = await abrirJsonPublicacion(publicacionId, eTag);
+  const { datos } = abierto;
+  const ahora = new Date().toISOString();
+  const extension = extensionVersion(datos.archivo);
+  const actualizado = {
+    ...datos,
+    origen: 'manual',
+    revision: Number.isInteger(datos.revision) ? datos.revision + 1 : 1,
+    estado: 'borrador',
+    aprobado_en: null,
+    aprobacion: null,
+    sha256_archivo: null,
+    actualizado_en: ahora,
+    versiones: [...(Array.isArray(datos.versiones) ? datos.versiones : []), { archivo: datos.archivo, tipo: TIPOS_VERSION[extension] || null, en: ahora, por: usuario.nombre }].slice(-20)
+  };
+  const guardado = await guardarJsonPublicacion(abierto, actualizado, eTag);
+  return {
+    jsonEtag: guardado.eTag || null, revision: actualizado.revision, estado: actualizado.estado, estadoAnterior: typeof datos.estado === 'string' ? datos.estado : '',
+    origen: 'manual', aprobadoEn: null, aprobacion: null
+  };
+}
+
+// Aprobar: confirma el texto exacto que se vio, exige que no queden pendientes y guarda quién,
+// para qué red y cuándo. Devolver: vuelve a borrador y deja el motivo. Ninguna cambia el texto.
+async function cambiarEstadoPublicacion(publicacionId, { accion, eTag, texto, red, fecha, hora, usuario, motivo, url }) {
+  const abierto = await abrirJsonPublicacion(publicacionId, eTag);
+  const { datos } = abierto;
+  const ahora = new Date().toISOString();
+  const estadoAnterior = typeof datos.estado === 'string' ? datos.estado : '';
+  let actualizado;
+
+  if (accion === 'aprobar') {
+    if (ESTADO_BLOQUEADO.test(estadoAnterior)) throw errorPublicacion('PUBLICACION_ESTADO', 'Esta publicación ya está aprobada.');
+    if (datos.texto !== texto) throw errorPublicacion('PUBLICACION_TEXTO_CAMBIO', 'El texto cambió desde que lo revisaste. Actualiza y vuelve a revisarlo.');
+    if (Array.isArray(datos.pendientes) && datos.pendientes.length > 0) {
+      throw errorPublicacion('PUBLICACION_PENDIENTES', 'La publicación tiene pendientes por completar.');
+    }
+    actualizado = {
+      ...datos, estado: 'aprobado', aprobado_en: ahora, actualizado_en: ahora, devuelto: null,
+      aprobacion: { por: usuario.nombre, uid: usuario.uid, red, fecha, hora, revision: Number.isInteger(datos.revision) ? datos.revision : null }
+    };
+  } else if (accion === 'publicar') {
+    if (!/aprob/i.test(estadoAnterior) || /publicad/i.test(estadoAnterior)) {
+      throw errorPublicacion('PUBLICACION_ESTADO', 'Solo se puede marcar como publicada una pieza aprobada.');
+    }
+    if (url && !/^https:\/\/\S{3,490}$/i.test(url)) throw errorPublicacion('PUBLICACION_ESTADO', 'El enlace debe empezar con https://.');
+    actualizado = { ...datos, estado: 'publicado', publicado_en: ahora, url_publicada: url || null, actualizado_en: ahora };
+  } else if (accion === 'devolver') {
+    if (/publicad/i.test(estadoAnterior)) throw errorPublicacion('PUBLICACION_ESTADO', 'La publicación ya salió y no se puede devolver.');
+    actualizado = {
+      ...datos, estado: 'borrador', aprobado_en: null, aprobacion: null, actualizado_en: ahora,
+      devuelto: { motivo, por: usuario.nombre, uid: usuario.uid, en: ahora }
+    };
+  } else {
+    throw new Error('Acción no válida.');
+  }
+
+  const guardado = await guardarJsonPublicacion(abierto, actualizado, eTag);
+  return {
+    jsonEtag: guardado.eTag || null, revision: Number.isInteger(actualizado.revision) ? actualizado.revision : null,
+    estado: actualizado.estado, estadoAnterior, aprobadoEn: actualizado.aprobado_en,
+    aprobacion: leerAprobacion(actualizado.aprobacion), devuelto: leerDevolucion(actualizado.devuelto),
+    publicadoEn: actualizado.publicado_en || null, urlPublicada: actualizado.url_publicada || null
+  };
 }
 
 module.exports = {
   actualizarTextoPublicacion,
+  cambiarEstadoPublicacion,
+  crearSesionSubidaVersion,
+  subirTrozoVersion,
+  registrarVersionManual,
+  obtenerLinkDescarga,
+  LIMITE_VERSION_BYTES,
   listarPostsRed,
   listarArchivosPublicacionCarpeta,
   listarCarpeta,

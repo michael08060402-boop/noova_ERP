@@ -420,6 +420,20 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Capturas de seguidores y métricas de las redes: se leen en tiempo real y solo
+    // se escriben desde el monitoreo automático (marketingMonitoreoDiario).
+    match /marketingRedes/{docId} {
+      allow read: if isActiveUser()
+        && (isGerente() || isAdministrador() || isSoporteTI() || isMarketing());
+      allow write: if false;
+    }
+
+    match /marketingEstadoRedes/{docId} {
+      allow read: if isActiveUser()
+        && (isGerente() || isAdministrador() || isSoporteTI() || isMarketing());
+      allow write: if false;
+    }
+
     match /ruc_cache/{docId} {
       allow read, write: if false;
     }

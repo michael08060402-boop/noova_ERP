@@ -11,7 +11,8 @@ const {
   listarCarpeta,
   obtenerCarpetaPorRuta, obtenerItem, crearCarpeta, subirArchivo,
   renombrarItem, eliminarItem, estaDentroDeCarpeta, buscarDocumentos,
-  listarArchivosPublicacionCarpeta, listarPostsRed, actualizarTextoPublicacion
+  listarArchivosPublicacionCarpeta, listarPostsRed, actualizarTextoPublicacion, cambiarEstadoPublicacion,
+  crearSesionSubidaVersion, subirTrozoVersion, registrarVersionManual, obtenerLinkDescarga
 } = require('./src/graph/graphDriveProvider');
 const {
   normalizarRol,
@@ -21,6 +22,8 @@ const {
   getCarpetaNubePerfil,
   crearAccessControl
 } = require('./src/accessControl');
+const { validarSolicitudPieza } = require('./src/marketingPiezas');
+const { leerCuentas: leerCuentasRedes, capturasParaGuardar, estadoParaGuardar } = require('./src/monitoreoRedes');
 const AdmZip = require('adm-zip');
 
 const TIPO_DOC_COD = { 'Factura': '01', 'Boleta': '03', 'Nota de Crédito': '07' };
@@ -311,6 +314,7 @@ function detectarRedSocial(nombreCarpeta) {
   if (/facebook|^fb$/.test(nombre)) return 'facebook';
   if (/instagram|^ig$/.test(nombre)) return 'instagram';
   if (/linkedin/.test(nombre)) return 'linkedin';
+  if (/tiktok|^tt$/.test(nombre)) return 'tiktok';
   return null;
 }
 
@@ -359,18 +363,6 @@ exports.marketingListarPublicaciones = onCall(
 // Generación de piezas: dispara el workflow "generar-pieza" del repo de marketing, que
 // deja el borrador en SharePoint. Las opciones deben coincidir con los inputs del workflow.
 const REPO_MARKETING = { propietario: 'Luanho11', repo: 'noova-marketing', workflow: 'generar-pieza.yml', rama: 'main' };
-// Formatos con variantes en el catálogo del repo de marketing, por red.
-const FORMATOS_POR_RED_PIEZA = {
-  linkedin: ['flyer', 'carrusel', 'publicacion'],
-  facebook: ['flyer', 'carrusel', 'publicacion'],
-  instagram: ['flyer', 'carrusel', 'publicacion', 'vertical']
-};
-const OPCIONES_PIEZA = {
-  red: Object.keys(FORMATOS_POR_RED_PIEZA),
-  formato: ['flyer', 'carrusel', 'publicacion', 'vertical'],
-  tema: ['automatico', 'trayectoria', 'proyectos', 'operaciones', 'alcance', 'fases-ventilacion', 'metodo-bombeo', 'ductos']
-};
-
 exports.marketingGenerarPieza = onCall(
   { region: 'us-central1', timeoutSeconds: 30, memory: '256MiB', secrets: ['MARKETING_GH_TOKEN'] },
   async (request) => {
@@ -380,22 +372,10 @@ exports.marketingGenerarPieza = onCall(
       throw new HttpsError('permission-denied', 'Tu rol no puede generar piezas.');
     }
 
-    const { red, formato, tema, fecha } = request.data || {};
-    for (const [campo, valor] of Object.entries({ red, formato, tema })) {
-      if (!OPCIONES_PIEZA[campo].includes(valor)) {
-        throw new HttpsError('invalid-argument', `El campo "${campo}" no es válido.`);
-      }
-    }
-    if (!FORMATOS_POR_RED_PIEZA[red].includes(formato)) {
-      throw new HttpsError('invalid-argument', 'Ese formato no está disponible para la red elegida.');
-    }
-    if (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
-      throw new HttpsError('invalid-argument', 'La fecha debe tener el formato AAAA-MM-DD.');
-    }
+    const { inputs, error: errorSolicitud } = validarSolicitudPieza(request.data);
+    if (errorSolicitud) throw new HttpsError('invalid-argument', errorSolicitud);
 
     const { propietario, repo, workflow, rama } = REPO_MARKETING;
-    const inputs = { red, formato, tema };
-    if (fecha) inputs.fecha = fecha;
 
     let respuesta;
     try {
@@ -468,9 +448,14 @@ exports.marketingActualizarTexto = onCall(
     if (typeof texto !== 'string' || !texto.trim() || texto.length > 32000 || typeof eTag !== 'string' || eTag.length > 500) {
       throw new HttpsError('invalid-argument', 'El texto o la versión de la publicación no es válido.');
     }
-    await contextoObservacionMarketing(request);
+    const contexto = await contextoObservacionMarketing(request);
     try {
-      return await actualizarTextoPublicacion(request.data.publicacionId, texto.trim(), eTag);
+      const resultado = await actualizarTextoPublicacion(request.data.publicacionId, texto.trim(), eTag);
+      await registrarHistorialMarketing(contexto.notas, perfil, request.auth.uid, {
+        accion: /aprob/i.test(resultado.estadoAnterior) ? 'edición: anuló la aprobación' : 'edición',
+        revision: resultado.revision
+      });
+      return resultado;
     } catch (error) {
       if (error.code === 'PUBLICACION_CONFLICTO' || error.response?.status === 412) {
         throw new HttpsError('aborted', 'El post cambió en SharePoint. Actualiza las publicaciones antes de guardar.');
@@ -510,10 +495,11 @@ exports.marketingEliminarPublicacion = onCall(
 
       await eliminarItem(objetivoId);
 
-      const observaciones = await notas.get();
-      if (!observaciones.empty) {
+      const [observaciones, historial] = await Promise.all([notas.get(), notas.parent.collection('historial').get()]);
+      const porBorrar = [...observaciones.docs, ...historial.docs].slice(0, 450);
+      if (porBorrar.length > 0) {
         const lote = db.batch();
-        observaciones.docs.slice(0, 450).forEach((doc) => lote.delete(doc.ref));
+        porBorrar.forEach((doc) => lote.delete(doc.ref));
         await lote.commit();
       }
       console.log(`marketingEliminarPublicacion: ${request.auth.uid} eliminó ${archivo.name}`);
@@ -522,6 +508,211 @@ exports.marketingEliminarPublicacion = onCall(
       if (error instanceof HttpsError) throw error;
       console.error('Error en marketingEliminarPublicacion:', error.message);
       throw convertirErrorGraph(error, 'Error eliminando la publicación');
+    }
+  }
+);
+
+const ROLES_APROBACION_MARKETING = ['gerencia', 'administrador', 'responsable_marketing'];
+const REDES_PUBLICACION = ['facebook', 'instagram', 'linkedin', 'tiktok'];
+
+// Cada cambio de estado deja una fila en marketingPublicaciones/{id}/historial.
+async function registrarHistorialMarketing(notas, perfil, uid, datos) {
+  await notas.parent.collection('historial').add({
+    ...datos,
+    usuarioUid: uid,
+    usuarioNombre: textoSeguro(perfil.nombre || 'Usuario', 150),
+    en: new Date().toISOString()
+  });
+}
+
+function errorCambioEstado(error) {
+  if (error instanceof HttpsError) return error;
+  if (error.code === 'PUBLICACION_CONFLICTO' || error.response?.status === 412) {
+    return new HttpsError('aborted', 'El post cambió en SharePoint. Actualiza las publicaciones antes de continuar.');
+  }
+  if (['PUBLICACION_ESTADO', 'PUBLICACION_TEXTO_CAMBIO', 'PUBLICACION_PENDIENTES'].includes(error.code)) {
+    return new HttpsError('failed-precondition', error.message);
+  }
+  console.error('Error cambiando el estado de una publicación:', error.message);
+  return new HttpsError('internal', 'No se pudo guardar el cambio en SharePoint.');
+}
+
+exports.marketingAprobar = onCall(
+  { region: 'us-central1', timeoutSeconds: 60, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
+  async (request) => {
+    const { perfil, notas } = await contextoObservacionMarketing(request);
+    if (!ROLES_APROBACION_MARKETING.includes(perfil.role)) {
+      throw new HttpsError('permission-denied', 'Tu rol no puede aprobar publicaciones.');
+    }
+    const { texto, eTag, red, fecha, hora } = request.data || {};
+    const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
+    if (typeof texto !== 'string' || !texto.trim() || texto.length > 32000 || typeof eTag !== 'string' || eTag.length > 500) {
+      throw new HttpsError('invalid-argument', 'El texto o la versión de la publicación no es válido.');
+    }
+    if (!REDES_PUBLICACION.includes(red)) throw new HttpsError('invalid-argument', 'Elige la red donde se publicará.');
+    if (typeof fecha !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(fecha) || Number.isNaN(Date.parse(fecha)) || fecha < hoyLima) {
+      throw new HttpsError('invalid-argument', 'La fecha debe ser hoy o posterior, con el formato AAAA-MM-DD.');
+    }
+    if (typeof hora !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(hora)) {
+      throw new HttpsError('invalid-argument', 'La hora debe tener el formato HH:MM.');
+    }
+    try {
+      const resultado = await cambiarEstadoPublicacion(request.data.publicacionId, {
+        accion: 'aprobar', eTag, texto, red, fecha, hora,
+        usuario: { nombre: textoSeguro(perfil.nombre || request.auth.token?.email || 'Usuario', 150), uid: request.auth.uid }
+      });
+      await registrarHistorialMarketing(notas, perfil, request.auth.uid, { accion: 'aprobó', red, fecha, hora, revision: resultado.revision, textoFinal: texto });
+      return resultado;
+    } catch (error) {
+      throw errorCambioEstado(error);
+    }
+  }
+);
+
+exports.marketingDevolver = onCall(
+  { region: 'us-central1', timeoutSeconds: 60, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
+  async (request) => {
+    const { perfil, notas } = await contextoObservacionMarketing(request);
+    if (!ROLES_APROBACION_MARKETING.includes(perfil.role)) {
+      throw new HttpsError('permission-denied', 'Tu rol no puede devolver publicaciones.');
+    }
+    const { eTag } = request.data || {};
+    const motivo = typeof request.data?.motivo === 'string' ? request.data.motivo.trim() : '';
+    if (typeof eTag !== 'string' || eTag.length > 500) throw new HttpsError('invalid-argument', 'La versión de la publicación no es válida.');
+    if (motivo.length < 3 || motivo.length > 500) throw new HttpsError('invalid-argument', 'Escribe el motivo, de 3 a 500 caracteres.');
+    try {
+      const resultado = await cambiarEstadoPublicacion(request.data.publicacionId, {
+        accion: 'devolver', eTag, motivo,
+        usuario: { nombre: textoSeguro(perfil.nombre || request.auth.token?.email || 'Usuario', 150), uid: request.auth.uid }
+      });
+      await registrarHistorialMarketing(notas, perfil, request.auth.uid, {
+        accion: /aprob/i.test(resultado.estadoAnterior) ? 'devolvió: anuló la aprobación' : 'devolvió', motivo, revision: resultado.revision
+      });
+      return resultado;
+    } catch (error) {
+      throw errorCambioEstado(error);
+    }
+  }
+);
+
+exports.marketingMarcarPublicada = onCall(
+  { region: 'us-central1', timeoutSeconds: 60, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
+  async (request) => {
+    const { perfil, notas } = await contextoObservacionMarketing(request);
+    if (!ROLES_APROBACION_MARKETING.includes(perfil.role)) {
+      throw new HttpsError('permission-denied', 'Tu rol no puede marcar publicaciones como publicadas.');
+    }
+    const { eTag } = request.data || {};
+    const url = typeof request.data?.url === 'string' ? request.data.url.trim() : '';
+    if (typeof eTag !== 'string' || eTag.length > 500) throw new HttpsError('invalid-argument', 'La versión de la publicación no es válida.');
+    try {
+      const resultado = await cambiarEstadoPublicacion(request.data.publicacionId, {
+        accion: 'publicar', eTag, url,
+        usuario: { nombre: textoSeguro(perfil.nombre || request.auth.token?.email || 'Usuario', 150), uid: request.auth.uid }
+      });
+      await registrarHistorialMarketing(notas, perfil, request.auth.uid, { accion: 'marcó como publicada', revision: resultado.revision, ...(url ? { enlace: url } : {}) });
+      return resultado;
+    } catch (error) {
+      throw errorCambioEstado(error);
+    }
+  }
+);
+
+exports.marketingListarHistorial = onCall(
+  { region: 'us-central1', timeoutSeconds: 30, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
+  async (request) => {
+    const { notas } = await contextoObservacionMarketing(request);
+    const snapshot = await notas.parent.collection('historial').orderBy('en', 'desc').limit(50).get();
+    return { items: snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id })) };
+  }
+);
+
+// Taller manual: quien edita a mano baja el paquete de la pieza y sube su versión.
+// Pueden hacerlo, además, quienes mantienen el sistema (soporte TI), que hoy también editan a mano.
+const ROLES_TALLER_MARKETING = ['gerencia', 'administrador', 'responsable_marketing', 'soporte_ti'];
+
+function exigirRolTaller(perfil) {
+  if (!ROLES_TALLER_MARKETING.includes(perfil.role)) {
+    throw new HttpsError('permission-denied', 'Tu rol no puede subir versiones editadas.');
+  }
+}
+
+function errorTaller(error, mensaje) {
+  if (error instanceof HttpsError) return error;
+  if (error.code === 'PUBLICACION_CONFLICTO' || error.response?.status === 412) {
+    return new HttpsError('aborted', 'El post cambió en SharePoint. Actualiza las publicaciones antes de continuar.');
+  }
+  if (error.code === 'PUBLICACION_ARCHIVO') return new HttpsError('invalid-argument', error.message);
+  console.error(`${mensaje}:`, error.message);
+  return new HttpsError('internal', mensaje);
+}
+
+exports.marketingDescargarPaquete = onCall(
+  { region: 'us-central1', timeoutSeconds: 60, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
+  async (request) => {
+    await contextoObservacionMarketing(request);
+    try {
+      const archivo = await obtenerItem(request.data.publicacionId);
+      const hijos = (await listarCarpeta(archivo.parentReference.id)).filter((item) => item.tipo === 'archivo').slice(0, 12);
+      const items = await Promise.all(hijos.map(async (hijo) => ({
+        nombre: textoSeguro(hijo.nombre, 200),
+        url: (await obtenerLinkDescarga(hijo.id)).urlDescarga
+      })));
+      return { items: items.filter((item) => item.url) };
+    } catch (error) {
+      throw errorTaller(error, 'No se pudo preparar el paquete.');
+    }
+  }
+);
+
+exports.marketingIniciarSubida = onCall(
+  { region: 'us-central1', timeoutSeconds: 60, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
+  async (request) => {
+    const { perfil } = await contextoObservacionMarketing(request);
+    exigirRolTaller(perfil);
+    const { nombre, tamano } = request.data || {};
+    if (typeof nombre !== 'string' || nombre.length > 200) throw new HttpsError('invalid-argument', 'El nombre del archivo no es válido.');
+    try {
+      return await crearSesionSubidaVersion(request.data.publicacionId, { nombre, tamano });
+    } catch (error) {
+      throw errorTaller(error, 'No se pudo iniciar la subida.');
+    }
+  }
+);
+
+exports.marketingSubirParte = onCall(
+  { region: 'us-central1', timeoutSeconds: 120, memory: '512MiB', secrets: GRAPH_SECRETS_NUBE },
+  async (request) => {
+    const { perfil } = await contextoObservacionMarketing(request);
+    exigirRolTaller(perfil);
+    const { uploadUrl, inicio, fin, total, contenidoBase64 } = request.data || {};
+    if (typeof uploadUrl !== 'string' || typeof contenidoBase64 !== 'string') throw new HttpsError('invalid-argument', 'Faltan datos del trozo.');
+    try {
+      return await subirTrozoVersion(uploadUrl, { inicio, fin, total, contenidoBase64 });
+    } catch (error) {
+      throw errorTaller(error, 'No se pudo subir el archivo.');
+    }
+  }
+);
+
+exports.marketingRegistrarVersion = onCall(
+  { region: 'us-central1', timeoutSeconds: 60, memory: '256MiB', secrets: GRAPH_SECRETS_NUBE },
+  async (request) => {
+    const { perfil, notas } = await contextoObservacionMarketing(request);
+    exigirRolTaller(perfil);
+    const { eTag } = request.data || {};
+    if (typeof eTag !== 'string' || eTag.length > 500) throw new HttpsError('invalid-argument', 'La versión de la publicación no es válida.');
+    try {
+      const resultado = await registrarVersionManual(request.data.publicacionId, {
+        eTag, usuario: { nombre: textoSeguro(perfil.nombre || request.auth.token?.email || 'Usuario', 150), uid: request.auth.uid }
+      });
+      await registrarHistorialMarketing(notas, perfil, request.auth.uid, {
+        accion: /aprob/i.test(resultado.estadoAnterior) ? 'subió una versión editada a mano: anuló la aprobación' : 'subió una versión editada a mano',
+        revision: resultado.revision
+      });
+      return resultado;
+    } catch (error) {
+      throw errorTaller(error, 'No se pudo registrar la versión.');
     }
   }
 );
@@ -560,6 +751,60 @@ exports.marketingCrearObservacion = onCall(
       return { ...observacion, id: referencia.id };
     });
     return { item };
+  }
+);
+
+// ── Monitoreo automático de redes ──
+// Lee los seguidores con las APIs oficiales (ver functions/src/monitoreoRedes.js) y los guarda en
+// marketingRedes/{cuenta}_{fecha}. El estado de cada conexión queda en marketingEstadoRedes/actual.
+// Antes de desplegar: firebase functions:secrets:set YOUTUBE_API_KEY y META_ACCESS_TOKEN
+// (puede ponerse «pendiente» hasta tener la credencial: la pantalla mostrará «conexión pendiente»).
+const SECRETOS_MONITOREO = ['YOUTUBE_API_KEY', 'META_ACCESS_TOKEN'];
+
+async function recolectarRedes() {
+  const configuracion = (await db.doc('marketingConfig/redes').get()).data() || {};
+  const resultados = await leerCuentasRedes({
+    fetchFn: fetch,
+    secretos: { YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY, META_ACCESS_TOKEN: process.env.META_ACCESS_TOKEN },
+    config: configuracion
+  });
+  const ahoraIso = new Date().toISOString();
+  const fecha = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
+  const lote = db.batch();
+  for (const { id, datos } of capturasParaGuardar(resultados, fecha, ahoraIso)) lote.set(db.collection('marketingRedes').doc(id), datos);
+  lote.set(db.doc('marketingEstadoRedes/actual'), estadoParaGuardar(resultados, ahoraIso));
+  await lote.commit();
+  return resultados;
+}
+
+exports.marketingMonitoreoDiario = onSchedule(
+  { schedule: '0 7 * * *', timeZone: 'America/Lima', region: 'us-central1', timeoutSeconds: 120, memory: '256MiB', secrets: SECRETOS_MONITOREO },
+  async () => {
+    const resultados = await recolectarRedes();
+    console.log('marketingMonitoreoDiario:', resultados.map((r) => `${r.cuenta}=${r.estado}`).join(' '));
+  }
+);
+
+// «Actualizar ahora»: la misma lectura, a pedido. No admite números escritos a mano.
+exports.marketingActualizarRedes = onCall(
+  { region: 'us-central1', timeoutSeconds: 120, memory: '256MiB', secrets: SECRETOS_MONITOREO },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado');
+    const perfil = await exigirPermiso(request.auth.uid, 'marketing');
+    if (!['gerencia', 'administrador', 'responsable_marketing', 'soporte_ti'].includes(perfil.role)) {
+      throw new HttpsError('permission-denied', 'Tu rol no puede actualizar las redes.');
+    }
+    const anterior = (await db.doc('marketingEstadoRedes/actual').get()).data();
+    if (anterior?.actualizadoEn && Date.now() - Date.parse(anterior.actualizadoEn) < 5 * 60 * 1000) {
+      throw new HttpsError('resource-exhausted', 'Se actualizó hace menos de 5 minutos. Espera un momento.');
+    }
+    try {
+      const resultados = await recolectarRedes();
+      return { resultados: resultados.map(({ cuenta, estado, mensaje }) => ({ cuenta, estado, mensaje })) };
+    } catch (error) {
+      console.error('Error en marketingActualizarRedes:', error.message);
+      throw new HttpsError('internal', 'No se pudieron leer las redes.');
+    }
   }
 );
 
