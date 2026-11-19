@@ -3,6 +3,7 @@ const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { initializeApp, getApps } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { getAuth } = require('firebase-admin/auth');
+const { getStorage } = require('firebase-admin/storage');
 const { generarXmlUBL, SIG_ID } = require('./src/generarXml');
 const { firmarXml } = require('./src/firmarXml');
 const { enviarASunat } = require('./src/sunatClient');
@@ -1168,7 +1169,7 @@ exports.usuariosCambiarEstado = onCall(
 exports.limpiarLogsAntiguos = onSchedule(
   { schedule: '0 3 * * 0', timeZone: 'America/Lima', region: 'us-central1', memory: '256MiB' },
   async () => {
-    const corteIso = new Date().toISOString();
+    const corteIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
     let totalBorrados = 0;
     while (true) {
@@ -1196,7 +1197,7 @@ exports.limpiarLogsAntiguos = onSchedule(
 const { v1: FirestoreAdminV1 } = require('@google-cloud/firestore');
 
 exports.backupFirestoreDiario = onSchedule(
-  { schedule: '0 9 * * *', timeZone: 'America/Lima', region: 'us-central1', memory: '256MiB', timeoutSeconds: 300 },
+  { schedule: '0 9 1,15 * *', timeZone: 'America/Lima', region: 'us-central1', memory: '256MiB', timeoutSeconds: 1800, maxInstances: 1, concurrency: 1, serviceAccount: 'noova-backup@noova-sac.iam.gserviceaccount.com' },
   async () => {
     const bucket = process.env.BACKUP_BUCKET;
     if (!bucket) {
@@ -1206,8 +1207,9 @@ exports.backupFirestoreDiario = onSchedule(
     const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT;
     const client = new FirestoreAdminV1.FirestoreAdminClient();
     const databaseName = client.databasePath(projectId, '(default)');
-    const fecha = new Date().toISOString().split('T')[0];
-    const outputUriPrefix = `gs://${bucket}/backups/${fecha}`;
+    const nombreCopia = new Date().toISOString().replace(/[:.]/g, '-');
+    const prefijoActual = `backups/${nombreCopia}/`;
+    const outputUriPrefix = `gs://${bucket}/${prefijoActual.slice(0, -1)}`;
 
     const [operation] = await client.exportDocuments({
       name: databaseName,
@@ -1216,5 +1218,13 @@ exports.backupFirestoreDiario = onSchedule(
     });
 
     console.log(`backupFirestoreDiario: exportación iniciada -> ${outputUriPrefix}`, operation.name || operation);
+    await operation.promise();
+
+    // Solo se borran exportaciones anteriores una vez terminada la nueva.
+    const [archivos] = await getStorage().bucket(bucket).getFiles({ prefix: 'backups/' });
+    for (const archivo of archivos) {
+      if (!archivo.name.startsWith(prefijoActual)) await archivo.delete();
+    }
+    console.log(`backupFirestoreDiario: exportación completada -> ${outputUriPrefix}`);
   }
 );

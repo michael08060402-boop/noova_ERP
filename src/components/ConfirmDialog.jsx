@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import useDialogFocus from '../hooks/useDialogFocus';
 import './ConfirmDialog.css';
 
 export default function ConfirmDialog({
@@ -14,6 +15,7 @@ export default function ConfirmDialog({
 }) {
   const [confirmandoInterno, setConfirmandoInterno] = useState(false);
   const ocupado = busy || confirmandoInterno;
+  const dialogRef = useDialogFocus(isOpen, ocupado ? null : onClose);
 
   if (!isOpen) return null;
 
@@ -31,11 +33,13 @@ export default function ConfirmDialog({
   return (
     <div className="confirm-overlay" onClick={ocupado ? undefined : onClose}>
       <div
+        ref={dialogRef}
         className="confirm-dialog"
         role="alertdialog"
         aria-modal="true"
         aria-label={title || 'Confirmar eliminación'}
         aria-busy={ocupado}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="confirm-icon">

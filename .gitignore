@@ -41,6 +41,7 @@ certificado.p12
 
 # Firebase Functions env y logs
 functions/.env
+functions/.env.*
 functions/firestore-debug.log
 
 .vite/

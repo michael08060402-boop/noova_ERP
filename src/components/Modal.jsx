@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import useDialogFocus from '../hooks/useDialogFocus';
 import './Modal.css';
 
 export default function Modal({ isOpen, onClose, title, children, size = 'medium' }) {
+  const titleId = useId();
   const containerRef = useRef(null);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
@@ -22,6 +24,9 @@ export default function Modal({ isOpen, onClose, title, children, size = 'medium
     }
   }, [hasUnsavedInput, onClose]);
 
+  useDialogFocus(isOpen && !showExitConfirm, tryClose, containerRef);
+  const confirmRef = useDialogFocus(isOpen && showExitConfirm, () => setShowExitConfirm(false));
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -33,18 +38,6 @@ export default function Modal({ isOpen, onClose, title, children, size = 'medium
       document.body.style.overflow = '';
     };
   }, [isOpen]);
-
-  useEffect(() => {
-    function handleEsc(e) {
-      if (e.key === 'Escape') {
-        tryClose();
-      }
-    }
-    if (isOpen) {
-      window.addEventListener('keydown', handleEsc);
-    }
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [isOpen, tryClose]);
 
   if (!isOpen) return null;
 
@@ -68,10 +61,14 @@ export default function Modal({ isOpen, onClose, title, children, size = 'medium
       <div
         ref={containerRef}
         className={`modal-container modal-${size}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">
-          <h2 className="modal-title">{title}</h2>
+          <h2 id={titleId} className="modal-title">{title}</h2>
           <button className="modal-close" onClick={tryClose} aria-label="Cerrar">
             &times;
           </button>
@@ -80,7 +77,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'medium
 
         {showExitConfirm && (
           <div className="modal-exit-confirm">
-            <div className="modal-exit-confirm-box">
+            <div ref={confirmRef} className="modal-exit-confirm-box" role="alertdialog" aria-modal="true" aria-label="Descartar los cambios" tabIndex={-1}>
               <p>¿Descartar los cambios?</p>
               <span>Tienes información ingresada que se perderá si cierras ahora.</span>
               <div className="modal-exit-confirm-actions">
